@@ -71,7 +71,15 @@ export async function POST(req: Request) {
   const json = (await res.json().catch(() => ({}))) as any;
   if (!res.ok) return NextResponse.json(json, { status: res.status });
 
-  const output = (json.output ?? {}) as Record<string, unknown>;
-  return NextResponse.json(output);
+  // LangGraph Deployments typically return { output: <final_state> } where final_state
+  // is our graph state: { output: <envelope>, messages: [...] }.
+  // The web UI expects the envelope directly.
+  const state = (json?.output ?? null) as any;
+  const maybeEnvelope = state && typeof state === "object" ? (state.output ?? state) : null;
+  if (maybeEnvelope && typeof maybeEnvelope === "object") {
+    return NextResponse.json(maybeEnvelope);
+  }
+  // Fallback: return raw response (helps debug unexpected deployment shapes)
+  return NextResponse.json(json);
 }
 

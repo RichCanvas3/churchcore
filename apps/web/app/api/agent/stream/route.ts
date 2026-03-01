@@ -77,9 +77,10 @@ export async function POST(req: Request) {
           return;
         }
 
-        // Shim: we only get a final envelope back from /runs/wait here.
-        const output = (json.output ?? {}) as any;
-        const message = typeof output?.message === "string" ? output.message : "";
+        // Shim: /runs/wait returns { output: <final_state> }.
+        const state = (json?.output ?? null) as any;
+        const output = state && typeof state === "object" ? (state.output ?? state) : {};
+        const message = typeof (output as any)?.message === "string" ? (output as any).message : "";
         for (const part of chunkText(message, 24)) send("token", part);
         send("final", output);
         send("done", { ok: true });
