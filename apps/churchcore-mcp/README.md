@@ -17,9 +17,11 @@ wrangler d1 create churchcore
 
 # update apps/churchcore-mcp/wrangler.jsonc with the database_id
 
+# apply schema + seed (local)
+pnpm -C apps/churchcore-mcp d1:local:setup
+
 # apply schema + seed (remote)
-wrangler d1 execute churchcore --remote --file apps/churchcore-mcp/schema.sql
-wrangler d1 execute churchcore --remote --file apps/churchcore-mcp/seed.sql
+pnpm -C apps/churchcore-mcp d1:remote:setup
 ```
 
 ## MCP endpoint

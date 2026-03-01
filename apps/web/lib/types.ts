@@ -3,6 +3,7 @@ export type Session = {
   campusId?: string | null;
   timezone: string;
   userId: string;
+  personId?: string | null;
   role: "seeker" | "guide";
   auth?: { isAuthenticated: boolean; roles: string[] };
   threadId?: string | null;

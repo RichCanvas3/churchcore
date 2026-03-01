@@ -1175,6 +1175,249 @@ function createServer(env: Env) {
     },
   );
 
+  // Chat + identity binding (multi-topic messaging)
+  async function requireOwnedThread(params: { churchId: string; userId: string; threadId: string }) {
+    const row = (
+      await env.churchcore
+        .prepare(`SELECT id, title, status FROM chat_threads WHERE church_id=?1 AND user_id=?2 AND id=?3`)
+        .bind(params.churchId, params.userId, params.threadId)
+        .first()
+    ) as any;
+    return row ?? null;
+  }
+
+  server.tool(
+    "churchcore_user_get_binding",
+    "Get the personId bound to an app userId.",
+    { churchId: z.string().min(1), userId: z.string().min(1) },
+    async (args) => {
+      const parsed = z.object({ churchId: z.string().min(1), userId: z.string().min(1) }).parse(args);
+      const row = (
+        await env.churchcore
+          .prepare(`SELECT person_id AS personId FROM user_person_bindings WHERE church_id=?1 AND user_id=?2`)
+          .bind(parsed.churchId, parsed.userId)
+          .first()
+      ) as any;
+      return jsonText({ personId: row?.personId ?? null });
+    },
+  );
+
+  server.tool(
+    "churchcore_user_set_binding",
+    "Bind an app userId to a personId (people.id).",
+    { churchId: z.string().min(1), userId: z.string().min(1), personId: z.string().min(1), actorUserId: z.string().optional() },
+    async (args) => {
+      const parsed = z
+        .object({ churchId: z.string().min(1), userId: z.string().min(1), personId: z.string().min(1), actorUserId: z.string().optional() })
+        .parse(args);
+
+      const person = (
+        await env.churchcore.prepare(`SELECT id FROM people WHERE church_id=?1 AND id=?2`).bind(parsed.churchId, parsed.personId).first()
+      ) as any;
+      if (!person) return jsonText({ ok: false, error: "Unknown personId" });
+
+      const now = nowIso();
+      await env.churchcore
+        .prepare(
+          `INSERT INTO user_person_bindings (church_id, user_id, person_id, created_at, updated_at)
+           VALUES (?1, ?2, ?3, ?4, ?5)
+           ON CONFLICT(church_id, user_id) DO UPDATE SET person_id=excluded.person_id, updated_at=excluded.updated_at`,
+        )
+        .bind(parsed.churchId, parsed.userId, parsed.personId, now, now)
+        .run();
+
+      await auditAppend(env, {
+        churchId: parsed.churchId,
+        actorUserId: parsed.actorUserId ?? null,
+        action: "identity.user_person_binding.set",
+        entityType: "user_person_bindings",
+        entityId: `${parsed.userId}`,
+        payload: { userId: parsed.userId, personId: parsed.personId },
+      });
+
+      return jsonText({ ok: true });
+    },
+  );
+
+  server.tool(
+    "churchcore_chat_list_threads",
+    "List chat topics for a user.",
+    { churchId: z.string().min(1), userId: z.string().min(1), includeArchived: z.boolean().optional() },
+    async (args) => {
+      const parsed = z.object({ churchId: z.string().min(1), userId: z.string().min(1), includeArchived: z.boolean().optional() }).parse(args);
+      const includeArchived = parsed.includeArchived ?? false;
+      const rows =
+        (
+          await env.churchcore
+            .prepare(
+              `SELECT id, title, status, created_at AS createdAt, updated_at AS updatedAt
+               FROM chat_threads
+               WHERE church_id=?1 AND user_id=?2 ${includeArchived ? "" : "AND status='active'"}
+               ORDER BY updated_at DESC`,
+            )
+            .bind(parsed.churchId, parsed.userId)
+            .all()
+        ).results ?? [];
+      return jsonText({ threads: rows });
+    },
+  );
+
+  server.tool(
+    "churchcore_chat_create_thread",
+    "Create a new chat topic for a user.",
+    { churchId: z.string().min(1), userId: z.string().min(1), title: z.string().optional() },
+    async (args) => {
+      const parsed = z.object({ churchId: z.string().min(1), userId: z.string().min(1), title: z.string().optional() }).parse(args);
+      const id = crypto.randomUUID();
+      const title = (parsed.title ?? "New topic").trim() || "New topic";
+      const now = nowIso();
+      await env.churchcore
+        .prepare(`INSERT INTO chat_threads (id, church_id, user_id, title, status, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, 'active', ?5, ?6)`)
+        .bind(id, parsed.churchId, parsed.userId, title, now, now)
+        .run();
+      return jsonText({ threadId: id, title });
+    },
+  );
+
+  server.tool(
+    "churchcore_chat_rename_thread",
+    "Rename a chat topic.",
+    { churchId: z.string().min(1), userId: z.string().min(1), threadId: z.string().min(1), title: z.string().min(1) },
+    async (args) => {
+      const parsed = z
+        .object({ churchId: z.string().min(1), userId: z.string().min(1), threadId: z.string().min(1), title: z.string().min(1) })
+        .parse(args);
+      const now = nowIso();
+      await env.churchcore
+        .prepare(`UPDATE chat_threads SET title=?1, updated_at=?2 WHERE church_id=?3 AND user_id=?4 AND id=?5`)
+        .bind(parsed.title, now, parsed.churchId, parsed.userId, parsed.threadId)
+        .run();
+      return jsonText({ ok: true });
+    },
+  );
+
+  server.tool(
+    "churchcore_chat_archive_thread",
+    "Archive a chat topic (soft delete).",
+    { churchId: z.string().min(1), userId: z.string().min(1), threadId: z.string().min(1) },
+    async (args) => {
+      const parsed = z.object({ churchId: z.string().min(1), userId: z.string().min(1), threadId: z.string().min(1) }).parse(args);
+      const now = nowIso();
+      await env.churchcore
+        .prepare(`UPDATE chat_threads SET status='archived', updated_at=?1 WHERE church_id=?2 AND user_id=?3 AND id=?4`)
+        .bind(now, parsed.churchId, parsed.userId, parsed.threadId)
+        .run();
+      return jsonText({ ok: true });
+    },
+  );
+
+  server.tool(
+    "churchcore_chat_list_messages",
+    "List messages for a thread (enforces per-user access).",
+    {
+      churchId: z.string().min(1),
+      userId: z.string().min(1),
+      threadId: z.string().min(1),
+      limit: z.number().int().min(1).max(200).optional(),
+      offset: z.number().int().min(0).max(500000).optional(),
+    },
+    async (args) => {
+      const parsed = z
+        .object({
+          churchId: z.string().min(1),
+          userId: z.string().min(1),
+          threadId: z.string().min(1),
+          limit: z.number().int().min(1).max(200).optional(),
+          offset: z.number().int().min(0).max(500000).optional(),
+        })
+        .parse(args);
+
+      const thread = await requireOwnedThread(parsed);
+      if (!thread) return jsonText({ error: "Thread not found" });
+
+      const limit = parsed.limit ?? 50;
+      const offset = parsed.offset ?? 0;
+      const rows =
+        (
+          await env.churchcore
+            .prepare(
+              `SELECT id, sender_type AS senderType, content, envelope_json AS envelopeJson, created_at AS createdAt
+               FROM chat_messages
+               WHERE church_id=?1 AND thread_id=?2
+               ORDER BY created_at ASC
+               LIMIT ${limit} OFFSET ${offset}`,
+            )
+            .bind(parsed.churchId, parsed.threadId)
+            .all()
+        ).results ?? [];
+
+      const messages = rows.map((r: any) => {
+        let envelope: unknown = null;
+        if (r?.envelopeJson) {
+          try {
+            envelope = JSON.parse(String(r.envelopeJson));
+          } catch {
+            envelope = null;
+          }
+        }
+        return {
+          id: r.id,
+          senderType: r.senderType,
+          content: r.content,
+          envelope,
+          createdAt: r.createdAt,
+        };
+      });
+
+      return jsonText({ thread: { id: thread.id, title: thread.title, status: thread.status }, messages });
+    },
+  );
+
+  server.tool(
+    "churchcore_chat_append_message",
+    "Append a message to a thread (enforces per-user access).",
+    {
+      churchId: z.string().min(1),
+      userId: z.string().min(1),
+      threadId: z.string().min(1),
+      senderType: z.enum(["user", "assistant", "system"]),
+      content: z.string().min(1),
+      envelope: z.any().optional(),
+    },
+    async (args) => {
+      const parsed = z
+        .object({
+          churchId: z.string().min(1),
+          userId: z.string().min(1),
+          threadId: z.string().min(1),
+          senderType: z.enum(["user", "assistant", "system"]),
+          content: z.string().min(1),
+          envelope: z.any().optional(),
+        })
+        .parse(args);
+
+      const thread = await requireOwnedThread(parsed);
+      if (!thread) return jsonText({ error: "Thread not found" });
+
+      const id = crypto.randomUUID();
+      const now = nowIso();
+      await env.churchcore
+        .prepare(
+          `INSERT INTO chat_messages (id, church_id, thread_id, sender_type, content, envelope_json, created_at)
+           VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)`,
+        )
+        .bind(id, parsed.churchId, parsed.threadId, parsed.senderType, parsed.content, parsed.envelope ? JSON.stringify(parsed.envelope) : null, now)
+        .run();
+
+      await env.churchcore
+        .prepare(`UPDATE chat_threads SET updated_at=?1 WHERE church_id=?2 AND user_id=?3 AND id=?4`)
+        .bind(now, parsed.churchId, parsed.userId, parsed.threadId)
+        .run();
+
+      return jsonText({ messageId: id, ok: true });
+    },
+  );
+
   // Planning Center-ish local interfaces (no external integration)
   server.tool(
     "churchcore_people_search",

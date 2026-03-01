@@ -42,6 +42,18 @@ INSERT OR REPLACE INTO memberships (id, church_id, user_id, status, updated_at) 
 ('m1','demo-church','local-user','guest',datetime('now')),
 ('m2','demo-church','local-guide','member',datetime('now'));
 
+-- Default app-user -> person binding (Noah Seeker)
+INSERT OR REPLACE INTO user_person_bindings (church_id, user_id, person_id, created_at, updated_at) VALUES
+('demo-church','demo_user_noah','p_seeker_2',datetime('now'),datetime('now'));
+
+-- Seed chat topics for Noah
+INSERT OR REPLACE INTO chat_threads (id, church_id, user_id, title, status, created_at, updated_at) VALUES
+('thread_noah_general','demo-church','demo_user_noah','General','active',datetime('now'),datetime('now')),
+('thread_noah_visiting','demo-church','demo_user_noah','Planning a visit','active',datetime('now'),datetime('now'));
+
+INSERT OR REPLACE INTO chat_messages (id, church_id, thread_id, sender_type, content, envelope_json, created_at) VALUES
+('msg_noah_1','demo-church','thread_noah_general','assistant','Hi Noah — how can I help today?',NULL,datetime('now'));
+
 -- Services
 INSERT OR REPLACE INTO services (
   id, church_id, campus_id, name, day_of_week, start_time_local, duration_minutes, timezone,

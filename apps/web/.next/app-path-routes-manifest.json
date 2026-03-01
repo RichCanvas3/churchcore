@@ -1,0 +1,23 @@
+{
+  "/api/a2a/chat/route": "/api/a2a/chat",
+  "/api/a2a/thread/append/route": "/api/a2a/thread/append",
+  "/api/a2a/chat/stream/route": "/api/a2a/chat/stream",
+  "/api/a2a/thread/archive/route": "/api/a2a/thread/archive",
+  "/api/a2a/thread/get/route": "/api/a2a/thread/get",
+  "/api/a2a/thread/list/route": "/api/a2a/thread/list",
+  "/api/a2a/thread/create/route": "/api/a2a/thread/create",
+  "/api/a2a/thread/rename/route": "/api/a2a/thread/rename",
+  "/api/churchcore/messages/list/route": "/api/churchcore/messages/list",
+  "/api/agent/run/route": "/api/agent/run",
+  "/api/churchcore/me/binding/route": "/api/churchcore/me/binding",
+  "/api/churchcore/threads/create/route": "/api/churchcore/threads/create",
+  "/api/churchcore/threads/list/route": "/api/churchcore/threads/list",
+  "/api/churchcore/threads/archive/route": "/api/churchcore/threads/archive",
+  "/api/churchcore/messages/append/route": "/api/churchcore/messages/append",
+  "/_not-found/page": "/_not-found",
+  "/api/churchcore/threads/rename/route": "/api/churchcore/threads/rename",
+  "/api/agent/stream/route": "/api/agent/stream",
+  "/chat/page": "/chat",
+  "/page": "/",
+  "/guide/page": "/guide"
+}

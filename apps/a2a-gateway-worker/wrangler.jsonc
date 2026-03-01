@@ -1,0 +1,22 @@
+/**
+ * https://developers.cloudflare.com/workers/wrangler/configuration/
+ */
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "a2a-gateway-worker",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-03-10",
+  "observability": { "enabled": true },
+  "vars": {
+    "LANGGRAPH_ASSISTANT_ID": "church_agent"
+  },
+  "d1_databases": [
+    {
+      "binding": "churchcore",
+      "database_name": "churchcore",
+      "database_id": "14f36eb6-1d4b-491e-ba03-bae862b0cfd1",
+      "remote": false
+    }
+  ]
+}
+

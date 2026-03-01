@@ -73564,6 +73564,178 @@ function createServer(env3) {
       return jsonText({ docs });
     }
   );
+  async function requireOwnedThread(params) {
+    const row = await env3.churchcore.prepare(`SELECT id, title, status FROM chat_threads WHERE church_id=?1 AND user_id=?2 AND id=?3`).bind(params.churchId, params.userId, params.threadId).first();
+    return row ?? null;
+  }
+  __name(requireOwnedThread, "requireOwnedThread");
+  server.tool(
+    "churchcore_user_get_binding",
+    "Get the personId bound to an app userId.",
+    { churchId: external_exports3.string().min(1), userId: external_exports3.string().min(1) },
+    async (args) => {
+      const parsed = external_exports3.object({ churchId: external_exports3.string().min(1), userId: external_exports3.string().min(1) }).parse(args);
+      const row = await env3.churchcore.prepare(`SELECT person_id AS personId FROM user_person_bindings WHERE church_id=?1 AND user_id=?2`).bind(parsed.churchId, parsed.userId).first();
+      return jsonText({ personId: row?.personId ?? null });
+    }
+  );
+  server.tool(
+    "churchcore_user_set_binding",
+    "Bind an app userId to a personId (people.id).",
+    { churchId: external_exports3.string().min(1), userId: external_exports3.string().min(1), personId: external_exports3.string().min(1), actorUserId: external_exports3.string().optional() },
+    async (args) => {
+      const parsed = external_exports3.object({ churchId: external_exports3.string().min(1), userId: external_exports3.string().min(1), personId: external_exports3.string().min(1), actorUserId: external_exports3.string().optional() }).parse(args);
+      const person = await env3.churchcore.prepare(`SELECT id FROM people WHERE church_id=?1 AND id=?2`).bind(parsed.churchId, parsed.personId).first();
+      if (!person) return jsonText({ ok: false, error: "Unknown personId" });
+      const now2 = nowIso();
+      await env3.churchcore.prepare(
+        `INSERT INTO user_person_bindings (church_id, user_id, person_id, created_at, updated_at)
+           VALUES (?1, ?2, ?3, ?4, ?5)
+           ON CONFLICT(church_id, user_id) DO UPDATE SET person_id=excluded.person_id, updated_at=excluded.updated_at`
+      ).bind(parsed.churchId, parsed.userId, parsed.personId, now2, now2).run();
+      await auditAppend(env3, {
+        churchId: parsed.churchId,
+        actorUserId: parsed.actorUserId ?? null,
+        action: "identity.user_person_binding.set",
+        entityType: "user_person_bindings",
+        entityId: `${parsed.userId}`,
+        payload: { userId: parsed.userId, personId: parsed.personId }
+      });
+      return jsonText({ ok: true });
+    }
+  );
+  server.tool(
+    "churchcore_chat_list_threads",
+    "List chat topics for a user.",
+    { churchId: external_exports3.string().min(1), userId: external_exports3.string().min(1), includeArchived: external_exports3.boolean().optional() },
+    async (args) => {
+      const parsed = external_exports3.object({ churchId: external_exports3.string().min(1), userId: external_exports3.string().min(1), includeArchived: external_exports3.boolean().optional() }).parse(args);
+      const includeArchived = parsed.includeArchived ?? false;
+      const rows = (await env3.churchcore.prepare(
+        `SELECT id, title, status, created_at AS createdAt, updated_at AS updatedAt
+               FROM chat_threads
+               WHERE church_id=?1 AND user_id=?2 ${includeArchived ? "" : "AND status='active'"}
+               ORDER BY updated_at DESC`
+      ).bind(parsed.churchId, parsed.userId).all()).results ?? [];
+      return jsonText({ threads: rows });
+    }
+  );
+  server.tool(
+    "churchcore_chat_create_thread",
+    "Create a new chat topic for a user.",
+    { churchId: external_exports3.string().min(1), userId: external_exports3.string().min(1), title: external_exports3.string().optional() },
+    async (args) => {
+      const parsed = external_exports3.object({ churchId: external_exports3.string().min(1), userId: external_exports3.string().min(1), title: external_exports3.string().optional() }).parse(args);
+      const id = crypto.randomUUID();
+      const title2 = (parsed.title ?? "New topic").trim() || "New topic";
+      const now2 = nowIso();
+      await env3.churchcore.prepare(`INSERT INTO chat_threads (id, church_id, user_id, title, status, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, 'active', ?5, ?6)`).bind(id, parsed.churchId, parsed.userId, title2, now2, now2).run();
+      return jsonText({ threadId: id, title: title2 });
+    }
+  );
+  server.tool(
+    "churchcore_chat_rename_thread",
+    "Rename a chat topic.",
+    { churchId: external_exports3.string().min(1), userId: external_exports3.string().min(1), threadId: external_exports3.string().min(1), title: external_exports3.string().min(1) },
+    async (args) => {
+      const parsed = external_exports3.object({ churchId: external_exports3.string().min(1), userId: external_exports3.string().min(1), threadId: external_exports3.string().min(1), title: external_exports3.string().min(1) }).parse(args);
+      const now2 = nowIso();
+      await env3.churchcore.prepare(`UPDATE chat_threads SET title=?1, updated_at=?2 WHERE church_id=?3 AND user_id=?4 AND id=?5`).bind(parsed.title, now2, parsed.churchId, parsed.userId, parsed.threadId).run();
+      return jsonText({ ok: true });
+    }
+  );
+  server.tool(
+    "churchcore_chat_archive_thread",
+    "Archive a chat topic (soft delete).",
+    { churchId: external_exports3.string().min(1), userId: external_exports3.string().min(1), threadId: external_exports3.string().min(1) },
+    async (args) => {
+      const parsed = external_exports3.object({ churchId: external_exports3.string().min(1), userId: external_exports3.string().min(1), threadId: external_exports3.string().min(1) }).parse(args);
+      const now2 = nowIso();
+      await env3.churchcore.prepare(`UPDATE chat_threads SET status='archived', updated_at=?1 WHERE church_id=?2 AND user_id=?3 AND id=?4`).bind(now2, parsed.churchId, parsed.userId, parsed.threadId).run();
+      return jsonText({ ok: true });
+    }
+  );
+  server.tool(
+    "churchcore_chat_list_messages",
+    "List messages for a thread (enforces per-user access).",
+    {
+      churchId: external_exports3.string().min(1),
+      userId: external_exports3.string().min(1),
+      threadId: external_exports3.string().min(1),
+      limit: external_exports3.number().int().min(1).max(200).optional(),
+      offset: external_exports3.number().int().min(0).max(5e5).optional()
+    },
+    async (args) => {
+      const parsed = external_exports3.object({
+        churchId: external_exports3.string().min(1),
+        userId: external_exports3.string().min(1),
+        threadId: external_exports3.string().min(1),
+        limit: external_exports3.number().int().min(1).max(200).optional(),
+        offset: external_exports3.number().int().min(0).max(5e5).optional()
+      }).parse(args);
+      const thread = await requireOwnedThread(parsed);
+      if (!thread) return jsonText({ error: "Thread not found" });
+      const limit = parsed.limit ?? 50;
+      const offset = parsed.offset ?? 0;
+      const rows = (await env3.churchcore.prepare(
+        `SELECT id, sender_type AS senderType, content, envelope_json AS envelopeJson, created_at AS createdAt
+               FROM chat_messages
+               WHERE church_id=?1 AND thread_id=?2
+               ORDER BY created_at ASC
+               LIMIT ${limit} OFFSET ${offset}`
+      ).bind(parsed.churchId, parsed.threadId).all()).results ?? [];
+      const messages = rows.map((r2) => {
+        let envelope = null;
+        if (r2?.envelopeJson) {
+          try {
+            envelope = JSON.parse(String(r2.envelopeJson));
+          } catch {
+            envelope = null;
+          }
+        }
+        return {
+          id: r2.id,
+          senderType: r2.senderType,
+          content: r2.content,
+          envelope,
+          createdAt: r2.createdAt
+        };
+      });
+      return jsonText({ thread: { id: thread.id, title: thread.title, status: thread.status }, messages });
+    }
+  );
+  server.tool(
+    "churchcore_chat_append_message",
+    "Append a message to a thread (enforces per-user access).",
+    {
+      churchId: external_exports3.string().min(1),
+      userId: external_exports3.string().min(1),
+      threadId: external_exports3.string().min(1),
+      senderType: external_exports3.enum(["user", "assistant", "system"]),
+      content: external_exports3.string().min(1),
+      envelope: external_exports3.any().optional()
+    },
+    async (args) => {
+      const parsed = external_exports3.object({
+        churchId: external_exports3.string().min(1),
+        userId: external_exports3.string().min(1),
+        threadId: external_exports3.string().min(1),
+        senderType: external_exports3.enum(["user", "assistant", "system"]),
+        content: external_exports3.string().min(1),
+        envelope: external_exports3.any().optional()
+      }).parse(args);
+      const thread = await requireOwnedThread(parsed);
+      if (!thread) return jsonText({ error: "Thread not found" });
+      const id = crypto.randomUUID();
+      const now2 = nowIso();
+      await env3.churchcore.prepare(
+        `INSERT INTO chat_messages (id, church_id, thread_id, sender_type, content, envelope_json, created_at)
+           VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)`
+      ).bind(id, parsed.churchId, parsed.threadId, parsed.senderType, parsed.content, parsed.envelope ? JSON.stringify(parsed.envelope) : null, now2).run();
+      await env3.churchcore.prepare(`UPDATE chat_threads SET updated_at=?1 WHERE church_id=?2 AND user_id=?3 AND id=?4`).bind(now2, parsed.churchId, parsed.userId, parsed.threadId).run();
+      return jsonText({ messageId: id, ok: true });
+    }
+  );
   server.tool(
     "churchcore_people_search",
     "Search people (local D1; Planning Center-ish).",

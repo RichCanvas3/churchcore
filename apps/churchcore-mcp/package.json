@@ -4,6 +4,12 @@
   "type": "module",
   "scripts": {
     "dev": "wrangler dev",
+    "d1:local:schema": "wrangler d1 execute churchcore --local --file ./schema.sql",
+    "d1:local:seed": "wrangler d1 execute churchcore --local --file ./seed.sql",
+    "d1:local:setup": "pnpm run d1:local:schema && pnpm run d1:local:seed",
+    "d1:remote:schema": "wrangler d1 execute churchcore --remote --file ./schema.sql",
+    "d1:remote:seed": "wrangler d1 execute churchcore --remote --file ./seed.sql",
+    "d1:remote:setup": "pnpm run d1:remote:schema && pnpm run d1:remote:seed",
     "deploy": "wrangler deploy",
     "lint": "tsc -p tsconfig.json --noEmit"
   },

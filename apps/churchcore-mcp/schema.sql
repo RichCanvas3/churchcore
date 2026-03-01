@@ -112,6 +112,42 @@ CREATE TABLE IF NOT EXISTS memberships (
 );
 CREATE INDEX IF NOT EXISTS idx_memberships_user ON memberships(church_id, user_id);
 
+-- Map app user identity -> person record (Planning Center People-ish)
+CREATE TABLE IF NOT EXISTS user_person_bindings (
+  church_id TEXT NOT NULL,
+  user_id TEXT NOT NULL,
+  person_id TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (church_id, user_id),
+  FOREIGN KEY (person_id) REFERENCES people(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_user_person ON user_person_bindings(church_id, person_id);
+
+-- Chat persistence (topics + messages) stored in D1
+CREATE TABLE IF NOT EXISTS chat_threads (
+  id TEXT PRIMARY KEY,
+  church_id TEXT NOT NULL,
+  user_id TEXT NOT NULL,
+  title TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'active', -- active|archived
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_chat_threads ON chat_threads(church_id, user_id, status, updated_at);
+
+CREATE TABLE IF NOT EXISTS chat_messages (
+  id TEXT PRIMARY KEY,
+  church_id TEXT NOT NULL,
+  thread_id TEXT NOT NULL,
+  sender_type TEXT NOT NULL, -- user|assistant|system
+  content TEXT NOT NULL,
+  envelope_json TEXT,
+  created_at TEXT NOT NULL,
+  FOREIGN KEY (thread_id) REFERENCES chat_threads(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_chat_messages ON chat_messages(church_id, thread_id, created_at);
+
 -- Public-facing discoverables
 CREATE TABLE IF NOT EXISTS services (
   id TEXT PRIMARY KEY,

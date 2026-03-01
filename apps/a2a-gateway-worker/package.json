@@ -1,0 +1,22 @@
+{
+  "name": "a2a-gateway-worker",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev --local --port 8788",
+    "d1:local:schema": "wrangler d1 execute churchcore --local --file ../churchcore-mcp/schema.sql",
+    "d1:local:seed": "wrangler d1 execute churchcore --local --file ../churchcore-mcp/seed.sql",
+    "d1:local:setup": "pnpm run d1:local:schema && pnpm run d1:local:seed",
+    "deploy": "wrangler deploy",
+    "lint": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20260305.0",
+    "typescript": "^5.9.3",
+    "wrangler": "^4.69.0"
+  }
+}
+

@@ -15,6 +15,7 @@ class Session(BaseModel):
     campusId: Optional[str] = None
     timezone: str = "UTC"
     userId: str
+    personId: Optional[str] = None
     role: Literal["seeker", "guide"]
     auth: Optional[AuthContext] = None
     threadId: Optional[str] = None

@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "functions": {
+    "/api/churchcore/me/binding": {},
+    "/api/churchcore/messages/append": {},
+    "/api/agent/stream": {},
+    "/api/churchcore/threads/archive": {},
+    "/api/churchcore/messages/list": {},
+    "/api/churchcore/threads/create": {},
+    "/api/churchcore/threads/list": {},
+    "/api/agent/run": {},
+    "/api/churchcore/threads/rename": {}
+  }
+}
