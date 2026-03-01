@@ -1,0 +1,7 @@
+{
+  "version": 1,
+  "functions": {
+    "/api/agent/run": {},
+    "/api/agent/stream": {}
+  }
+}

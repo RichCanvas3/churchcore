@@ -2,6 +2,11 @@
   "name": "church-agent-platform",
   "private": true,
   "packageManager": "pnpm@10.25.0",
+  "pnpm": {
+    "overrides": {
+      "@modelcontextprotocol/sdk": "1.26.0"
+    }
+  },
   "scripts": {
     "dev": "pnpm --filter web dev",
     "build": "pnpm --filter web build",

@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import { useMemo, useState } from "react";
@@ -94,7 +93,7 @@ export default function GuidePage() {
               }}
             />
             <button
-              onClick={() => callSkill("chat", null, message)}
+              onClick={() => callSkill("chat", undefined, message)}
               disabled={loading || !message.trim()}
               style={{
                 border: "1px solid #0f172a",

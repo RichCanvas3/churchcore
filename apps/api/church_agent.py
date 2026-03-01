@@ -6,6 +6,7 @@ from typing import Any, Optional
 
 from langchain_openai import ChatOpenAI
 
+from .knowledge_index import ensure_index_with_mcp, search_kb
 from .mcp_tools import load_mcp_tools_from_env
 from .models import Input, NextAction, OutputEnvelope, Session
 
@@ -119,10 +120,14 @@ async def handle_seeker_skill(
 
     if skill in {"chat", "chat.stream"}:
         model = ChatOpenAI(model=os.environ.get("OPENAI_MODEL", "gpt-5.2"))
+        kb_ttl = int(float(os.environ.get("KB_INDEX_TTL_SECONDS", "300") or "300"))
+        kb_index = await ensure_index_with_mcp(church_id=session.churchId, ttl_seconds=max(30, kb_ttl))
+        kb_text, kb_hits = search_kb(kb_index, (message or "").strip(), k=4) if (message or "").strip() and kb_index else ("", [])
         sys = (
             "You are Church Agent in seeker role. Help the person explore faith and take next steps.\n"
             "Do not invent service times, events, groups, or volunteer opportunities; instead suggest discover skills.\n"
-            "Always be warm, concise, and propose 1-3 next actions."
+            "Always be warm, concise, and propose 1-3 next actions.\n\n"
+            + (kb_text + "\n\n" if kb_text else "")
         )
         user = (message or "").strip()
         if not user:
@@ -143,7 +148,12 @@ async def handle_seeker_skill(
                 NextAction(title="Upcoming events", skill="discover.events"),
                 NextAction(title="Request contact", skill="connect.request_contact"),
             ],
+            citations=[{"sourceId": h.sourceId, "snippet": h.snippet} for h in kb_hits],
         )
+
+    # Aliases (spec names)
+    if skill == "discover.volunteer_opportunities":
+        skill = "discover.volunteer_opportunities"
 
     if skill == "discover.service_times":
         res = await _call_tool_json(
@@ -279,6 +289,38 @@ async def handle_seeker_skill(
             data=res,
         )
 
+    if skill == "care.request_pastoral_care":
+        req_txt = args.get("request") or message
+        if not isinstance(req_txt, str) or not req_txt.strip():
+            return OutputEnvelope(
+                message="What would you like care about?",
+                forms=[
+                    {
+                        "type": "pastoral_care_request",
+                        "fields": [
+                            {"name": "request", "type": "textarea", "required": True},
+                            {"name": "urgency", "type": "select", "options": ["low", "normal", "high"], "required": False},
+                            {"name": "safeToText", "type": "checkbox", "required": False},
+                        ],
+                    }
+                ],
+            )
+        payload = {
+            "churchId": session.churchId,
+            "userId": session.userId,
+            "request": req_txt,
+            "urgency": args.get("urgency") or "normal",
+            "safeToText": bool(args.get("safeToText", False)),
+        }
+        res = await _call_tool_json(tools, "churchcore_request_pastoral_care", payload)
+        if not res:
+            return _missing_mcp("churchcore_request_pastoral_care")
+        return OutputEnvelope(
+            message="Thanks — a care team member will follow up.",
+            cards=[{"type": "request", "title": "Pastoral care request submitted", "body": f"requestId={res.get('requestId')}"}],
+            data=res,
+        )
+
     if skill == "profile.permissions_check":
         res = await _call_tool_json(
             tools, "churchcore_permissions_check", {"churchId": session.churchId, "userId": session.userId}
@@ -336,10 +378,14 @@ async def handle_guide_skill(
 
     if skill in {"chat", "chat.stream"}:
         model = ChatOpenAI(model=os.environ.get("OPENAI_MODEL", "gpt-5.2"))
+        kb_ttl = int(float(os.environ.get("KB_INDEX_TTL_SECONDS", "300") or "300"))
+        kb_index = await ensure_index_with_mcp(church_id=session.churchId, ttl_seconds=max(30, kb_ttl))
+        kb_text, kb_hits = search_kb(kb_index, (message or "").strip(), k=4) if (message or "").strip() and kb_index else ("", [])
         sys = (
             "You are Church Agent in guide role. Be concise and operational.\n"
             "You can triage, create follow-ups, and write notes via ChurchCore MCP.\n"
-            "If asked for restricted operations, confirm permissions and use the appropriate tool."
+            "If asked for restricted operations, confirm permissions and use the appropriate tool.\n\n"
+            + (kb_text + "\n\n" if kb_text else "")
         )
         user = (message or "").strip()
         if not user:
@@ -358,6 +404,7 @@ async def handle_guide_skill(
                 NextAction(title="Assigned seekers", skill="guide.view_assigned_seekers"),
                 NextAction(title="Open care requests", skill="care.view_requests"),
             ],
+            citations=[{"sourceId": h.sourceId, "snippet": h.snippet} for h in kb_hits],
         )
 
     if skill == "guide.view_assigned_seekers":
@@ -421,6 +468,125 @@ async def handle_guide_skill(
             cards=[{"type": "requests", "title": "Open requests", "items": items}],
             data={"requests": items},
         )
+
+    if skill == "guide.view_seeker_profile":
+        seeker_id = args.get("seekerId")
+        if not isinstance(seeker_id, str) or not seeker_id.strip():
+            return OutputEnvelope(
+                message="Missing seekerId.",
+                forms=[{"type": "seeker_profile", "fields": [{"name": "seekerId", "type": "text", "required": True}]}],
+            )
+        res = await _call_tool_json(tools, "churchcore_get_seeker_profile", {"churchId": session.churchId, "seekerId": seeker_id})
+        if not res:
+            return _missing_mcp("churchcore_get_seeker_profile")
+        return OutputEnvelope(message="Seeker profile.", cards=[{"type": "seeker_profile", "title": "Seeker profile", "items": [res.get("seeker")]}], data=res)
+
+    if skill == "guide.view_journey_state":
+        seeker_id = args.get("seekerId")
+        if not isinstance(seeker_id, str) or not seeker_id.strip():
+            return OutputEnvelope(
+                message="Missing seekerId.",
+                forms=[{"type": "journey_state", "fields": [{"name": "seekerId", "type": "text", "required": True}]}],
+            )
+        res = await _call_tool_json(tools, "churchcore_get_journey_state", {"churchId": session.churchId, "seekerId": seeker_id})
+        if not res:
+            return _missing_mcp("churchcore_get_journey_state")
+        return OutputEnvelope(message="Journey state.", cards=[{"type": "journey_state", "title": "Journey state", "items": [res]}], data=res)
+
+    if skill == "guide.create_followup_task":
+        seeker_id = args.get("seekerId")
+        title = args.get("title") or "Follow up"
+        if not isinstance(seeker_id, str) or not seeker_id.strip():
+            return OutputEnvelope(
+                message="Missing seekerId.",
+                forms=[
+                    {
+                        "type": "create_followup",
+                        "fields": [
+                            {"name": "seekerId", "type": "text", "required": True},
+                            {"name": "title", "type": "text", "required": True},
+                            {"name": "dueAt", "type": "text", "required": False},
+                            {"name": "notes", "type": "textarea", "required": False},
+                        ],
+                    }
+                ],
+            )
+        res = await _call_tool_json(
+            tools,
+            "churchcore_create_followup_task",
+            {
+                "churchId": session.churchId,
+                "seekerId": seeker_id,
+                "assignedToUserId": session.userId,
+                "title": title,
+                "dueAt": args.get("dueAt"),
+                "notes": args.get("notes") or message,
+                "actorUserId": session.userId,
+            },
+        )
+        if not res:
+            return _missing_mcp("churchcore_create_followup_task")
+        return OutputEnvelope(message="Follow-up created.", cards=[{"type": "followup", "title": "Follow-up task", "items": [res]}], data=res)
+
+    # Stubs for remaining guide skills (return envelope; expand later)
+    if skill.startswith("guide.") or skill.startswith("group.") or skill.startswith("serve.") or skill.startswith("insights.") or skill == "profile.role_bindings":
+        return OutputEnvelope(
+            message=f"Not implemented yet: {skill}",
+            suggested_next_actions=[
+                NextAction(title="Assigned seekers", skill="guide.view_assigned_seekers"),
+                NextAction(title="Open care requests", skill="care.view_requests"),
+            ],
+            data={"skill": skill},
+        )
+
+    if skill == "care.assign_case":
+        request_id = args.get("requestId")
+        assigned_to = args.get("assignedToUserId") or session.userId
+        if not isinstance(request_id, str) or not request_id.strip():
+            return OutputEnvelope(
+                message="Missing requestId.",
+                forms=[{"type": "assign_case", "fields": [{"name": "requestId", "type": "text", "required": True}]}],
+            )
+        res = await _call_tool_json(
+            tools,
+            "churchcore_assign_care_case",
+            {"churchId": session.churchId, "requestId": request_id, "assignedToUserId": assigned_to, "actorUserId": session.userId},
+        )
+        if not res:
+            return _missing_mcp("churchcore_assign_care_case")
+        return OutputEnvelope(message="Case assigned.", data=res)
+
+    if skill == "care.escalate_to_staff":
+        request_id = args.get("requestId")
+        if not isinstance(request_id, str) or not request_id.strip():
+            return OutputEnvelope(
+                message="Missing requestId.",
+                forms=[{"type": "escalate_case", "fields": [{"name": "requestId", "type": "text", "required": True}, {"name": "reason", "type": "textarea"}]}],
+            )
+        res = await _call_tool_json(
+            tools,
+            "churchcore_escalate_to_staff",
+            {"churchId": session.churchId, "requestId": request_id, "actorUserId": session.userId, "reason": args.get("reason")},
+        )
+        if not res:
+            return _missing_mcp("churchcore_escalate_to_staff")
+        return OutputEnvelope(message="Case escalated.", data=res)
+
+    if skill == "care.close_case":
+        request_id = args.get("requestId")
+        if not isinstance(request_id, str) or not request_id.strip():
+            return OutputEnvelope(
+                message="Missing requestId.",
+                forms=[{"type": "close_case", "fields": [{"name": "requestId", "type": "text", "required": True}, {"name": "resolution", "type": "textarea"}]}],
+            )
+        res = await _call_tool_json(
+            tools,
+            "churchcore_close_case",
+            {"churchId": session.churchId, "requestId": request_id, "actorUserId": session.userId, "resolution": args.get("resolution")},
+        )
+        if not res:
+            return _missing_mcp("churchcore_close_case")
+        return OutputEnvelope(message="Case closed.", data=res)
 
     if skill == "profile.permissions_check":
         res = await _call_tool_json(tools, "churchcore_permissions_check", {"churchId": session.churchId, "userId": session.userId, "requestedRole": "guide"})
