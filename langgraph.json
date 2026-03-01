@@ -1,0 +1,7 @@
+{
+  "dependencies": ["./apps/api"],
+  "graphs": {
+    "church_agent": "apps.api.graph:graph"
+  }
+}
+
