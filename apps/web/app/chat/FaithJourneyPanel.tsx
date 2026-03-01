@@ -11,27 +11,22 @@ type Identity = {
   persona_id?: string | null;
 };
 
-const FAITH_PHASES = [
-  { id: "seeker", label: "Seeker", description: "Exploring faith" },
-  { id: "visit_planned", label: "Planning a visit", description: "First visit in mind" },
-  { id: "new", label: "New", description: "Just getting started" },
-  { id: "new_believer", label: "New Believer", description: "Recent decision" },
-  { id: "growing", label: "Growing", description: "Growing in faith" },
-  { id: "mature", label: "Mature", description: "Established in faith" },
-  { id: "leader", label: "Leader", description: "Leading others" },
-] as const;
+type Stage = { id: string; title: string; summary?: string | null };
+type JourneyNode = { id: string; type: string; title: string; summary?: string | null; metadata?: any };
 
-type MemoryGetResponse = {
+type JourneyGetStateResponse = {
   ok?: boolean;
   person_id?: string;
-  updated_at?: string;
-  memory?: {
-    spiritualJourney?: {
-      stage?: string;
-      milestones?: Array<{ name?: string; date?: string; note?: string } | string>;
-    };
-  };
-  can_edit?: { faith_journey?: boolean };
+  current_stage?: JourneyNode | null;
+  stages?: Stage[];
+  completed_node_ids?: string[];
+  confidence?: number;
+  error?: string;
+};
+
+type JourneyNextStepsResponse = {
+  ok?: boolean;
+  next_steps?: Array<{ node: JourneyNode; edgeType: string; score: number; why: string }>;
   error?: string;
 };
 
@@ -51,22 +46,24 @@ export function FaithJourneyPanel(props: { identity: Identity; onClose: () => vo
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [data, setData] = useState<MemoryGetResponse | null>(null);
-  const [stage, setStage] = useState<string>("");
-  const [newMilestone, setNewMilestone] = useState("");
+  const [state, setState] = useState<JourneyGetStateResponse | null>(null);
+  const [next, setNext] = useState<JourneyNextStepsResponse | null>(null);
+  const [stageId, setStageId] = useState<string>("");
 
-  const sj = data?.memory?.spiritualJourney;
-  const currentStage = (sj?.stage ?? "").trim() || "seeker";
-  const milestones = Array.isArray(sj?.milestones) ? sj.milestones : [];
-  const canEdit = data?.can_edit?.faith_journey !== false;
+  const stages = Array.isArray(state?.stages) ? state.stages : [];
+  const currentStage = state?.current_stage?.id ? String(state.current_stage.id) : "";
+  const completedNodeIds = Array.isArray(state?.completed_node_ids) ? state.completed_node_ids : [];
+  const completed = new Set<string>(completedNodeIds.map(String));
 
   async function refresh() {
     setLoading(true);
     setError(null);
     try {
-      const out = await postJson<MemoryGetResponse>("/api/a2a/memory/get", { identity });
-      setData(out);
-      setStage((out?.memory?.spiritualJourney as any)?.stage ?? "seeker");
+      const s = await postJson<JourneyGetStateResponse>("/api/a2a/journey/get_state", { identity });
+      setState(s);
+      setStageId(String((s?.current_stage as any)?.id ?? ""));
+      const n = await postJson<JourneyNextStepsResponse>("/api/a2a/journey/next_steps", { identity, limit: 3 });
+      setNext(n);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Failed to load memory");
     } finally {
@@ -75,21 +72,19 @@ export function FaithJourneyPanel(props: { identity: Identity; onClose: () => vo
   }
 
   useEffect(() => {
-    setData(null);
+    setState(null);
+    setNext(null);
     setError(null);
     void refresh();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [identity.tenant_id, identity.user_id]);
 
   async function saveStage() {
-    if (!canEdit) return;
     setSaving(true);
     setError(null);
     try {
-      await postJson("/api/a2a/memory/apply_ops", {
-        identity,
-        ops: [{ op: "set", path: "spiritualJourney.stage", value: stage || "seeker", visibility: "self" }],
-      });
+      if (!stageId) return;
+      await postJson("/api/a2a/journey/complete_step", { identity, node_id: stageId, event_type: "NOTE", value: { setStage: true }, access_level: "self" });
       await refresh();
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Failed to save");
@@ -98,20 +93,14 @@ export function FaithJourneyPanel(props: { identity: Identity; onClose: () => vo
     }
   }
 
-  async function addMilestone() {
-    if (!canEdit || !newMilestone.trim()) return;
-    const entry = { name: newMilestone.trim(), date: new Date().toISOString().slice(0, 10) };
+  async function markComplete(nodeId: string) {
     setSaving(true);
     setError(null);
     try {
-      await postJson("/api/a2a/memory/apply_ops", {
-        identity,
-        ops: [{ op: "append", path: "spiritualJourney.milestones", value: entry, visibility: "self" }],
-      });
-      setNewMilestone("");
+      await postJson("/api/a2a/journey/complete_step", { identity, node_id: nodeId, event_type: "COMPLETED", value: { via: "faith_journey_tool" }, access_level: "self" });
       await refresh();
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Failed to add milestone");
+      setError(e instanceof Error ? e.message : "Failed to save");
     } finally {
       setSaving(false);
     }
@@ -142,7 +131,7 @@ export function FaithJourneyPanel(props: { identity: Identity; onClose: () => vo
         </div>
       </div>
 
-      <div style={{ padding: 14, overflow: "auto", display: "grid", gap: 14, alignContent: "start" }}>
+      <div style={{ padding: 14, overflow: "auto", display: "grid", gap: 14, alignContent: "start", background: "#f8fafc" }}>
         {error ? <div style={{ color: "#dc2626", fontSize: 13 }}>{error}</div> : null}
         {loading ? (
           <div style={{ color: "#64748b" }}>Loading…</div>
@@ -154,56 +143,59 @@ export function FaithJourneyPanel(props: { identity: Identity; onClose: () => vo
                 Your current stage in your faith journey. This helps the church support you well.
               </p>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                {FAITH_PHASES.map((p) => (
+                {stages.map((p) => (
                   <button
                     key={p.id}
                     type="button"
-                    onClick={() => canEdit && setStage(p.id)}
+                    onClick={() => setStageId(p.id)}
                     style={{
                       ...btn,
-                      background: currentStage === p.id ? "#0f172a" : stage === p.id ? "#334155" : "#f1f5f9",
-                      color: currentStage === p.id || stage === p.id ? "white" : "#0f172a",
+                      background: currentStage === p.id ? "#0f172a" : stageId === p.id ? "#334155" : "#f1f5f9",
+                      color: currentStage === p.id || stageId === p.id ? "white" : "#0f172a",
                       border: currentStage === p.id ? "2px solid #0f172a" : "1px solid #e2e8f0",
                     }}
                   >
-                    {p.label}
+                    {p.title}
                   </button>
                 ))}
               </div>
-              {canEdit && stage !== currentStage && (
+              {stageId && stageId !== currentStage && (
                 <button type="button" onClick={() => void saveStage()} disabled={saving} style={{ ...btn, marginTop: 10 }}>
                   {saving ? "Saving…" : "Save phase"}
                 </button>
               )}
             </section>
 
-            <section style={{ border: "1px solid #e2e8f0", borderRadius: 12, padding: 14 }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: "#0f172a", marginBottom: 10 }}>Milestones</div>
-              <p style={{ fontSize: 12, color: "#64748b", margin: "0 0 10px 0" }}>
-                Baptism, membership class, first serving, small group, etc.
-              </p>
-              <ul style={{ margin: "0 0 10px 0", paddingLeft: 20 }}>
-                {milestones.map((m, i) => (
-                  <li key={i} style={{ fontSize: 13, marginBottom: 4 }}>
-                    {typeof m === "string" ? m : (m as any)?.name ?? (m as any)?.note ?? JSON.stringify(m)}
-                    {(m as any)?.date ? ` (${String((m as any).date).slice(0, 10)})` : ""}
-                  </li>
-                ))}
-              </ul>
-              {canEdit && (
-                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                  <input
-                    type="text"
-                    placeholder="e.g. Baptism, Membership class"
-                    value={newMilestone}
-                    onChange={(e) => setNewMilestone(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && addMilestone()}
-                    style={{ flex: 1, padding: "8px 10px", borderRadius: 8, border: "1px solid #e2e8f0" }}
-                  />
-                  <button type="button" onClick={() => void addMilestone()} disabled={saving || !newMilestone.trim()} style={btn}>
-                    Add
-                  </button>
+            <section style={{ border: "1px solid #e2e8f0", borderRadius: 12, padding: 14, background: "white" }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: "#0f172a", marginBottom: 10 }}>Next steps</div>
+              <p style={{ fontSize: 12, color: "#64748b", margin: "0 0 10px 0" }}>Small, concrete steps tied to your current stage.</p>
+              {Array.isArray(next?.next_steps) && next!.next_steps!.length ? (
+                <div style={{ display: "grid", gap: 10 }}>
+                  {next!.next_steps!.map((s, idx) => {
+                    const nodeId = String((s as any)?.node?.id ?? "");
+                    const title = String((s as any)?.node?.title ?? "");
+                    const type = String((s as any)?.node?.type ?? "");
+                    const why = String((s as any)?.why ?? "");
+                    const done = nodeId ? completed.has(nodeId) : false;
+                    return (
+                      <div key={idx} style={{ border: "1px solid #e2e8f0", borderRadius: 12, padding: 12, background: "#f8fafc" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "baseline" }}>
+                          <div style={{ fontWeight: 900, color: "#0f172a" }}>{title}</div>
+                          <div style={{ fontSize: 12, color: "#64748b" }}>{type}</div>
+                        </div>
+                        {why ? <div style={{ marginTop: 6, fontSize: 12, color: "#64748b" }}>{why}</div> : null}
+                        <div style={{ marginTop: 10, display: "flex", gap: 8, alignItems: "center" }}>
+                          <button type="button" disabled={saving || done || !nodeId} onClick={() => void markComplete(nodeId)} style={{ ...btn, opacity: saving || done ? 0.7 : 1 }}>
+                            {done ? "Completed" : "Mark complete"}
+                          </button>
+                          {nodeId ? <span style={{ fontSize: 12, color: "#94a3b8" }}>{nodeId}</span> : null}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
+              ) : (
+                <div style={{ fontSize: 12, color: "#64748b" }}>No next steps available yet.</div>
               )}
             </section>
           </>

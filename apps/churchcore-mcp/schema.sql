@@ -600,3 +600,71 @@ CREATE TABLE IF NOT EXISTS content_docs (
 );
 CREATE INDEX IF NOT EXISTS idx_content_docs ON content_docs(church_id, entity_type, entity_id, locale);
 
+-- Evangelical faith journey graph (canonical) + per-person journey instance
+CREATE TABLE IF NOT EXISTS journey_node (
+  node_id TEXT PRIMARY KEY,
+  church_id TEXT NOT NULL,
+  node_type TEXT NOT NULL, -- Stage|Milestone|Practice|DoctrineTopic|Barrier|Resource|Community|Assessment|ActionStep
+  title TEXT NOT NULL,
+  summary TEXT,
+  metadata_json TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_journey_node_church_type ON journey_node(church_id, node_type);
+
+CREATE TABLE IF NOT EXISTS journey_edge (
+  edge_id TEXT PRIMARY KEY,
+  church_id TEXT NOT NULL,
+  from_node_id TEXT NOT NULL,
+  to_node_id TEXT NOT NULL,
+  edge_type TEXT NOT NULL, -- NEXT_STAGE|REQUIRES|RECOMMENDS|UNLOCKS|BLOCKED_BY|RESOLVED_BY|SUPPORTED_BY|MEASURED_BY
+  weight REAL DEFAULT 1.0,
+  metadata_json TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  FOREIGN KEY(from_node_id) REFERENCES journey_node(node_id),
+  FOREIGN KEY(to_node_id) REFERENCES journey_node(node_id)
+);
+CREATE INDEX IF NOT EXISTS idx_journey_edge_church_from ON journey_edge(church_id, from_node_id);
+CREATE INDEX IF NOT EXISTS idx_journey_edge_church_type ON journey_edge(church_id, edge_type);
+
+CREATE TABLE IF NOT EXISTS person_journey_state (
+  church_id TEXT NOT NULL,
+  person_id TEXT NOT NULL,
+  current_stage_id TEXT,
+  confidence REAL DEFAULT 0.5,
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY(church_id, person_id),
+  FOREIGN KEY (person_id) REFERENCES people(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_person_journey_state ON person_journey_state(church_id, person_id, updated_at);
+
+CREATE TABLE IF NOT EXISTS person_journey_event (
+  event_id TEXT PRIMARY KEY,
+  church_id TEXT NOT NULL,
+  person_id TEXT NOT NULL,
+  node_id TEXT NOT NULL,          -- milestone/practice/topic etc.
+  event_type TEXT NOT NULL,       -- COMPLETED|STARTED|STREAK|NOTE|ASSESSMENT
+  value_json TEXT,                -- flexible payload
+  source TEXT,                    -- user|staff|system|agent
+  access_level TEXT DEFAULT 'self', -- self|staff|pastoral|restricted
+  created_at TEXT NOT NULL,
+  FOREIGN KEY (person_id) REFERENCES people(id) ON DELETE CASCADE,
+  FOREIGN KEY(node_id) REFERENCES journey_node(node_id)
+);
+CREATE INDEX IF NOT EXISTS idx_person_journey_event_person ON person_journey_event(church_id, person_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_person_journey_event_node ON person_journey_event(church_id, node_id, created_at DESC);
+
+-- Link canonical journey nodes to KB content_docs (for retrieval)
+CREATE TABLE IF NOT EXISTS journey_resource_link (
+  link_id TEXT PRIMARY KEY,
+  church_id TEXT NOT NULL,
+  node_id TEXT NOT NULL,
+  resource_id TEXT NOT NULL, -- content_docs.id
+  relevance REAL DEFAULT 1.0,
+  created_at TEXT NOT NULL,
+  FOREIGN KEY(node_id) REFERENCES journey_node(node_id)
+);
+CREATE INDEX IF NOT EXISTS idx_journey_resource_link_node ON journey_resource_link(church_id, node_id);
+

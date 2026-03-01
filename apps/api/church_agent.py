@@ -110,6 +110,9 @@ def _ui_handoff_for_user_text(user_text: str) -> list[dict[str, Any]]:
             "faith phase",
             "milestone",
             "milestones",
+            "next step",
+            "next steps",
+            "what should i do next",
         ]
     )
     if faith_journeyish:
@@ -364,6 +367,34 @@ def _household_context_from_args(args: dict[str, Any]) -> str:
     return str(s).strip() if isinstance(s, str) else ""
 
 
+def _journey_context_from_args(args: dict[str, Any]) -> tuple[dict[str, Any] | None, str]:
+    ctx = args.get("__context")
+    if not isinstance(ctx, dict):
+        return None, ""
+    j = ctx.get("journey")
+    if not isinstance(j, dict):
+        return None, ""
+    cur = j.get("current_stage")
+    cur_title = ""
+    if isinstance(cur, dict) and isinstance(cur.get("title"), str):
+        cur_title = str(cur.get("title") or "").strip()
+    steps = j.get("next_steps")
+    step_titles: list[str] = []
+    if isinstance(steps, list):
+        for s in steps[:5]:
+            node = s.get("node") if isinstance(s, dict) else None
+            if isinstance(node, dict) and isinstance(node.get("title"), str):
+                t = str(node.get("title") or "").strip()
+                if t:
+                    step_titles.append(t)
+    summary_bits: list[str] = []
+    if cur_title:
+        summary_bits.append(f"stage={cur_title}")
+    if step_titles:
+        summary_bits.append("next=" + ", ".join(step_titles[:3]))
+    return j, ("; ".join(summary_bits)).strip()
+
+
 def _safe_json_loads(text: str) -> Any:
     try:
         return json.loads(text)
@@ -447,6 +478,7 @@ async def handle_seeker_skill(
         user = (message or "").strip()
         mem, mem_summary = _memory_context_from_args(args)
         hh_summary = _household_context_from_args(args)
+        journey, journey_summary = _journey_context_from_args(args)
 
         # Always ground church-specific questions in authoritative ChurchCore D1 data.
         # (No hallucinated service times/events/groups/resources.)
@@ -481,6 +513,7 @@ async def handle_seeker_skill(
             "- teams_skills: staff-only serving teams/skills.\n"
             "- kids_safety: staff-only kids safety notes.\n"
             'If a UI tool should open, include a handoff item like: {"type":"ui_tool","tool_id":"identity_contact"}.\n\n'
+            + (("Faith journey context:\n" + journey_summary + "\n\n") if journey_summary else "")
             + (("Known person memory (shared across topics):\n" + mem_summary + "\n\n") if mem_summary else "")
             + (("Household context:\n" + hh_summary + "\n\n") if hh_summary else "")
             + (("Authoritative church data excerpt:\n" + church_context + "\n\n") if church_context else "")

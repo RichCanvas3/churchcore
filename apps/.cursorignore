@@ -37,16 +37,14 @@ yarn.lock
 *.db-wal
 
 # Environment files
-.env
-.env.*
-!.env.example
+
 
 # Generated artifacts
 *.generated.*
 *.tsbuildinfo
 
 # Large SQL dumps / exports
-*.sql
+
 
 # Git
 .git/

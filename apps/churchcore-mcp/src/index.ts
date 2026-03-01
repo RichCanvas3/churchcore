@@ -1168,6 +1168,9 @@ function createServer(env: Env) {
       const groups = (await env.churchcore.prepare(`SELECT * FROM groups WHERE church_id=?1 LIMIT ${limit}`).bind(parsed.churchId).all()).results ?? [];
       const opportunities = (await env.churchcore.prepare(`SELECT * FROM opportunities WHERE church_id=?1 LIMIT ${limit}`).bind(parsed.churchId).all()).results ?? [];
       const resources = (await env.churchcore.prepare(`SELECT * FROM resources WHERE church_id=?1 LIMIT ${limit}`).bind(parsed.churchId).all()).results ?? [];
+      const journeyNodes = (await env.churchcore.prepare(`SELECT * FROM journey_node WHERE church_id=?1 LIMIT ${limit}`).bind(parsed.churchId).all()).results ?? [];
+      const journeyEdges = (await env.churchcore.prepare(`SELECT * FROM journey_edge WHERE church_id=?1 LIMIT ${limit}`).bind(parsed.churchId).all()).results ?? [];
+      const journeyLinks = (await env.churchcore.prepare(`SELECT * FROM journey_resource_link WHERE church_id=?1 LIMIT ${limit}`).bind(parsed.churchId).all()).results ?? [];
 
       const contentDocs = (
         await env.churchcore
@@ -1185,6 +1188,7 @@ function createServer(env: Env) {
         { sourceId: "church/events.json", text: JSON.stringify({ events, outreaches }, null, 2) },
         { sourceId: "church/groups.json", text: JSON.stringify({ groups, opportunities }, null, 2) },
         { sourceId: "church/resources.json", text: JSON.stringify({ resources }, null, 2) },
+        { sourceId: "church/journey_graph.json", text: JSON.stringify({ journeyNodes, journeyEdges, journeyLinks }, null, 2) },
         ...contentDocs.map((d: any) => ({
           sourceId: `content/${String(d.entityType)}/${String(d.entityId)}/${String(d.locale)}#${String(d.docId)}`,
           text: String(d.bodyMarkdown ?? ""),

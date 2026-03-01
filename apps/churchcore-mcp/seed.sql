@@ -172,6 +172,91 @@ INSERT OR REPLACE INTO journey_state (id, church_id, seeker_id, state_json, upda
 ('js1','demo-church','p_seeker_1','{\"stage\":\"new\",\"lastTouch\":\"seed\"}',datetime('now')),
 ('js2','demo-church','p_seeker_2','{\"stage\":\"visit_planned\",\"lastTouch\":\"seed\"}',datetime('now'));
 
+-- Evangelical faith journey graph (canonical)
+INSERT OR REPLACE INTO journey_node (node_id, church_id, node_type, title, summary, metadata_json, created_at, updated_at) VALUES
+('stage_seeker','demo-church','Stage','Seeker','Exploring faith, asking questions.','{}',datetime('now'),datetime('now')),
+('stage_gospel_clarity','demo-church','Stage','Gospel Clarity','Understands the gospel and its implications.','{}',datetime('now'),datetime('now')),
+('stage_conversion','demo-church','Stage','Conversion','Responded to Christ with repentance and faith.','{}',datetime('now'),datetime('now')),
+('stage_new_believer','demo-church','Stage','New Believer','Early formation, assurance, basic practices.','{}',datetime('now'),datetime('now')),
+('stage_connected','demo-church','Stage','Connected','Belongs in community and participates regularly.','{}',datetime('now'),datetime('now')),
+('stage_growing','demo-church','Stage','Growing Disciple','Developing habits, doctrine, obedience.','{}',datetime('now'),datetime('now')),
+('stage_serving','demo-church','Stage','Serving','Using gifts to build up the church.','{}',datetime('now'),datetime('now')),
+('stage_multiplying','demo-church','Stage','Multiplying','Sharing faith and discipling others.','{}',datetime('now'),datetime('now')),
+('stage_leader','demo-church','Stage','Leader','Shepherding others with recognized responsibility.','{}',datetime('now'),datetime('now')),
+
+('ms_understood_gospel','demo-church','Milestone','Understood the Gospel','Can explain the gospel in their own words.','{}',datetime('now'),datetime('now')),
+('ms_profession_faith','demo-church','Milestone','Profession of Faith','Expressed repentance and faith in Christ.','{}',datetime('now'),datetime('now')),
+('ms_baptism','demo-church','Milestone','Baptism','Public identification with Christ.','{}',datetime('now'),datetime('now')),
+('ms_joined_group','demo-church','Milestone','Joined a Small Group','Connected into ongoing community.','{}',datetime('now'),datetime('now')),
+('ms_foundations_class','demo-church','Milestone','Completed Foundations','Completed core beliefs / discipleship class.','{}',datetime('now'),datetime('now')),
+('ms_started_serving','demo-church','Milestone','Started Serving','Serving on a team consistently.','{}',datetime('now'),datetime('now')),
+('ms_shared_testimony','demo-church','Milestone','Shared Testimony','Able to share story clearly.','{}',datetime('now'),datetime('now')),
+
+('pr_bible','demo-church','Practice','Bible Reading','Regular Scripture intake.','{}',datetime('now'),datetime('now')),
+('pr_prayer','demo-church','Practice','Prayer','Daily prayer rhythm.','{}',datetime('now'),datetime('now')),
+
+('topic_gospel','demo-church','DoctrineTopic','The Gospel','Jesus, sin, grace, faith, new life.','{}',datetime('now'),datetime('now')),
+('topic_assurance','demo-church','DoctrineTopic','Assurance of Salvation','Confidence grounded in Christ.','{}',datetime('now'),datetime('now')),
+
+('barrier_doubt','demo-church','Barrier','Doubt/Uncertainty','Questions about faith, truth, or salvation.','{}',datetime('now'),datetime('now')),
+('barrier_shame','demo-church','Barrier','Shame/Guilt','Feels unworthy or stuck in regret.','{}',datetime('now'),datetime('now')),
+
+('step_talk_to_guide','demo-church','ActionStep','Talk with a Guide','Schedule a 15-minute conversation with a church guide.','{\"cta\":\"Talk with a guide\",\"tool\":\"guide\"}',datetime('now'),datetime('now')),
+('step_join_group','demo-church','ActionStep','Join a Small Group','Pick a group and attend this week.','{\"cta\":\"Find a group\",\"tool\":\"groups\"}',datetime('now'),datetime('now'));
+
+INSERT OR REPLACE INTO journey_edge (edge_id, church_id, from_node_id, to_node_id, edge_type, weight, metadata_json, created_at, updated_at) VALUES
+('e1','demo-church','stage_seeker','stage_gospel_clarity','NEXT_STAGE',1.0,'{}',datetime('now'),datetime('now')),
+('e2','demo-church','stage_gospel_clarity','stage_conversion','NEXT_STAGE',1.0,'{}',datetime('now'),datetime('now')),
+('e3','demo-church','stage_conversion','stage_new_believer','NEXT_STAGE',1.0,'{}',datetime('now'),datetime('now')),
+('e4','demo-church','stage_new_believer','stage_connected','NEXT_STAGE',1.0,'{}',datetime('now'),datetime('now')),
+('e5','demo-church','stage_connected','stage_growing','NEXT_STAGE',1.0,'{}',datetime('now'),datetime('now')),
+('e6','demo-church','stage_growing','stage_serving','NEXT_STAGE',1.0,'{}',datetime('now'),datetime('now')),
+('e7','demo-church','stage_serving','stage_multiplying','NEXT_STAGE',1.0,'{}',datetime('now'),datetime('now')),
+('e8','demo-church','stage_multiplying','stage_leader','NEXT_STAGE',1.0,'{}',datetime('now'),datetime('now')),
+
+('r1','demo-church','stage_gospel_clarity','ms_understood_gospel','REQUIRES',1.2,'{}',datetime('now'),datetime('now')),
+('r2','demo-church','stage_conversion','ms_profession_faith','REQUIRES',1.2,'{}',datetime('now'),datetime('now')),
+('r3','demo-church','stage_new_believer','pr_bible','REQUIRES',1.0,'{}',datetime('now'),datetime('now')),
+('r4','demo-church','stage_new_believer','pr_prayer','REQUIRES',1.0,'{}',datetime('now'),datetime('now')),
+('r5','demo-church','stage_connected','ms_joined_group','REQUIRES',1.1,'{}',datetime('now'),datetime('now')),
+('r6','demo-church','stage_growing','ms_foundations_class','REQUIRES',1.0,'{}',datetime('now'),datetime('now')),
+('r7','demo-church','stage_serving','ms_started_serving','REQUIRES',1.0,'{}',datetime('now'),datetime('now')),
+
+('b1','demo-church','stage_gospel_clarity','barrier_doubt','BLOCKED_BY',1.0,'{}',datetime('now'),datetime('now')),
+('b2','demo-church','stage_conversion','barrier_shame','BLOCKED_BY',1.0,'{}',datetime('now'),datetime('now')),
+
+('rec1','demo-church','barrier_doubt','step_talk_to_guide','RESOLVED_BY',1.3,'{}',datetime('now'),datetime('now')),
+('rec2','demo-church','stage_connected','step_join_group','RECOMMENDS',1.2,'{}',datetime('now'),datetime('now')),
+('rec3','demo-church','stage_new_believer','topic_assurance','RECOMMENDS',1.1,'{}',datetime('now'),datetime('now')),
+('rec4','demo-church','stage_gospel_clarity','topic_gospel','RECOMMENDS',1.1,'{}',datetime('now'),datetime('now')),
+('u1','demo-church','ms_baptism','stage_connected','UNLOCKS',1.0,'{}',datetime('now'),datetime('now'));
+
+-- Journey content docs (KB-friendly) + linkages
+INSERT OR REPLACE INTO content_docs (id, church_id, entity_type, entity_id, locale, title, body_markdown, created_at, updated_at) VALUES
+('doc_journey_topic_gospel','demo-church','journey_topic','topic_gospel','en','The Gospel',
+ '## The Gospel\\n\\nThe gospel is the good news that **Jesus Christ** lived the life we could not, died for our sins, and rose again. Salvation is **by grace through faith**, not by works.\\n\\n**Next step**: if you want, tell me what you think the gospel is in your own words.',
+ datetime('now'),datetime('now')),
+('doc_journey_topic_assurance','demo-church','journey_topic','topic_assurance','en','Assurance of Salvation',
+ '## Assurance of Salvation\\n\\nAssurance is confidence grounded in **Christ**—his character and promises—not in perfect feelings. If you are unsure, it is okay to ask honest questions and take one small step at a time.\\n\\n**Next step**: we can talk through what you are trusting and what you are afraid of.',
+ datetime('now'),datetime('now')),
+('doc_journey_step_talk_to_guide','demo-church','journey_step','step_talk_to_guide','en','Talk with a Guide',
+ '## Talk with a Guide\\n\\nA Guide is a trusted person who can listen, pray, and help you take the next step—at your pace.\\n\\n**Suggested**: ask for a 15-minute conversation after service or this week.',
+ datetime('now'),datetime('now')),
+('doc_journey_step_join_group','demo-church','journey_step','step_join_group','en','Join a Small Group',
+ '## Join a Small Group\\n\\nFaith grows in community. A small group is a simple place to build friendships, ask questions, and pray together.\\n\\n**Suggested**: pick a group and attend once.',
+ datetime('now'),datetime('now'));
+
+INSERT OR REPLACE INTO journey_resource_link (link_id, church_id, node_id, resource_id, relevance, created_at) VALUES
+('jrl1','demo-church','topic_gospel','doc_journey_topic_gospel',1.0,datetime('now')),
+('jrl2','demo-church','topic_assurance','doc_journey_topic_assurance',1.0,datetime('now')),
+('jrl3','demo-church','step_talk_to_guide','doc_journey_step_talk_to_guide',1.0,datetime('now')),
+('jrl4','demo-church','step_join_group','doc_journey_step_join_group',1.0,datetime('now'));
+
+-- Person journey instance (seed)
+INSERT OR REPLACE INTO person_journey_state (church_id, person_id, current_stage_id, confidence, updated_at) VALUES
+('demo-church','p_seeker_1','stage_new_believer',0.5,datetime('now')),
+('demo-church','p_seeker_2','stage_seeker',0.5,datetime('now'));
+
 -- Person memory (seed from journey_state)
 INSERT OR REPLACE INTO person_memory (church_id, person_id, memory_json, created_at, updated_at) VALUES
 (

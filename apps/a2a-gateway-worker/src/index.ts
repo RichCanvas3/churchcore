@@ -63,6 +63,14 @@ async function parseJson(req: Request) {
   return raw;
 }
 
+function safeJsonParse(text: string) {
+  try {
+    return JSON.parse(String(text ?? ""));
+  } catch {
+    return null;
+  }
+}
+
 async function getUserRoles(env: Env, args: { churchId: string; userId: string }) {
   const rows =
     (
@@ -245,6 +253,27 @@ const MemoryAuditListSchema = z.object({
   person_id: z.string().min(1).optional().nullable(),
   limit: z.number().int().min(1).max(200).optional().nullable(),
   offset: z.number().int().min(0).max(500000).optional().nullable(),
+});
+
+// Journey endpoints
+const JourneyGetStateSchema = z.object({
+  identity: IdentitySchema,
+  person_id: z.string().min(1).optional().nullable(),
+});
+
+const JourneyNextStepsSchema = z.object({
+  identity: IdentitySchema,
+  person_id: z.string().min(1).optional().nullable(),
+  limit: z.number().int().min(1).max(10).optional().nullable(),
+});
+
+const JourneyCompleteStepSchema = z.object({
+  identity: IdentitySchema,
+  person_id: z.string().min(1).optional().nullable(),
+  node_id: z.string().min(1),
+  event_type: z.enum(["COMPLETED", "STARTED", "NOTE", "ASSESSMENT"]).optional().nullable(),
+  value: z.unknown().optional().nullable(),
+  access_level: z.enum(["self", "staff", "pastoral", "restricted"]).optional().nullable(),
 });
 
 function applyMemoryOps(baseMemory: any, ops: MemoryOp[], identityRole: string) {
@@ -434,6 +463,101 @@ async function handleMemoryAuditList(req: Request, env: Env) {
   return json({ ok: true, person_id: personId, audits, actor: { userId, role, roles: Array.from(roles.values()) } });
 }
 
+async function handleJourneyGetState(req: Request, env: Env) {
+  const parsed = JourneyGetStateSchema.safeParse(await parseJson(req));
+  if (!parsed.success) return json({ error: "Invalid body", issues: parsed.error.issues }, { status: 400 });
+  const { identity } = parsed.data;
+  const churchId = identity.tenant_id;
+  const userId = identity.user_id;
+  const role = (identity.role ?? "seeker") as string;
+
+  const resolved = await resolvePerson(env, identity);
+  const personId = (parsed.data.person_id ?? "").trim() || resolved.personId;
+  if (!personId) return json({ ok: false, error: "No personId" }, { status: 400 });
+
+  const personMemory = await getPersonMemory(env, { churchId, personId });
+  const state = await ensurePersonJourneyState(env, { churchId, personId, personMemory: personMemory.memory ?? {} });
+  const stages = await getJourneyStages(env, { churchId });
+  const currentStageId = state.currentStageId ?? "stage_seeker";
+  const currentStage = await getJourneyNode(env, { churchId, nodeId: currentStageId });
+  const completed = await listPersonJourneyCompleted(env, { churchId, personId });
+
+  return json({
+    ok: true,
+    person_id: personId,
+    current_stage: currentStage,
+    stages,
+    completed_node_ids: Array.from(completed.completedNodeIds.values()),
+    confidence: state.confidence,
+    updated_at: state.updatedAt,
+    actor: { userId, role },
+  });
+}
+
+async function handleJourneyNextSteps(req: Request, env: Env) {
+  const parsed = JourneyNextStepsSchema.safeParse(await parseJson(req));
+  if (!parsed.success) return json({ error: "Invalid body", issues: parsed.error.issues }, { status: 400 });
+  const { identity } = parsed.data;
+  const churchId = identity.tenant_id;
+  const userId = identity.user_id;
+  const role = (identity.role ?? "seeker") as string;
+
+  const resolved = await resolvePerson(env, identity);
+  const personId = (parsed.data.person_id ?? "").trim() || resolved.personId;
+  if (!personId) return json({ ok: false, error: "No personId" }, { status: 400 });
+
+  const limit = parsed.data.limit ?? 3;
+  const personMemory = await getPersonMemory(env, { churchId, personId });
+  const state = await ensurePersonJourneyState(env, { churchId, personId, personMemory: personMemory.memory ?? {} });
+  const currentStageId = state.currentStageId ?? "stage_seeker";
+  const nextSteps = await computeJourneyNextSteps(env, { churchId, personId, currentStageId, limit });
+
+  return json({ ok: true, person_id: personId, current_stage_id: currentStageId, next_steps: nextSteps, actor: { userId, role } });
+}
+
+async function handleJourneyCompleteStep(req: Request, env: Env) {
+  const parsed = JourneyCompleteStepSchema.safeParse(await parseJson(req));
+  if (!parsed.success) return json({ error: "Invalid body", issues: parsed.error.issues }, { status: 400 });
+  const { identity } = parsed.data;
+  const churchId = identity.tenant_id;
+  const userId = identity.user_id;
+  const role = (identity.role ?? "seeker") as string;
+  const roles = await getUserRoles(env, { churchId, userId });
+
+  const resolved = await resolvePerson(env, identity);
+  const personId = (parsed.data.person_id ?? "").trim() || resolved.personId;
+  if (!personId) return json({ ok: false, error: "No personId" }, { status: 400 });
+
+  const nodeId = parsed.data.node_id.trim();
+  const node = await getJourneyNode(env, { churchId, nodeId });
+  if (!node) return json({ ok: false, error: "Unknown node_id" }, { status: 404 });
+
+  const identityRole = (role || "seeker").toLowerCase();
+  const isGuide = identityRole === "guide" || roles.has("staff");
+  const eventType = (parsed.data.event_type ?? "COMPLETED").trim();
+  const accessLevel = (parsed.data.access_level ?? (isGuide ? "pastoral" : "self")).trim();
+  const allowedAccess =
+    accessLevel === "self" || (isGuide && (accessLevel === "staff" || accessLevel === "pastoral" || accessLevel === "restricted"));
+  if (!allowedAccess) return json({ ok: false, error: "Not permitted" }, { status: 403 });
+
+  if (node.type === "Stage") {
+    await upsertPersonJourneyStage(env, { churchId, personId, stageId: node.id, confidence: 0.6 });
+    await insertPersonJourneyEvent(env, { churchId, personId, nodeId: node.id, eventType: "NOTE", valueJson: { setStage: true }, source: "user", accessLevel: "self" });
+    return json({ ok: true, person_id: personId, updated_stage_id: node.id });
+  }
+
+  await insertPersonJourneyEvent(env, {
+    churchId,
+    personId,
+    nodeId: node.id,
+    eventType,
+    valueJson: parsed.data.value ?? null,
+    source: isGuide ? "staff" : "user",
+    accessLevel,
+  });
+  return json({ ok: true, person_id: personId, node_id: node.id, event_type: eventType });
+}
+
 async function auditMemoryOps(env: Env, args: { churchId: string; personId: string; threadId: string; actorUserId: string; actorRole: string; ops: unknown; turnId?: string | null }) {
   const id = crypto.randomUUID();
   await env.churchcore
@@ -444,6 +568,163 @@ async function auditMemoryOps(env: Env, args: { churchId: string; personId: stri
     .bind(id, args.churchId, args.personId, args.threadId, args.turnId ?? null, args.actorUserId, args.actorRole, JSON.stringify(args.ops ?? {}), nowIso())
     .run();
   return { ok: true, auditId: id };
+}
+
+type JourneyStage = { id: string; title: string; summary: string | null };
+
+async function getJourneyStages(env: Env, args: { churchId: string }): Promise<JourneyStage[]> {
+  const rows = (
+    await env.churchcore
+      .prepare(`SELECT node_id AS id, title, summary FROM journey_node WHERE church_id=?1 AND node_type='Stage' ORDER BY node_id ASC`)
+      .bind(args.churchId)
+      .all()
+  ).results as any[];
+  return (rows ?? []).map((r) => ({ id: String(r.id), title: String(r.title), summary: r.summary ?? null }));
+}
+
+async function getJourneyNode(env: Env, args: { churchId: string; nodeId: string }) {
+  const row = (
+    await env.churchcore
+      .prepare(`SELECT node_id AS id, node_type AS type, title, summary, metadata_json AS metadataJson FROM journey_node WHERE church_id=?1 AND node_id=?2`)
+      .bind(args.churchId, args.nodeId)
+      .first()
+  ) as any;
+  return row
+    ? {
+        id: String(row.id),
+        type: String(row.type),
+        title: String(row.title),
+        summary: row.summary ?? null,
+        metadata: typeof row.metadataJson === "string" ? safeJsonParse(row.metadataJson) : null,
+      }
+    : null;
+}
+
+async function getPersonJourneyState(env: Env, args: { churchId: string; personId: string }) {
+  const row = (
+    await env.churchcore
+      .prepare(`SELECT current_stage_id AS currentStageId, confidence, updated_at AS updatedAt FROM person_journey_state WHERE church_id=?1 AND person_id=?2`)
+      .bind(args.churchId, args.personId)
+      .first()
+  ) as any;
+  return row
+    ? {
+        currentStageId: row.currentStageId ? String(row.currentStageId) : null,
+        confidence: typeof row.confidence === "number" ? row.confidence : 0.5,
+        updatedAt: row.updatedAt ?? null,
+      }
+    : { currentStageId: null, confidence: 0.5, updatedAt: null };
+}
+
+async function upsertPersonJourneyStage(env: Env, args: { churchId: string; personId: string; stageId: string; confidence?: number | null }) {
+  const now = nowIso();
+  await env.churchcore
+    .prepare(
+      `INSERT INTO person_journey_state (church_id, person_id, current_stage_id, confidence, updated_at)
+       VALUES (?1, ?2, ?3, ?4, ?5)
+       ON CONFLICT(church_id, person_id) DO UPDATE SET current_stage_id=excluded.current_stage_id, confidence=excluded.confidence, updated_at=excluded.updated_at`,
+    )
+    .bind(args.churchId, args.personId, args.stageId, typeof args.confidence === "number" ? args.confidence : 0.5, now)
+    .run();
+}
+
+async function listPersonJourneyCompleted(env: Env, args: { churchId: string; personId: string }) {
+  const rows = (
+    await env.churchcore
+      .prepare(
+        `SELECT node_id AS nodeId, created_at AS createdAt
+         FROM person_journey_event
+         WHERE church_id=?1 AND person_id=?2 AND event_type='COMPLETED'
+         ORDER BY created_at DESC LIMIT 500`,
+      )
+      .bind(args.churchId, args.personId)
+      .all()
+  ).results as any[];
+  const set = new Set<string>();
+  for (const r of rows ?? []) set.add(String(r.nodeId));
+  return { completedNodeIds: set, completedRows: rows ?? [] };
+}
+
+async function listJourneyEdgesFrom(env: Env, args: { churchId: string; fromNodeId: string }) {
+  const rows = (
+    await env.churchcore
+      .prepare(
+        `SELECT edge_id AS edgeId, to_node_id AS toNodeId, edge_type AS edgeType, weight, metadata_json AS metadataJson
+         FROM journey_edge WHERE church_id=?1 AND from_node_id=?2`,
+      )
+      .bind(args.churchId, args.fromNodeId)
+      .all()
+  ).results as any[];
+  return (rows ?? []).map((r) => ({
+    edgeId: String(r.edgeId),
+    toNodeId: String(r.toNodeId),
+    edgeType: String(r.edgeType),
+    weight: typeof r.weight === "number" ? r.weight : 1.0,
+    metadata: typeof r.metadataJson === "string" ? safeJsonParse(r.metadataJson) : null,
+  }));
+}
+
+async function insertPersonJourneyEvent(env: Env, args: { churchId: string; personId: string; nodeId: string; eventType: string; valueJson: any; source: string; accessLevel: string }) {
+  const now = nowIso();
+  await env.churchcore
+    .prepare(
+      `INSERT INTO person_journey_event (event_id, church_id, person_id, node_id, event_type, value_json, source, access_level, created_at)
+       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)`,
+    )
+    .bind(crypto.randomUUID(), args.churchId, args.personId, args.nodeId, args.eventType, JSON.stringify(args.valueJson ?? null), args.source, args.accessLevel, now)
+    .run();
+}
+
+function mapLegacyStageToCanonical(stage: string) {
+  const s = String(stage || "").trim().toLowerCase();
+  if (!s) return "stage_seeker";
+  if (s === "visit_planned") return "stage_seeker";
+  if (s === "seeker") return "stage_seeker";
+  if (s === "gospel_clarity") return "stage_gospel_clarity";
+  if (s === "conversion") return "stage_conversion";
+  if (s === "new" || s === "new_believer") return "stage_new_believer";
+  if (s === "connected") return "stage_connected";
+  if (s === "growing") return "stage_growing";
+  if (s === "serving") return "stage_serving";
+  if (s === "multiplying") return "stage_multiplying";
+  if (s === "leader") return "stage_leader";
+  return "stage_seeker";
+}
+
+async function ensurePersonJourneyState(env: Env, args: { churchId: string; personId: string; personMemory: any }) {
+  const existing = await getPersonJourneyState(env, { churchId: args.churchId, personId: args.personId });
+  if (existing.currentStageId) return existing;
+  const legacy = args.personMemory?.spiritualJourney?.stage;
+  const canonical = mapLegacyStageToCanonical(typeof legacy === "string" ? legacy : "");
+  await upsertPersonJourneyStage(env, { churchId: args.churchId, personId: args.personId, stageId: canonical, confidence: 0.5 });
+  return await getPersonJourneyState(env, { churchId: args.churchId, personId: args.personId });
+}
+
+async function computeJourneyNextSteps(env: Env, args: { churchId: string; personId: string; currentStageId: string; limit: number }) {
+  const { completedNodeIds } = await listPersonJourneyCompleted(env, { churchId: args.churchId, personId: args.personId });
+  const edges = await listJourneyEdgesFrom(env, { churchId: args.churchId, fromNodeId: args.currentStageId });
+
+  const candidates: Array<{ nodeId: string; edgeType: string; weight: number; why: string }> = [];
+  for (const e of edges) {
+    const edgeType = String(e.edgeType);
+    const weight = typeof e.weight === "number" ? e.weight : 1.0;
+    if (edgeType === "REQUIRES") {
+      if (!completedNodeIds.has(e.toNodeId)) candidates.push({ nodeId: e.toNodeId, edgeType, weight, why: "Required for this stage" });
+    } else if (edgeType === "RECOMMENDS") {
+      candidates.push({ nodeId: e.toNodeId, edgeType, weight, why: "Recommended next step" });
+    }
+  }
+
+  candidates.sort((a, b) => (b.weight ?? 1) - (a.weight ?? 1));
+  const top = candidates.slice(0, Math.max(1, args.limit));
+
+  const out: any[] = [];
+  for (const c of top) {
+    const node = await getJourneyNode(env, { churchId: args.churchId, nodeId: c.nodeId });
+    if (!node) continue;
+    out.push({ node, edgeType: c.edgeType, score: c.weight, why: c.why });
+  }
+  return out;
 }
 
 async function requireOwnedThread(env: Env, args: { churchId: string; userId: string; threadId: string }) {
@@ -793,6 +1074,10 @@ async function handleChat(req: Request, env: Env) {
   const personMemory = personId ? await getPersonMemory(env, { churchId, personId }) : { memory: null, updatedAt: null };
   const redactedMemory = redactMemoryForRole(role, personMemory.memory);
   const hh = personId ? await getHouseholdSummary(env, { churchId, personId }) : { householdId: null, summary: "" };
+  const journeyState = personId ? await ensurePersonJourneyState(env, { churchId, personId, personMemory: personMemory.memory ?? {} }) : { currentStageId: null, confidence: 0.5, updatedAt: null };
+  const currentStageId = journeyState.currentStageId ?? "stage_seeker";
+  const journeyCurrentStage = personId ? await getJourneyNode(env, { churchId, nodeId: currentStageId }) : null;
+  const journeyNextSteps = personId ? await computeJourneyNextSteps(env, { churchId, personId, currentStageId, limit: 3 }) : [];
   const inputArgs = parsed.data.args && typeof parsed.data.args === "object" ? (parsed.data.args as Record<string, unknown>) : {};
   const session = {
     churchId,
@@ -816,6 +1101,7 @@ async function handleChat(req: Request, env: Env) {
           person_memory: redactedMemory,
           person_memory_updated_at: personMemory.updatedAt,
           household: { household_id: hh.householdId, summary: hh.summary },
+          journey: { current_stage: journeyCurrentStage, next_steps: journeyNextSteps },
           policy: { role },
         },
       },
@@ -1422,6 +1708,12 @@ export default {
         return handleMemoryApplyOps(req, env);
       case "/a2a/memory.audit.list":
         return handleMemoryAuditList(req, env);
+      case "/a2a/journey.get_state":
+        return handleJourneyGetState(req, env);
+      case "/a2a/journey.next_steps":
+        return handleJourneyNextSteps(req, env);
+      case "/a2a/journey.complete_step":
+        return handleJourneyCompleteStep(req, env);
       default:
         return json({ error: "Not found" }, { status: 404 });
     }
