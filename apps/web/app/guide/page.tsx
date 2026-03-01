@@ -1,42 +1,75 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import type { OutputEnvelope, Session } from "../../lib/types";
+import { useEffect, useMemo, useState } from "react";
+import type { OutputEnvelope } from "../../lib/types";
 import { CardsRenderer } from "../../components/CardsRenderer";
 import { NextActionsRenderer } from "../../components/NextActionsRenderer";
 import { FormsRenderer } from "../../components/FormsRenderer";
 import { HandoffRenderer } from "../../components/HandoffRenderer";
+import { useDemoIdentity } from "../../components/DemoIdentityProvider";
 
-function defaultSession(): Session {
-  return {
-    churchId: "demo-church",
-    campusId: null,
-    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
-    userId: "local-guide",
-    role: "guide",
-    auth: { isAuthenticated: true, roles: ["guide"] },
-    threadId: null,
-  };
+async function postJson<T = any>(url: string, body: unknown): Promise<T> {
+  const res = await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+  const json = (await res.json().catch(() => ({}))) as any;
+  if (!res.ok) throw new Error(json?.error || `HTTP ${res.status}`);
+  return json as T;
 }
 
 export default function GuidePage() {
-  const [session, setSession] = useState<Session>(() => defaultSession());
+  const { identity } = useDemoIdentity();
   const [message, setMessage] = useState<string>("");
   const [output, setOutput] = useState<OutputEnvelope | null>(null);
   const [loading, setLoading] = useState(false);
+  const [threadId, setThreadId] = useState<string | null>(null);
+  const [runAsGuide, setRunAsGuide] = useState(true);
+  const [uiError, setUiError] = useState<string | null>(null);
 
-  const authOk = useMemo(() => !!session.auth?.isAuthenticated, [session.auth]);
+  const effectiveRole = useMemo(() => (runAsGuide ? "guide" : identity.role), [identity.role, runAsGuide]);
+
+  useEffect(() => {
+    setThreadId(null);
+    setOutput(null);
+    setUiError(null);
+  }, [identity.user_id]);
+
+  async function ensureThread(): Promise<string> {
+    if (threadId) return threadId;
+    const created = await postJson<{ thread_id: string; title?: string }>("/api/a2a/thread/create", {
+      identity: {
+        tenant_id: identity.tenant_id,
+        user_id: identity.user_id,
+        role: effectiveRole,
+        campus_id: identity.campus_id ?? undefined,
+        timezone: identity.timezone ?? undefined,
+      },
+      title: "Guide console",
+      metadata: { surface: "guide" },
+    });
+    setThreadId(created.thread_id);
+    return created.thread_id;
+  }
 
   async function callSkill(skill: string, args?: Record<string, unknown>, msg?: string) {
     setLoading(true);
+    setUiError(null);
     try {
-      const res = await fetch("/api/agent/run", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ skill, message: msg ?? null, args: args ?? null, session }),
+      const tid = await ensureThread();
+      const json = await postJson<{ thread_id: string; output: OutputEnvelope }>("/api/a2a/chat", {
+        identity: {
+          tenant_id: identity.tenant_id,
+          user_id: identity.user_id,
+          role: effectiveRole,
+          campus_id: identity.campus_id ?? undefined,
+          timezone: identity.timezone ?? undefined,
+        },
+        thread_id: tid,
+        message: String(msg ?? "").trim(),
+        skill,
+        args: args ?? null,
       });
-      const json = (await res.json().catch(() => ({}))) as any;
-      setOutput(json as OutputEnvelope);
+      setOutput((json as any)?.output ?? null);
+    } catch (e: any) {
+      setUiError(String(e?.message ?? e ?? "Request failed"));
     } finally {
       setLoading(false);
     }
@@ -48,23 +81,18 @@ export default function GuidePage() {
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
           <div>
             <div style={{ fontSize: 20, fontWeight: 800 }}>Guide Console</div>
-            <div style={{ color: "#475569" }}>Permission-protected skills. Uses the same deployed agent.</div>
+            <div style={{ color: "#475569" }}>All requests go through the A2A gateway.</div>
           </div>
           <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
             <a href="/chat" style={{ fontSize: 12 }}>
               Back to Seeker Chat
             </a>
             <label style={{ display: "flex", gap: 6, alignItems: "center" }}>
-              <span style={{ fontSize: 12, color: "#475569" }}>Authenticated</span>
+              <span style={{ fontSize: 12, color: "#475569" }}>Run as guide</span>
               <input
                 type="checkbox"
-                checked={authOk}
-                onChange={(e) =>
-                  setSession((s) => ({
-                    ...s,
-                    auth: e.target.checked ? { isAuthenticated: true, roles: ["guide"] } : { isAuthenticated: false, roles: [] },
-                  }))
-                }
+                checked={runAsGuide}
+                onChange={(e) => setRunAsGuide(e.target.checked)}
               />
             </label>
           </div>
@@ -108,6 +136,7 @@ export default function GuidePage() {
               Send
             </button>
           </div>
+          {uiError ? <div style={{ color: "#b91c1c", fontSize: 12 }}>{uiError}</div> : null}
           <NextActionsRenderer
             actions={[
               { title: "View assigned seekers", skill: "guide.view_assigned_seekers" },

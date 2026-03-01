@@ -66,6 +66,29 @@ def _citations_from_docs(docs: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return out
 
 
+def _ui_handoff_for_user_text(user_text: str) -> list[dict[str, Any]]:
+    """
+    Minimal client-side UI tool signaling.
+    The web can render a right-side panel when the agent includes a handoff item:
+      {"type":"ui_tool","tool_id":"household_manager", ...}
+    """
+    u = (user_text or "").strip().lower()
+    if not u:
+        return []
+    householdish = any(k in u for k in ["household", "family", "kids", "kid", "child", "children"])
+    manageish = any(k in u for k in ["update", "edit", "add", "remove", "change", "member", "members"])
+    if householdish and manageish:
+        return [
+            {
+                "type": "ui_tool",
+                "tool_id": "household_manager",
+                "title": "Household",
+                "instructions": "Open the household manager panel.",
+            }
+        ]
+    return []
+
+
 def _cards_from_export_docs(docs: list[dict[str, Any]]) -> list[dict[str, Any]]:
     cards: list[dict[str, Any]] = []
     for d in docs:
@@ -345,6 +368,9 @@ async def handle_seeker_skill(
             "You are Church Agent in seeker role. Help the person explore faith and take next steps.\n"
             "Do not invent service times, events, groups, or volunteer opportunities. Use ONLY the provided church data excerpt.\n"
             "Always be warm, concise, and propose 1-3 next actions.\n\n"
+            "Client UI tools available (use handoff items when helpful):\n"
+            "- household_manager: manage household members (add/edit/remove kids, allergies, special needs).\n"
+            'If a UI tool should open, include a handoff item like: {"type":"ui_tool","tool_id":"household_manager"}.\n\n'
             + (("Known person memory (shared across topics):\n" + mem_summary + "\n\n") if mem_summary else "")
             + (("Household context:\n" + hh_summary + "\n\n") if hh_summary else "")
             + (("Authoritative church data excerpt:\n" + church_context + "\n\n") if church_context else "")
@@ -362,6 +388,7 @@ async def handle_seeker_skill(
         r = await model.ainvoke([("system", sys), ("user", user)])
         txt = getattr(r, "content", "") if r else ""
         out_text = str(txt or "").strip() or "How can I help?"
+        ui_handoff = _ui_handoff_for_user_text(user)
         memory_ops: list[dict[str, Any]] = []
         try:
             memory_ops = await _propose_memory_ops(
@@ -382,6 +409,7 @@ async def handle_seeker_skill(
                 NextAction(title="Request contact", skill="connect.request_contact"),
             ],
             cards=_cards_from_export_docs(relevant_docs),
+            handoff=ui_handoff,
             citations=([{"sourceId": h.sourceId, "snippet": h.snippet} for h in kb_hits] if kb_hits else _citations_from_docs(relevant_docs)),
             data={"memory_ops": memory_ops, "memory_summary_used": mem_summary},
         )

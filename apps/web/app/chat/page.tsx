@@ -5,6 +5,7 @@ import { ComposerPrimitive, MessagePrimitive, ThreadPrimitive } from "@assistant
 import type { Session } from "../../lib/types";
 import { A2AChatRuntime } from "./A2AChatRuntime";
 import { useDemoIdentity } from "../../components/DemoIdentityProvider";
+import { HouseholdManagerPanel } from "./HouseholdManagerPanel";
 
 type ThreadMeta = { id: string; title: string; status: string; updatedAt?: string; createdAt?: string };
 
@@ -74,42 +75,56 @@ function Composer() {
 
 export default function ChatPage() {
   const { identity } = useDemoIdentity();
-  const [session, setSession] = useState<Session>(() => ({
-    churchId: identity.tenant_id,
-    campusId: identity.campus_id ?? "campus_main",
-    timezone: identity.timezone ?? (Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"),
-    userId: identity.user_id,
-    personId: null,
-    role: "seeker",
-    auth: { isAuthenticated: false, roles: [] },
-    threadId: null,
-  }));
   const [threads, setThreads] = useState<ThreadMeta[]>([]);
+  const [threadsOwnerUserId, setThreadsOwnerUserId] = useState<string>(() => identity.user_id);
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [mePerson, setMePerson] = useState<Record<string, unknown> | null>(null);
   const [editingThreadId, setEditingThreadId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState<string>("");
   const [renaming, setRenaming] = useState(false);
+  const [uiError, setUiError] = useState<string | null>(null);
+  const [activeUiToolId, setActiveUiToolId] = useState<string | null>(null);
+
+  const effectiveThreadId = useMemo(() => {
+    if (threadsOwnerUserId !== identity.user_id) return null;
+    if (!activeThreadId) return null;
+    return threads.some((t) => t && t.id === activeThreadId) ? activeThreadId : null;
+  }, [activeThreadId, identity.user_id, threads, threadsOwnerUserId]);
+
+  const session = useMemo<Session>(
+    () => ({
+      churchId: identity.tenant_id,
+      campusId: identity.campus_id ?? "campus_main",
+      timezone: identity.timezone ?? (Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"),
+      userId: identity.user_id,
+      personId: typeof (mePerson as any)?.id === "string" ? String((mePerson as any).id) : null,
+      role: "seeker",
+      auth: { isAuthenticated: false, roles: [] },
+      threadId: effectiveThreadId,
+    }),
+    [effectiveThreadId, identity.campus_id, identity.tenant_id, identity.timezone, identity.user_id, mePerson],
+  );
 
   const meLabel = useMemo(() => {
     const first = typeof (mePerson as any)?.first_name === "string" ? String((mePerson as any).first_name) : "";
     const last = typeof (mePerson as any)?.last_name === "string" ? String((mePerson as any).last_name) : "";
     const full = `${first} ${last}`.trim();
     if (full) return full;
-    if (session.personId === "p_seeker_2") return "Noah Seeker";
-    return session.personId ? `Person ${session.personId}` : "Seeker";
-  }, [mePerson, session.personId]);
+    if (identity.user_id === "demo_user_noah") return "Noah Seeker";
+    if (identity.user_id === "demo_user_ava") return "Ava Seeker";
+    return "Seeker";
+  }, [identity.user_id, mePerson]);
 
   async function refreshThreads() {
     const out = await postJson<{ threads?: ThreadMeta[]; person?: any }>("/api/a2a/thread/list", {
       identity: {
-        tenant_id: session.churchId,
-        user_id: session.userId,
-        role: session.role,
-        campus_id: session.campusId ?? undefined,
-        timezone: session.timezone,
-        persona_id: session.personId ?? undefined,
+        tenant_id: identity.tenant_id,
+        user_id: identity.user_id,
+        role: identity.role,
+        campus_id: identity.campus_id ?? undefined,
+        timezone: identity.timezone ?? undefined,
+        persona_id: null,
       },
       include_archived: false,
     });
@@ -117,23 +132,22 @@ export default function ChatPage() {
     if (out?.person && typeof out.person === "object") setMePerson(out.person);
     const next = Array.isArray(out?.threads) ? out.threads : [];
     setThreads(next);
-    if (!activeThreadId && next.length) setActiveThreadId(String(next[0].id));
+    setThreadsOwnerUserId(identity.user_id);
+    setActiveThreadId((prev) => {
+      if (prev && next.some((t) => t && t.id === prev)) return prev;
+      return next.length ? String(next[0].id) : null;
+    });
   }
 
   useEffect(() => {
-    setSession({
-      churchId: identity.tenant_id,
-      campusId: identity.campus_id ?? "campus_main",
-      timezone: identity.timezone ?? (Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"),
-      userId: identity.user_id,
-      personId: null,
-      role: "seeker",
-      auth: { isAuthenticated: false, roles: [] },
-      threadId: null,
-    });
     setThreads([]);
+    setThreadsOwnerUserId(identity.user_id);
     setActiveThreadId(null);
     setMePerson(null);
+    setEditingThreadId(null);
+    setEditingTitle("");
+    setUiError(null);
+    setActiveUiToolId(null);
     refreshThreads().catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [identity.user_id]);
@@ -141,12 +155,12 @@ export default function ChatPage() {
   async function createThread() {
     const out = await postJson<{ thread_id?: string }>("/api/a2a/thread/create", {
       identity: {
-        tenant_id: session.churchId,
-        user_id: session.userId,
-        role: session.role,
-        campus_id: session.campusId ?? undefined,
-        timezone: session.timezone,
-        persona_id: session.personId ?? undefined,
+        tenant_id: identity.tenant_id,
+        user_id: identity.user_id,
+        role: identity.role,
+        campus_id: identity.campus_id ?? undefined,
+        timezone: identity.timezone ?? undefined,
+        persona_id: null,
       },
       title: "New topic",
     });
@@ -157,12 +171,12 @@ export default function ChatPage() {
   async function archiveThread(threadId: string) {
     await postJson("/api/a2a/thread/archive", {
       identity: {
-        tenant_id: session.churchId,
-        user_id: session.userId,
-        role: session.role,
-        campus_id: session.campusId ?? undefined,
-        timezone: session.timezone,
-        persona_id: session.personId ?? undefined,
+        tenant_id: identity.tenant_id,
+        user_id: identity.user_id,
+        role: identity.role,
+        campus_id: identity.campus_id ?? undefined,
+        timezone: identity.timezone ?? undefined,
+        persona_id: null,
       },
       thread_id: threadId,
     });
@@ -173,49 +187,58 @@ export default function ChatPage() {
   async function renameThread(threadId: string, nextTitle: string) {
     const title = String(nextTitle ?? "").trim();
     if (!title) return;
+    setUiError(null);
     setRenaming(true);
     try {
       await postJson("/api/a2a/thread/rename", {
         identity: {
-          tenant_id: session.churchId,
-          user_id: session.userId,
-          role: session.role,
-          campus_id: session.campusId ?? undefined,
-          timezone: session.timezone,
-          persona_id: session.personId ?? undefined,
+          tenant_id: identity.tenant_id,
+          user_id: identity.user_id,
+          role: identity.role,
+          campus_id: identity.campus_id ?? undefined,
+          timezone: identity.timezone ?? undefined,
+          persona_id: null,
         },
         thread_id: threadId,
         title,
       });
       setThreads((prev) => prev.map((t) => (t.id === threadId ? { ...t, title } : t)));
       await refreshThreads();
-    } finally {
-      setRenaming(false);
       setEditingThreadId(null);
       setEditingTitle("");
+    } catch (e: any) {
+      setUiError(String(e?.message ?? e ?? "Rename failed"));
+    } finally {
+      setRenaming(false);
     }
   }
 
   const historyAdapter = useMemo(() => {
-    const threadId = activeThreadId;
+    const threadId = effectiveThreadId;
     return {
       async load() {
         if (!threadId) return { headId: null, messages: [] };
-        const out = await postJson<{ messages?: any[] }>("/api/a2a/thread/get", {
-          identity: {
-            tenant_id: session.churchId,
-            user_id: session.userId,
-            role: session.role,
-            campus_id: session.campusId ?? undefined,
-            timezone: session.timezone,
-            persona_id: session.personId ?? undefined,
-          },
-          thread_id: threadId,
-          limit: 200,
-          offset: 0,
-        });
+        let out: { messages?: any[] } | null = null;
+        try {
+          out = await postJson<{ messages?: any[] }>("/api/a2a/thread/get", {
+            identity: {
+              tenant_id: identity.tenant_id,
+              user_id: identity.user_id,
+              role: identity.role,
+              campus_id: identity.campus_id ?? undefined,
+              timezone: identity.timezone ?? undefined,
+              persona_id: null,
+            },
+            thread_id: threadId,
+            limit: 200,
+            offset: 0,
+          });
+        } catch {
+          // Happens if the active threadId belongs to a different user (e.g. after switching accounts).
+          return { headId: null, messages: [] };
+        }
 
-        const rows = (Array.isArray(out?.messages) ? out.messages : []).filter(Boolean);
+        const rows = (Array.isArray(out?.messages) ? out!.messages : []).filter(Boolean);
         const likes = rows
           .map((m: any) => {
             const role = m?.senderType === "user" ? "user" : m?.senderType === "system" ? "system" : "assistant";
@@ -294,10 +317,18 @@ export default function ChatPage() {
         // no-op: A2A gateway persists transcript in D1.
       },
     };
-  }, [activeThreadId, session]);
+  }, [effectiveThreadId, identity.campus_id, identity.role, identity.tenant_id, identity.timezone, identity.user_id]);
 
   return (
-    <div style={{ height: "100%", background: "#f8fafc", display: "grid", gridTemplateColumns: "320px 1fr", overflow: "hidden" }}>
+    <div
+      style={{
+        height: "100%",
+        background: "#f8fafc",
+        display: "grid",
+        gridTemplateColumns: activeUiToolId ? "320px 1fr 420px" : "320px 1fr",
+        overflow: "hidden",
+      }}
+    >
       <div
         style={{
           borderRight: "1px solid #e2e8f0",
@@ -319,13 +350,14 @@ export default function ChatPage() {
               New topic
             </button>
           </div>
+          {uiError ? <div style={{ marginTop: 10, fontSize: 12, color: "#b91c1c" }}>{uiError}</div> : null}
         </div>
 
         <div style={{ overflow: "auto", minHeight: 0 }}>
           {threads.length ? (
             <div style={{ padding: 10, display: "grid", gap: 6 }}>
               {threads.map((t) => {
-                const isActive = t.id === activeThreadId;
+                const isActive = t.id === effectiveThreadId;
                 const isEditing = t.id === editingThreadId;
                 return (
                   <div
@@ -355,7 +387,7 @@ export default function ChatPage() {
                           }
                           if (e.key === "Enter") {
                             e.preventDefault();
-                            renameThread(t.id, editingTitle).catch(() => {});
+                            void renameThread(t.id, editingTitle);
                           }
                         }}
                         style={{
@@ -394,7 +426,7 @@ export default function ChatPage() {
                           disabled={renaming}
                           onClick={(e) => {
                             e.stopPropagation();
-                            renameThread(t.id, editingTitle).catch(() => {});
+                            void renameThread(t.id, editingTitle);
                           }}
                           style={{
                             border: "1px solid #0f172a",
@@ -436,18 +468,22 @@ export default function ChatPage() {
 
       <div style={{ display: "grid", gridTemplateRows: "auto 1fr", minHeight: 0, overflow: "hidden" }}>
         <div style={{ padding: 14, borderBottom: "1px solid #e2e8f0", background: "white" }}>
-          <div style={{ fontSize: 16, fontWeight: 900 }}>{threads.find((t) => t.id === activeThreadId)?.title ?? "Select a topic"}</div>
+          <div style={{ fontSize: 16, fontWeight: 900 }}>{threads.find((t) => t.id === effectiveThreadId)?.title ?? "Select a topic"}</div>
           <div style={{ color: "#64748b", fontSize: 12 }}>A2A threads/messages in D1; streaming tokens.</div>
         </div>
 
-        {activeThreadId ? (
+        {effectiveThreadId ? (
           <A2AChatRuntime
-            key={activeThreadId}
+            key={effectiveThreadId}
             session={session}
-            threadId={activeThreadId}
+            threadId={effectiveThreadId}
             historyAdapter={historyAdapter}
             onFinalEnvelope={(env) => {
               setSending(false);
+              const handoff = Array.isArray((env as any)?.handoff) ? ((env as any).handoff as any[]) : [];
+              const uiTool = handoff.find((h) => h && typeof h === "object" && String((h as any).type || "").toLowerCase() === "ui_tool");
+              const toolId = uiTool && typeof (uiTool as any).tool_id === "string" ? String((uiTool as any).tool_id) : null;
+              if (toolId) setActiveUiToolId(toolId);
               refreshThreads().catch(() => {});
             }}
           >
@@ -483,6 +519,28 @@ export default function ChatPage() {
           <div style={{ padding: 16, color: "#64748b" }}>Pick a topic on the left.</div>
         )}
       </div>
+
+      {activeUiToolId ? (
+        <div style={{ borderLeft: "1px solid #e2e8f0", minHeight: 0, overflow: "hidden" }}>
+          {activeUiToolId === "household_manager" ? (
+            <HouseholdManagerPanel
+              identity={{
+                tenant_id: identity.tenant_id,
+                user_id: identity.user_id,
+                role: identity.role,
+                campus_id: identity.campus_id ?? null,
+                timezone: identity.timezone ?? null,
+                persona_id: null,
+              }}
+              onClose={() => setActiveUiToolId(null)}
+            />
+          ) : (
+            <div style={{ padding: 14, color: "#64748b", background: "white", height: "100%" }}>
+              Unknown tool: {activeUiToolId}
+            </div>
+          )}
+        </div>
+      ) : null}
     </div>
   );
 }
