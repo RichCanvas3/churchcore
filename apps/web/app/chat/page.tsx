@@ -7,6 +7,13 @@ import { A2AChatRuntime } from "./A2AChatRuntime";
 import { useDemoIdentity } from "../../components/DemoIdentityProvider";
 import { HouseholdManagerPanel } from "./HouseholdManagerPanel";
 import { KidsCheckinPanel } from "./KidsCheckinPanel";
+import { FaithJourneyPanel } from "./FaithJourneyPanel";
+import { IdentityContactPanel } from "./IdentityContactPanel";
+import { CommPrefsPanel } from "./CommPrefsPanel";
+import { TeamsSkillsPanel } from "./TeamsSkillsPanel";
+import { CarePastoralPanel } from "./CarePastoralPanel";
+import { KidsSafetyPanel } from "./KidsSafetyPanel";
+import { MemoryManagerPanel } from "./MemoryManagerPanel";
 
 type ThreadMeta = { id: string; title: string; status: string; updatedAt?: string; createdAt?: string };
 
@@ -171,7 +178,26 @@ export default function ChatPage() {
       <span style={{ whiteSpace: "pre-wrap" }}>
         {parts.map((p, i) => {
           if (p.kind === "text") return <span key={i}>{p.value}</span>;
-          const title = p.toolId === "kids_checkin" ? "Kids check-in" : p.toolId === "household_manager" ? "Household" : p.toolId;
+          const title =
+            p.toolId === "kids_checkin"
+              ? "Kids check-in"
+              : p.toolId === "household_manager"
+                ? "Household"
+                : p.toolId === "faith_journey"
+                  ? "Faith journey"
+                  : p.toolId === "identity_contact"
+                    ? "Identity & contact"
+                    : p.toolId === "comm_prefs"
+                      ? "Communication prefs"
+                      : p.toolId === "care_pastoral"
+                        ? "Care & prayer"
+                        : p.toolId === "teams_skills"
+                          ? "Teams & skills"
+                          : p.toolId === "kids_safety"
+                            ? "Kids safety"
+                            : p.toolId === "memory_manager"
+                              ? "Memory manager"
+                              : p.toolId;
           return (
             <span key={i} style={{ display: "inline-flex", margin: "0 6px", verticalAlign: "middle" }}>
               <ToolButton toolId={p.toolId} title={title} />
@@ -686,6 +712,91 @@ export default function ChatPage() {
                 role: identity.role,
                 campus_id: identity.campus_id ?? null,
                 timezone: identity.timezone ?? null,
+              }}
+              onClose={() => setActiveUiToolId(null)}
+            />
+          ) : activeUiToolId === "memory_manager" ? (
+            <MemoryManagerPanel
+              identity={{
+                tenant_id: identity.tenant_id,
+                user_id: identity.user_id,
+                role: identity.role,
+                campus_id: identity.campus_id ?? null,
+                timezone: identity.timezone ?? null,
+                persona_id: null,
+              }}
+              onClose={() => setActiveUiToolId(null)}
+              onOpenTool={(toolId) => setActiveUiToolId(toolId)}
+            />
+          ) : activeUiToolId === "faith_journey" ? (
+            <FaithJourneyPanel
+              identity={{
+                tenant_id: identity.tenant_id,
+                user_id: identity.user_id,
+                role: identity.role,
+                campus_id: identity.campus_id ?? null,
+                timezone: identity.timezone ?? null,
+                persona_id: null,
+              }}
+              onClose={() => setActiveUiToolId(null)}
+            />
+          ) : activeUiToolId === "identity_contact" ? (
+            <IdentityContactPanel
+              identity={{
+                tenant_id: identity.tenant_id,
+                user_id: identity.user_id,
+                role: identity.role,
+                campus_id: identity.campus_id ?? null,
+                timezone: identity.timezone ?? null,
+                persona_id: null,
+              }}
+              onClose={() => setActiveUiToolId(null)}
+            />
+          ) : activeUiToolId === "comm_prefs" ? (
+            <CommPrefsPanel
+              identity={{
+                tenant_id: identity.tenant_id,
+                user_id: identity.user_id,
+                role: identity.role,
+                campus_id: identity.campus_id ?? null,
+                timezone: identity.timezone ?? null,
+                persona_id: null,
+              }}
+              onClose={() => setActiveUiToolId(null)}
+            />
+          ) : activeUiToolId === "care_pastoral" ? (
+            <CarePastoralPanel
+              identity={{
+                tenant_id: identity.tenant_id,
+                user_id: identity.user_id,
+                role: identity.role,
+                campus_id: identity.campus_id ?? null,
+                timezone: identity.timezone ?? null,
+                persona_id: null,
+              }}
+              onClose={() => setActiveUiToolId(null)}
+            />
+          ) : activeUiToolId === "teams_skills" ? (
+            <TeamsSkillsPanel
+              identity={{
+                tenant_id: identity.tenant_id,
+                user_id: identity.user_id,
+                role: identity.role,
+                campus_id: identity.campus_id ?? null,
+                timezone: identity.timezone ?? null,
+                persona_id: null,
+              }}
+              onClose={() => setActiveUiToolId(null)}
+            />
+          ) : activeUiToolId === "kids_safety" ? (
+            <KidsSafetyPanel
+              identity={{
+                tenant_id: identity.tenant_id,
+                user_id: identity.user_id,
+                role: identity.role,
+                campus_id: identity.campus_id ?? null,
+                timezone: identity.timezone ?? null,
+                persona_id: null,
               }}
               onClose={() => setActiveUiToolId(null)}
             />

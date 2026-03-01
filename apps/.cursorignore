@@ -1,0 +1,57 @@
+# Dependency folders
+node_modules/
+.pnpm-store/
+.yarn/
+.yarn-cache/
+
+# Build outputs
+dist/
+build/
+.build/
+.next/
+out/
+coverage/
+
+# Cloudflare
+.wrangler/
+.cloudflare/
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Lock files (huge and useless for AI)
+package-lock.json
+pnpm-lock.yaml
+yarn.lock
+*.lock
+
+# Databases
+*.sqlite
+*.sqlite3
+*.db
+*.db-shm
+*.db-wal
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Generated artifacts
+*.generated.*
+*.tsbuildinfo
+
+# Large SQL dumps / exports
+*.sql
+
+# Git
+.git/
+.gitignore
+
+# OS junk
+.DS_Store
+Thumbs.db

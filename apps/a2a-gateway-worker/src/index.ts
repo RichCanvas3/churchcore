@@ -220,6 +220,33 @@ type MemoryOp = {
   confidence?: number;
 };
 
+const MemoryOpSchema = z.object({
+  op: z.enum(["set", "append"]),
+  path: z.string().min(1),
+  value: z.unknown(),
+  visibility: z.enum(["self", "team", "pastoral", "restricted"]).optional().nullable(),
+  confidence: z.number().optional().nullable(),
+});
+
+const MemoryGetSchema = z.object({
+  identity: IdentitySchema,
+  person_id: z.string().min(1).optional().nullable(),
+});
+
+const MemoryApplyOpsSchema = z.object({
+  identity: IdentitySchema,
+  thread_id: z.string().min(1).optional().nullable(),
+  person_id: z.string().min(1).optional().nullable(),
+  ops: z.array(MemoryOpSchema).min(1),
+});
+
+const MemoryAuditListSchema = z.object({
+  identity: IdentitySchema,
+  person_id: z.string().min(1).optional().nullable(),
+  limit: z.number().int().min(1).max(200).optional().nullable(),
+  offset: z.number().int().min(0).max(500000).optional().nullable(),
+});
+
 function applyMemoryOps(baseMemory: any, ops: MemoryOp[], identityRole: string) {
   const role = (identityRole || "seeker").toLowerCase();
   const mem = baseMemory && typeof baseMemory === "object" ? baseMemory : {};
@@ -249,6 +276,162 @@ function applyMemoryOps(baseMemory: any, ops: MemoryOp[], identityRole: string) 
   }
 
   return { memory: mem, applied };
+}
+
+function isAllowedMemoryPathForSeeker(path: string) {
+  const p = String(path || "").trim();
+  if (!p) return false;
+  if (p.startsWith("identity.")) return true;
+  if (p.startsWith("contact.")) return true;
+  if (p.startsWith("communicationPreferences.")) return true;
+  if (p.startsWith("spiritualJourney.")) return true;
+  if (p.startsWith("intentProfile.")) return true;
+  if (p.startsWith("pastoralCare.prayerRequests")) return true;
+  return false;
+}
+
+function canEditArea(identityRole: string, roles: Set<string>, area: string) {
+  const role = (identityRole || "seeker").toLowerCase();
+  if (role === "guide" || roles.has("staff")) return true;
+  const a = String(area || "").toLowerCase();
+  if (a === "identity_contact") return true;
+  if (a === "faith_journey") return true;
+  if (a === "comm_prefs") return true;
+  if (a === "care_pastoral") return true; // seekers can manage their own prayer requests
+  return false;
+}
+
+async function handleMemoryGet(req: Request, env: Env) {
+  const parsed = MemoryGetSchema.safeParse(await parseJson(req));
+  if (!parsed.success) return json({ error: "Invalid body", issues: parsed.error.issues }, { status: 400 });
+  const { identity } = parsed.data;
+  const churchId = identity.tenant_id;
+  const userId = identity.user_id;
+  const role = (identity.role ?? "seeker") as string;
+  const roles = await getUserRoles(env, { churchId, userId });
+
+  const resolved = await resolvePerson(env, identity);
+  const personId = (parsed.data.person_id ?? "").trim() || resolved.personId;
+  if (!personId) return json({ ok: false, error: "No personId" }, { status: 400 });
+
+  const memRow = await getPersonMemory(env, { churchId, personId });
+  const redacted = redactMemoryForRole(role, memRow.memory ?? {});
+
+  return json({
+    ok: true,
+    person_id: personId,
+    updated_at: memRow.updatedAt,
+    memory: redacted,
+    can_edit: {
+      identity_contact: canEditArea(role, roles, "identity_contact"),
+      faith_journey: canEditArea(role, roles, "faith_journey"),
+      comm_prefs: canEditArea(role, roles, "comm_prefs"),
+      teams_skills: canEditArea(role, roles, "teams_skills"),
+      care_pastoral: canEditArea(role, roles, "care_pastoral"),
+      kids_safety: canEditArea(role, roles, "kids_safety"),
+    },
+    actor: { userId, role, roles: Array.from(roles.values()) },
+  });
+}
+
+async function handleMemoryApplyOps(req: Request, env: Env) {
+  const parsed = MemoryApplyOpsSchema.safeParse(await parseJson(req));
+  if (!parsed.success) return json({ error: "Invalid body", issues: parsed.error.issues }, { status: 400 });
+  const { identity } = parsed.data;
+  const churchId = identity.tenant_id;
+  const userId = identity.user_id;
+  const role = (identity.role ?? "seeker") as string;
+  const roles = await getUserRoles(env, { churchId, userId });
+
+  const resolved = await resolvePerson(env, identity);
+  const personId = (parsed.data.person_id ?? "").trim() || resolved.personId;
+  if (!personId) return json({ ok: false, error: "No personId" }, { status: 400 });
+
+  const personMemory = await getPersonMemory(env, { churchId, personId });
+  const base = personMemory.memory ?? {};
+
+  const identityRole = (role || "seeker").toLowerCase();
+  const canEditAll = identityRole === "guide" || roles.has("staff");
+  const ops: MemoryOp[] = [];
+  for (const op of parsed.data.ops as any[]) {
+    const vis = ((op?.visibility ?? "self") || "self") as Visibility;
+    const path = String(op?.path ?? "").trim();
+    if (!path) continue;
+    if (!canEditAll) {
+      if (!isAllowedMemoryPathForSeeker(path)) continue;
+      if (vis !== "self") continue;
+    }
+    ops.push({ op: op.op, path, value: op.value, visibility: vis, confidence: typeof op.confidence === "number" ? op.confidence : undefined });
+  }
+
+  if (!ops.length) return json({ ok: false, error: "No permitted ops" }, { status: 403 });
+
+  const { memory: nextMemory, applied } = applyMemoryOps(base, ops, identityRole);
+  if (applied.length) {
+    await upsertPersonMemory(env, { churchId, personId, memory: nextMemory });
+    await auditMemoryOps(env, {
+      churchId,
+      personId,
+      threadId: (parsed.data.thread_id ?? "").trim() || (identity.thread_id ?? "").trim() || "thread_unknown",
+      actorUserId: userId,
+      actorRole: canEditAll ? "guide" : "seeker",
+      ops: applied,
+      turnId: null,
+    });
+  }
+
+  const updated = await getPersonMemory(env, { churchId, personId });
+  const redacted = redactMemoryForRole(role, updated.memory ?? {});
+  return json({ ok: true, person_id: personId, updated_at: updated.updatedAt, memory: redacted, applied });
+}
+
+async function handleMemoryAuditList(req: Request, env: Env) {
+  const parsed = MemoryAuditListSchema.safeParse(await parseJson(req));
+  if (!parsed.success) return json({ error: "Invalid body", issues: parsed.error.issues }, { status: 400 });
+  const { identity } = parsed.data;
+  const churchId = identity.tenant_id;
+  const userId = identity.user_id;
+  const role = (identity.role ?? "seeker") as string;
+  const roles = await getUserRoles(env, { churchId, userId });
+
+  const resolved = await resolvePerson(env, identity);
+  const personId = (parsed.data.person_id ?? "").trim() || resolved.personId;
+  if (!personId) return json({ ok: false, error: "No personId" }, { status: 400 });
+
+  const limit = parsed.data.limit ?? 50;
+  const offset = parsed.data.offset ?? 0;
+  const rows =
+    (
+      await env.churchcore
+        .prepare(
+          `SELECT id, thread_id AS threadId, turn_id AS turnId, actor_user_id AS actorUserId, actor_role AS actorRole, ops_json AS opsJson, created_at AS createdAt
+           FROM person_memory_audit
+           WHERE church_id=?1 AND person_id=?2
+           ORDER BY created_at DESC
+           LIMIT ${limit} OFFSET ${offset}`,
+        )
+        .bind(churchId, personId)
+        .all()
+    ).results ?? [];
+
+  const isGuide = (role || "seeker").toLowerCase() === "guide" || roles.has("staff");
+  const audits = (rows as any[]).map((r) => {
+    let ops: any[] = [];
+    try {
+      ops = JSON.parse(String(r.opsJson || "[]"));
+    } catch {
+      ops = [];
+    }
+    if (!isGuide) {
+      ops = (Array.isArray(ops) ? ops : []).filter((op) => {
+        const vis = (op?.visibility ?? "restricted") as Visibility;
+        return canViewVisibility(role, vis) && isAllowedMemoryPathForSeeker(String(op?.path ?? ""));
+      });
+    }
+    return { id: r.id, threadId: r.threadId, turnId: r.turnId, actorUserId: r.actorUserId, actorRole: r.actorRole, ops, createdAt: r.createdAt };
+  });
+
+  return json({ ok: true, person_id: personId, audits, actor: { userId, role, roles: Array.from(roles.values()) } });
 }
 
 async function auditMemoryOps(env: Env, args: { churchId: string; personId: string; threadId: string; actorUserId: string; actorRole: string; ops: unknown; turnId?: string | null }) {
@@ -1233,6 +1416,12 @@ export default {
         return handleCheckinPreview(req, env);
       case "/a2a/checkin.commit":
         return handleCheckinCommit(req, env);
+      case "/a2a/memory.get":
+        return handleMemoryGet(req, env);
+      case "/a2a/memory.apply_ops":
+        return handleMemoryApplyOps(req, env);
+      case "/a2a/memory.audit.list":
+        return handleMemoryAuditList(req, env);
       default:
         return json({ error: "Not found" }, { status: 404 });
     }

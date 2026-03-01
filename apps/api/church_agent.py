@@ -86,6 +86,97 @@ def _ui_handoff_for_user_text(user_text: str) -> list[dict[str, Any]]:
             }
         ]
 
+    identityish = any(k in u for k in ["contact", "phone", "email", "address", "preferred name", "my info", "my details"])
+    if identityish:
+        return [
+            {
+                "type": "ui_tool",
+                "tool_id": "identity_contact",
+                "title": "Identity & contact",
+                "instructions": "Open the identity/contact panel.",
+            }
+        ]
+
+    faith_journeyish = any(
+        k in u
+        for k in [
+            "faith journey",
+            "faith stage",
+            "spiritual journey",
+            "my stage",
+            "phases",
+            "phase",
+            "where am i",
+            "faith phase",
+            "milestone",
+            "milestones",
+        ]
+    )
+    if faith_journeyish:
+        return [
+            {
+                "type": "ui_tool",
+                "tool_id": "faith_journey",
+                "title": "Faith journey",
+                "instructions": "Open the faith journey panel (phase + milestones).",
+            }
+        ]
+
+    commish = any(k in u for k in ["communication", "preferences", "opt in", "opt-in", "sms", "text me", "email me", "notifications"])
+    if commish:
+        return [
+            {
+                "type": "ui_tool",
+                "tool_id": "comm_prefs",
+                "title": "Communication preferences",
+                "instructions": "Open the communication preferences panel.",
+            }
+        ]
+
+    careish = any(k in u for k in ["prayer", "pray for", "care", "pastoral", "counseling", "counselling"])
+    if careish:
+        return [
+            {
+                "type": "ui_tool",
+                "tool_id": "care_pastoral",
+                "title": "Care & prayer",
+                "instructions": "Open the care/prayer panel.",
+            }
+        ]
+
+    teamsish = any(k in u for k in ["volunteer", "serving", "serve", "team", "teams", "skills", "gift", "gifts"])
+    if teamsish:
+        return [
+            {
+                "type": "ui_tool",
+                "tool_id": "teams_skills",
+                "title": "Teams & skills",
+                "instructions": "Open the teams/skills panel.",
+            }
+        ]
+
+    kids_safetyish = any(k in u for k in ["kids safety", "authorized pickup", "authorised pickup", "custody", "allergy note", "release to", "do not release"])
+    if kids_safetyish:
+        return [
+            {
+                "type": "ui_tool",
+                "tool_id": "kids_safety",
+                "title": "Kids safety",
+                "instructions": "Open the kids safety panel.",
+            }
+        ]
+
+    memoryish = any(k in u for k in ["memory", "profile memory", "manage memory", "edit memory"])
+    if memoryish:
+        return [
+            {
+                "type": "ui_tool",
+                "tool_id": "memory_manager",
+                "title": "Memory manager",
+                "instructions": "Open the memory manager panel.",
+            }
+        ]
+
     householdish = any(k in u for k in ["household", "family", "kids", "kid", "child", "children"])
     manageish = any(k in u for k in ["update", "edit", "add", "remove", "change", "member", "members"])
     if householdish and manageish:
@@ -382,7 +473,14 @@ async def handle_seeker_skill(
             "Client UI tools available (use handoff items when helpful):\n"
             "- household_manager: manage household members (add/edit/remove kids, allergies, special needs).\n"
             "- kids_checkin: run kids check-in flow (find family, preview rooms, commit check-in).\n"
-            'If a UI tool should open, include a handoff item like: {"type":"ui_tool","tool_id":"kids_checkin"}.\n\n'
+            "- memory_manager: manage person memory areas (hub).\n"
+            "- identity_contact: view/edit preferred name + email/phone.\n"
+            "- faith_journey: view/edit faith journey phase and milestones (Seeker, New Believer, Growing, etc.).\n"
+            "- comm_prefs: view/edit communication preferences (SMS/email opt-in, preferred channel).\n"
+            "- care_pastoral: manage prayer requests (and staff-only care notes).\n"
+            "- teams_skills: staff-only serving teams/skills.\n"
+            "- kids_safety: staff-only kids safety notes.\n"
+            'If a UI tool should open, include a handoff item like: {"type":"ui_tool","tool_id":"identity_contact"}.\n\n'
             + (("Known person memory (shared across topics):\n" + mem_summary + "\n\n") if mem_summary else "")
             + (("Household context:\n" + hh_summary + "\n\n") if hh_summary else "")
             + (("Authoritative church data excerpt:\n" + church_context + "\n\n") if church_context else "")
