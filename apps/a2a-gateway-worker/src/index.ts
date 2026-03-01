@@ -58,6 +58,15 @@ const IdentitySchema = z.object({
   metadata: z.record(z.string(), z.unknown()).optional().nullable(),
 });
 
+const ChurchOverviewSchema = z.object({
+  identity: IdentitySchema,
+});
+
+const StrategicIntentsListSchema = z.object({
+  identity: IdentitySchema,
+  intent_type: z.string().min(1).optional().nullable(),
+});
+
 async function parseJson(req: Request) {
   const raw = await req.json().catch(() => null);
   return raw;
@@ -1275,7 +1284,7 @@ async function handleChat(req: Request, env: Env) {
   const inputArgs = parsed.data.args && typeof parsed.data.args === "object" ? (parsed.data.args as Record<string, unknown>) : {};
   const session = {
     churchId,
-    campusId: identity.campus_id ?? "campus_main",
+    campusId: identity.campus_id ?? "campus_boulder",
     timezone: identity.timezone ?? "UTC",
     userId,
     personId,
@@ -1320,6 +1329,85 @@ async function handleChat(req: Request, env: Env) {
   await appendMessage(env, { churchId, userId, threadId, senderType: "assistant", content: assistantText || "", envelope });
 
   return json({ thread_id: threadId, output: envelope });
+}
+
+async function handleChurchGetOverview(req: Request, env: Env) {
+  const parsed = ChurchOverviewSchema.safeParse(await parseJson(req));
+  if (!parsed.success) return json({ error: "Invalid body", issues: parsed.error.issues }, { status: 400 });
+  const { identity } = parsed.data;
+  const churchId = identity.tenant_id;
+
+  const church = (await env.churchcore.prepare(`SELECT * FROM churches WHERE id=?1`).bind(churchId).first()) as any;
+  const branding = (await env.churchcore.prepare(`SELECT * FROM church_branding WHERE church_id=?1`).bind(churchId).first()) as any;
+  const campuses = (await env.churchcore.prepare(`SELECT * FROM campuses WHERE church_id=?1 ORDER BY name ASC`).bind(churchId).all()).results ?? [];
+  const locations = (await env.churchcore.prepare(`SELECT * FROM locations WHERE church_id=?1 ORDER BY name ASC`).bind(churchId).all()).results ?? [];
+  const services = (await env.churchcore.prepare(`SELECT * FROM services WHERE church_id=?1 ORDER BY day_of_week ASC, start_time_local ASC`).bind(churchId).all())
+    .results ?? [];
+
+  const intents = (
+    await env.churchcore
+      .prepare(
+        `SELECT id,intent_type AS intentType,title,body_markdown AS bodyMarkdown,sort_order AS sortOrder,source_url AS sourceUrl,updated_at AS updatedAt
+         FROM strategic_intents
+         WHERE church_id=?1
+         ORDER BY intent_type ASC, sort_order ASC`,
+      )
+      .bind(churchId)
+      .all()
+  ).results ?? [];
+
+  // small summary: first mission/vision/purpose/strategy if present
+  const summarize: Record<string, any> = {};
+  for (const it of intents as any[]) {
+    const k = String((it as any).intentType || "");
+    if (!k) continue;
+    if (k === "mission" || k === "vision" || k === "purpose" || k === "strategy") {
+      if (!summarize[k]) summarize[k] = it;
+    }
+  }
+
+  return json({
+    church: church ?? null,
+    branding: branding ?? null,
+    campuses,
+    locations,
+    services,
+    strategic_intent_summary: summarize,
+  });
+}
+
+async function handleChurchStrategicIntentsList(req: Request, env: Env) {
+  const parsed = StrategicIntentsListSchema.safeParse(await parseJson(req));
+  if (!parsed.success) return json({ error: "Invalid body", issues: parsed.error.issues }, { status: 400 });
+  const { identity } = parsed.data;
+  const churchId = identity.tenant_id;
+  const intentType = parsed.data.intent_type ? String(parsed.data.intent_type) : null;
+
+  const intents = (
+    await env.churchcore
+      .prepare(
+        `SELECT id,intent_type AS intentType,title,body_markdown AS bodyMarkdown,sort_order AS sortOrder,source_url AS sourceUrl,updated_at AS updatedAt
+         FROM strategic_intents
+         WHERE church_id=?1 ${intentType ? "AND intent_type=?2" : ""}
+         ORDER BY intent_type ASC, sort_order ASC`,
+      )
+      .bind(churchId, ...(intentType ? [intentType] : []))
+      .all()
+  ).results ?? [];
+
+  const links = (
+    await env.churchcore
+      .prepare(
+        `SELECT from_intent_id AS fromIntentId,to_intent_id AS toIntentId,link_type AS linkType,weight,metadata_json AS metadataJson,created_at AS createdAt
+         FROM strategic_intent_links
+         WHERE church_id=?1
+         ORDER BY created_at ASC`,
+      )
+      .bind(churchId)
+      .all()
+  ).results ?? [];
+
+  return json({ intents, links });
 }
 
 async function handleChatStream(req: Request, env: Env) {
@@ -1908,6 +1996,10 @@ export default {
         return handleJourneyNextSteps(req, env);
       case "/a2a/journey.complete_step":
         return handleJourneyCompleteStep(req, env);
+      case "/a2a/church.get_overview":
+        return handleChurchGetOverview(req, env);
+      case "/a2a/church.strategic_intent.list":
+        return handleChurchStrategicIntentsList(req, env);
       default:
         return json({ error: "Not found" }, { status: 404 });
     }

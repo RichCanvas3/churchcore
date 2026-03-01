@@ -17,6 +17,16 @@ CREATE TABLE IF NOT EXISTS churches (
   updated_at TEXT NOT NULL
 );
 
+-- Branding / overview (kept separate for non-breaking schema evolution)
+CREATE TABLE IF NOT EXISTS church_branding (
+  church_id TEXT PRIMARY KEY,
+  logo_url TEXT,
+  overview_markdown TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  FOREIGN KEY (church_id) REFERENCES churches(id) ON DELETE CASCADE
+);
+
 CREATE TABLE IF NOT EXISTS campuses (
   id TEXT PRIMARY KEY,
   church_id TEXT NOT NULL,
@@ -52,6 +62,35 @@ CREATE TABLE IF NOT EXISTS locations (
   FOREIGN KEY (campus_id) REFERENCES campuses(id) ON DELETE SET NULL
 );
 CREATE INDEX IF NOT EXISTS idx_locations_church ON locations(church_id, campus_id);
+
+-- Strategic intent (purpose/vision/mission/values/etc.) – ChurchCore ontology-aligned
+CREATE TABLE IF NOT EXISTS strategic_intents (
+  id TEXT PRIMARY KEY,
+  church_id TEXT NOT NULL,
+  intent_type TEXT NOT NULL, -- purpose|vision|mission|strategy|aim|goal|objective|value|belief
+  title TEXT NOT NULL,
+  body_markdown TEXT NOT NULL,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  source_url TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  FOREIGN KEY (church_id) REFERENCES churches(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_strategic_intents ON strategic_intents(church_id, intent_type, sort_order);
+
+CREATE TABLE IF NOT EXISTS strategic_intent_links (
+  church_id TEXT NOT NULL,
+  from_intent_id TEXT NOT NULL,
+  to_intent_id TEXT NOT NULL,
+  link_type TEXT NOT NULL, -- supports|drives|implements|measures
+  weight REAL DEFAULT 1.0,
+  metadata_json TEXT,
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (church_id, from_intent_id, to_intent_id, link_type),
+  FOREIGN KEY (from_intent_id) REFERENCES strategic_intents(id) ON DELETE CASCADE,
+  FOREIGN KEY (to_intent_id) REFERENCES strategic_intents(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_strategic_intent_links ON strategic_intent_links(church_id, from_intent_id, link_type);
 
 -- People / roles (Planning Center-ish: people + households)
 CREATE TABLE IF NOT EXISTS people (

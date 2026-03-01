@@ -15,6 +15,8 @@ import { CarePastoralPanel } from "./CarePastoralPanel";
 import { KidsSafetyPanel } from "./KidsSafetyPanel";
 import { MemoryManagerPanel } from "./MemoryManagerPanel";
 import { GuidePanel } from "./GuidePanel";
+import { ChurchOverviewPanel } from "./ChurchOverviewPanel";
+import { StrategicIntentPanel } from "./StrategicIntentPanel";
 import styles from "./ChatLayout.module.css";
 
 type ThreadMeta = { id: string; title: string; status: string; updatedAt?: string; createdAt?: string };
@@ -119,7 +121,7 @@ export default function ChatPage() {
   const session = useMemo<Session>(
     () => ({
       churchId: identity.tenant_id,
-      campusId: identity.campus_id ?? "campus_main",
+      campusId: identity.campus_id ?? "campus_boulder",
       timezone: identity.timezone ?? (Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"),
       userId: identity.user_id,
       personId: typeof (mePerson as any)?.id === "string" ? String((mePerson as any).id) : null,
@@ -241,6 +243,10 @@ export default function ChatPage() {
                               ? "Memory manager"
                     : p.toolId === "guide"
                       ? "Guide"
+                      : p.toolId === "church_overview"
+                        ? "Church"
+                        : p.toolId === "strategic_intent"
+                          ? "Strategic intent"
                               : p.toolId;
           return (
             <span key={i} style={{ display: "inline-flex", margin: "0 6px", verticalAlign: "middle" }}>
@@ -720,14 +726,6 @@ export default function ChatPage() {
               >
                 Tools
               </button>
-              <button
-                className={styles.desktopOnly}
-                onClick={closeTool}
-                title="Close tool panel"
-                style={{ border: "1px solid #e2e8f0", background: "white", borderRadius: 10, padding: "6px 8px", cursor: "pointer", fontSize: 12, fontWeight: 900 }}
-              >
-                Tool ✕
-              </button>
             </>
           ) : null}
           <div className={styles.desktopOnly} style={{ color: "#64748b", fontSize: 12 }}>
@@ -907,6 +905,31 @@ export default function ChatPage() {
               }}
               onClose={closeTool}
               onOpenTool={(toolId: string) => setActiveUiToolId(toolId)}
+            />
+          ) : activeUiToolId === "church_overview" ? (
+            <ChurchOverviewPanel
+              identity={{
+                tenant_id: identity.tenant_id,
+                user_id: identity.user_id,
+                role: identity.role,
+                campus_id: identity.campus_id ?? null,
+                timezone: identity.timezone ?? null,
+                persona_id: null,
+              }}
+              onClose={closeTool}
+              onOpenTool={(toolId: string) => setActiveUiToolId(toolId)}
+            />
+          ) : activeUiToolId === "strategic_intent" ? (
+            <StrategicIntentPanel
+              identity={{
+                tenant_id: identity.tenant_id,
+                user_id: identity.user_id,
+                role: identity.role,
+                campus_id: identity.campus_id ?? null,
+                timezone: identity.timezone ?? null,
+                persona_id: null,
+              }}
+              onClose={closeTool}
             />
           ) : (
             <div style={{ padding: 14, color: "#64748b", background: "white", height: "100%" }}>

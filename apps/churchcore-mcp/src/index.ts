@@ -1158,6 +1158,7 @@ function createServer(env: Env) {
       const limit = parsed.limitPerTable ?? 200;
 
       const church = (await env.churchcore.prepare(`SELECT * FROM churches WHERE id=?1`).bind(parsed.churchId).first()) as any;
+      const branding = (await env.churchcore.prepare(`SELECT * FROM church_branding WHERE church_id=?1`).bind(parsed.churchId).first()) as any;
       const campuses = (await env.churchcore.prepare(`SELECT * FROM campuses WHERE church_id=?1 LIMIT ${limit}`).bind(parsed.churchId).all()).results ?? [];
       const locations = (await env.churchcore.prepare(`SELECT * FROM locations WHERE church_id=?1 LIMIT ${limit}`).bind(parsed.churchId).all()).results ?? [];
       const services = (await env.churchcore.prepare(`SELECT * FROM services WHERE church_id=?1 LIMIT ${limit}`).bind(parsed.churchId).all()).results ?? [];
@@ -1168,6 +1169,8 @@ function createServer(env: Env) {
       const groups = (await env.churchcore.prepare(`SELECT * FROM groups WHERE church_id=?1 LIMIT ${limit}`).bind(parsed.churchId).all()).results ?? [];
       const opportunities = (await env.churchcore.prepare(`SELECT * FROM opportunities WHERE church_id=?1 LIMIT ${limit}`).bind(parsed.churchId).all()).results ?? [];
       const resources = (await env.churchcore.prepare(`SELECT * FROM resources WHERE church_id=?1 LIMIT ${limit}`).bind(parsed.churchId).all()).results ?? [];
+      const strategicIntents = (await env.churchcore.prepare(`SELECT * FROM strategic_intents WHERE church_id=?1 LIMIT ${limit}`).bind(parsed.churchId).all()).results ?? [];
+      const strategicLinks = (await env.churchcore.prepare(`SELECT * FROM strategic_intent_links WHERE church_id=?1 LIMIT ${limit}`).bind(parsed.churchId).all()).results ?? [];
       const journeyNodes = (await env.churchcore.prepare(`SELECT * FROM journey_node WHERE church_id=?1 LIMIT ${limit}`).bind(parsed.churchId).all()).results ?? [];
       const journeyEdges = (await env.churchcore.prepare(`SELECT * FROM journey_edge WHERE church_id=?1 LIMIT ${limit}`).bind(parsed.churchId).all()).results ?? [];
       const journeyLinks = (await env.churchcore.prepare(`SELECT * FROM journey_resource_link WHERE church_id=?1 LIMIT ${limit}`).bind(parsed.churchId).all()).results ?? [];
@@ -1183,11 +1186,12 @@ function createServer(env: Env) {
       ).results ?? [];
 
       const docs = [
-        { sourceId: "church/church.json", text: JSON.stringify({ church, campuses, locations }, null, 2) },
+        { sourceId: "church/church.json", text: JSON.stringify({ church, branding, campuses, locations }, null, 2) },
         { sourceId: "church/services.json", text: JSON.stringify({ services, servicePlans, servicePlanItems }, null, 2) },
         { sourceId: "church/events.json", text: JSON.stringify({ events, outreaches }, null, 2) },
         { sourceId: "church/groups.json", text: JSON.stringify({ groups, opportunities }, null, 2) },
         { sourceId: "church/resources.json", text: JSON.stringify({ resources }, null, 2) },
+        { sourceId: "church/strategy.json", text: JSON.stringify({ strategicIntents, strategicLinks }, null, 2) },
         { sourceId: "church/journey_graph.json", text: JSON.stringify({ journeyNodes, journeyEdges, journeyLinks }, null, 2) },
         ...contentDocs.map((d: any) => ({
           sourceId: `content/${String(d.entityType)}/${String(d.entityId)}/${String(d.locale)}#${String(d.docId)}`,

@@ -13,17 +13,17 @@ export type DemoIdentity = {
 const STORAGE_KEY = "churchcore.demo_identity.v1";
 
 const Noah: DemoIdentity = {
-  tenant_id: "demo-church",
+  tenant_id: "calvarybible",
   user_id: "demo_user_noah",
   role: "seeker",
-  campus_id: "campus_main",
+  campus_id: "campus_boulder",
 };
 
 const Ava: DemoIdentity = {
-  tenant_id: "demo-church",
+  tenant_id: "calvarybible",
   user_id: "demo_user_ava",
   role: "seeker",
-  campus_id: "campus_main",
+  campus_id: "campus_boulder",
 };
 
 type Ctx = {
@@ -42,10 +42,10 @@ function readStored(): DemoIdentity | null {
     if (!j || typeof j !== "object") return null;
     if (j.user_id !== Noah.user_id && j.user_id !== Ava.user_id) return null;
     return {
-      tenant_id: "demo-church",
+      tenant_id: "calvarybible",
       user_id: String(j.user_id),
       role: "seeker",
-      campus_id: "campus_main",
+      campus_id: "campus_boulder",
       timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
     };
   } catch {
@@ -66,10 +66,10 @@ export function DemoIdentityProvider(props: { children: React.ReactNode }) {
 
   function setIdentity(next: DemoIdentity) {
     const normalized: DemoIdentity = {
-      tenant_id: "demo-church",
+      tenant_id: "calvarybible",
       user_id: next.user_id,
       role: "seeker",
-      campus_id: "campus_main",
+      campus_id: "campus_boulder",
       timezone: next.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
     };
     setIdentityState(normalized);
