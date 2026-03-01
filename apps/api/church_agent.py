@@ -75,6 +75,17 @@ def _ui_handoff_for_user_text(user_text: str) -> list[dict[str, Any]]:
     u = (user_text or "").strip().lower()
     if not u:
         return []
+    checkinish = any(k in u for k in ["checkin", "check-in", "check in", "drop off", "pickup", "pick up"])
+    if checkinish:
+        return [
+            {
+                "type": "ui_tool",
+                "tool_id": "kids_checkin",
+                "title": "Kids check-in",
+                "instructions": "Open the kids check-in panel.",
+            }
+        ]
+
     householdish = any(k in u for k in ["household", "family", "kids", "kid", "child", "children"])
     manageish = any(k in u for k in ["update", "edit", "add", "remove", "change", "member", "members"])
     if householdish and manageish:
@@ -370,7 +381,8 @@ async def handle_seeker_skill(
             "Always be warm, concise, and propose 1-3 next actions.\n\n"
             "Client UI tools available (use handoff items when helpful):\n"
             "- household_manager: manage household members (add/edit/remove kids, allergies, special needs).\n"
-            'If a UI tool should open, include a handoff item like: {"type":"ui_tool","tool_id":"household_manager"}.\n\n'
+            "- kids_checkin: run kids check-in flow (find family, preview rooms, commit check-in).\n"
+            'If a UI tool should open, include a handoff item like: {"type":"ui_tool","tool_id":"kids_checkin"}.\n\n'
             + (("Known person memory (shared across topics):\n" + mem_summary + "\n\n") if mem_summary else "")
             + (("Household context:\n" + hh_summary + "\n\n") if hh_summary else "")
             + (("Authoritative church data excerpt:\n" + church_context + "\n\n") if church_context else "")

@@ -62,6 +62,31 @@ export function HouseholdManagerPanel(props: { identity: Identity; onClose: () =
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [identity.tenant_id, identity.user_id]);
 
+  async function saveAdult(adult: any) {
+    if (!householdId) return;
+    setLoading(true);
+    setUiError(null);
+    try {
+      const out = await postJson("/api/a2a/household/member/upsert", {
+        identity,
+        household_id: householdId,
+        member: {
+          person_id: adult.id,
+          role: "adult",
+          first_name: String(adult.first_name ?? "").trim() || "Adult",
+          last_name: adult.last_name ?? null,
+          birthdate: adult.birthdate ?? null,
+        },
+      });
+      setData((prev) => (prev ? { ...prev, ...(out as any) } : (out as any)));
+      await refresh();
+    } catch (e: any) {
+      setUiError(String(e?.message ?? e ?? "Save failed"));
+    } finally {
+      setLoading(false);
+    }
+  }
+
   async function saveChild(child: any) {
     if (!householdId) return;
     setLoading(true);
@@ -112,6 +137,12 @@ export function HouseholdManagerPanel(props: { identity: Identity; onClose: () =
     if (!householdId) return;
     const first = newChild.first_name.trim();
     if (!first) return;
+    const derivedLast = String((adults[0] as any)?.last_name ?? "").trim();
+    const last = newChild.last_name.trim() || derivedLast;
+    if (!last) {
+      setUiError("Last name is required for a child.");
+      return;
+    }
     setLoading(true);
     setUiError(null);
     try {
@@ -121,7 +152,7 @@ export function HouseholdManagerPanel(props: { identity: Identity; onClose: () =
         member: {
           role: "child",
           first_name: first,
-          last_name: newChild.last_name.trim() || null,
+          last_name: last,
           birthdate: newChild.birthdate.trim() || null,
           allergies: newChild.allergies.trim() || null,
           special_needs: Boolean(newChild.special_needs),
@@ -162,9 +193,57 @@ export function HouseholdManagerPanel(props: { identity: Identity; onClose: () =
           {adults.length ? (
             <div style={{ display: "grid", gap: 8 }}>
               {adults.map((a: any) => (
-                <div key={String(a.id)} style={{ border: "1px solid #e2e8f0", borderRadius: 12, padding: 10 }}>
-                  <div style={{ fontWeight: 800 }}>{`${a.first_name ?? ""} ${a.last_name ?? ""}`.trim() || a.id}</div>
+                <div key={String(a.id)} style={{ border: "1px solid #e2e8f0", borderRadius: 12, padding: 10, display: "grid", gap: 8 }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                    <label style={{ display: "grid", gap: 4 }}>
+                      <div style={{ fontSize: 12, color: "#64748b" }}>First name</div>
+                      <input
+                        value={String(a.first_name ?? "")}
+                        onChange={(e) =>
+                          setData((prev) =>
+                            prev
+                              ? {
+                                  ...prev,
+                                  members: (Array.isArray(prev.members) ? prev.members : []).map((m: any) =>
+                                    m && m.id === a.id ? { ...m, first_name: e.target.value } : m,
+                                  ),
+                                }
+                              : prev,
+                          )
+                        }
+                        style={{ border: "1px solid #cbd5e1", borderRadius: 10, padding: "8px 10px" }}
+                      />
+                    </label>
+                    <label style={{ display: "grid", gap: 4 }}>
+                      <div style={{ fontSize: 12, color: "#64748b" }}>Last name</div>
+                      <input
+                        value={String(a.last_name ?? "")}
+                        onChange={(e) =>
+                          setData((prev) =>
+                            prev
+                              ? {
+                                  ...prev,
+                                  members: (Array.isArray(prev.members) ? prev.members : []).map((m: any) =>
+                                    m && m.id === a.id ? { ...m, last_name: e.target.value } : m,
+                                  ),
+                                }
+                              : prev,
+                          )
+                        }
+                        style={{ border: "1px solid #cbd5e1", borderRadius: 10, padding: "8px 10px" }}
+                      />
+                    </label>
+                  </div>
                   <div style={{ fontSize: 12, color: "#64748b" }}>{String(a.id)}</div>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button
+                      disabled={loading}
+                      onClick={() => void saveAdult(a)}
+                      style={{ border: "1px solid #0f172a", background: loading ? "#334155" : "#0f172a", color: "white", borderRadius: 10, padding: "8px 10px", cursor: "pointer", fontSize: 12, fontWeight: 900 }}
+                    >
+                      Save
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -189,6 +268,35 @@ export function HouseholdManagerPanel(props: { identity: Identity; onClose: () =
                       Remove
                     </button>
                   </div>
+
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                    <label style={{ display: "grid", gap: 4 }}>
+                      <div style={{ fontSize: 12, color: "#64748b" }}>First name</div>
+                      <input
+                        value={String(k.first_name ?? "")}
+                        onChange={(e) => setData((prev) => (prev ? { ...prev, children: kids.map((x) => (x.id === k.id ? { ...x, first_name: e.target.value } : x)) } : prev))}
+                        style={{ border: "1px solid #cbd5e1", borderRadius: 10, padding: "8px 10px" }}
+                      />
+                    </label>
+                    <label style={{ display: "grid", gap: 4 }}>
+                      <div style={{ fontSize: 12, color: "#64748b" }}>Last name</div>
+                      <input
+                        value={String(k.last_name ?? "")}
+                        onChange={(e) => setData((prev) => (prev ? { ...prev, children: kids.map((x) => (x.id === k.id ? { ...x, last_name: e.target.value } : x)) } : prev))}
+                        style={{ border: "1px solid #cbd5e1", borderRadius: 10, padding: "8px 10px" }}
+                      />
+                    </label>
+                  </div>
+
+                  <label style={{ display: "grid", gap: 4 }}>
+                    <div style={{ fontSize: 12, color: "#64748b" }}>Birthdate</div>
+                    <input
+                      value={String(k.birthdate ?? "")}
+                      onChange={(e) => setData((prev) => (prev ? { ...prev, children: kids.map((x) => (x.id === k.id ? { ...x, birthdate: e.target.value } : x)) } : prev))}
+                      style={{ border: "1px solid #cbd5e1", borderRadius: 10, padding: "8px 10px" }}
+                      placeholder="YYYY-MM-DD"
+                    />
+                  </label>
 
                   <label style={{ display: "grid", gap: 4 }}>
                     <div style={{ fontSize: 12, color: "#64748b" }}>Allergies</div>
@@ -231,6 +339,12 @@ export function HouseholdManagerPanel(props: { identity: Identity; onClose: () =
               value={newChild.first_name}
               onChange={(e) => setNewChild((s) => ({ ...s, first_name: e.target.value }))}
               placeholder="First name"
+              style={{ border: "1px solid #cbd5e1", borderRadius: 10, padding: "8px 10px" }}
+            />
+            <input
+              value={newChild.last_name}
+              onChange={(e) => setNewChild((s) => ({ ...s, last_name: e.target.value }))}
+              placeholder={adults.length ? `Last name (default: ${String((adults[0] as any)?.last_name ?? "").trim() || "same as parent"})` : "Last name"}
               style={{ border: "1px solid #cbd5e1", borderRadius: 10, padding: "8px 10px" }}
             />
             <input

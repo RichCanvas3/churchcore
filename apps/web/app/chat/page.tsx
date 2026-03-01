@@ -6,6 +6,7 @@ import type { Session } from "../../lib/types";
 import { A2AChatRuntime } from "./A2AChatRuntime";
 import { useDemoIdentity } from "../../components/DemoIdentityProvider";
 import { HouseholdManagerPanel } from "./HouseholdManagerPanel";
+import { KidsCheckinPanel } from "./KidsCheckinPanel";
 
 type ThreadMeta = { id: string; title: string; status: string; updatedAt?: string; createdAt?: string };
 
@@ -85,6 +86,7 @@ export default function ChatPage() {
   const [renaming, setRenaming] = useState(false);
   const [uiError, setUiError] = useState<string | null>(null);
   const [activeUiToolId, setActiveUiToolId] = useState<string | null>(null);
+  const [leftCollapsed, setLeftCollapsed] = useState(false);
 
   const effectiveThreadId = useMemo(() => {
     if (threadsOwnerUserId !== identity.user_id) return null;
@@ -148,6 +150,7 @@ export default function ChatPage() {
     setEditingTitle("");
     setUiError(null);
     setActiveUiToolId(null);
+    setLeftCollapsed(false);
     refreshThreads().catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [identity.user_id]);
@@ -325,7 +328,9 @@ export default function ChatPage() {
         height: "100%",
         background: "#f8fafc",
         display: "grid",
-        gridTemplateColumns: activeUiToolId ? "320px 1fr 420px" : "320px 1fr",
+        gridTemplateColumns: activeUiToolId
+          ? `${leftCollapsed ? "72px" : "320px"} 1fr minmax(420px, 40%)`
+          : `${leftCollapsed ? "72px" : "320px"} 1fr`,
         overflow: "hidden",
       }}
     >
@@ -340,17 +345,38 @@ export default function ChatPage() {
         }}
       >
         <div style={{ padding: 14, borderBottom: "1px solid #e2e8f0" }}>
-          <div style={{ fontSize: 16, fontWeight: 900 }}>Messages</div>
-          <div style={{ color: "#64748b", fontSize: 12 }}>{meLabel}</div>
-          <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+          <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10 }}>
+            {leftCollapsed ? (
+              <div style={{ fontSize: 16, fontWeight: 900 }}>⋯</div>
+            ) : (
+              <div style={{ fontSize: 16, fontWeight: 900 }}>Messages</div>
+            )}
+            <button
+              onClick={() => setLeftCollapsed((v) => !v)}
+              title={leftCollapsed ? "Expand topics" : "Collapse topics"}
+              style={{
+                border: "1px solid #e2e8f0",
+                background: "white",
+                borderRadius: 10,
+                padding: "6px 8px",
+                cursor: "pointer",
+                fontSize: 12,
+                fontWeight: 900,
+              }}
+            >
+              {leftCollapsed ? "⟩" : "⟨"}
+            </button>
+          </div>
+          {!leftCollapsed ? <div style={{ color: "#64748b", fontSize: 12 }}>{meLabel}</div> : null}
+          <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
             <button
               onClick={() => createThread()}
               style={{ border: "1px solid #0f172a", background: "#0f172a", color: "white", padding: "8px 10px", borderRadius: 10, cursor: "pointer" }}
             >
-              New topic
+              {leftCollapsed ? "+" : "New topic"}
             </button>
           </div>
-          {uiError ? <div style={{ marginTop: 10, fontSize: 12, color: "#b91c1c" }}>{uiError}</div> : null}
+          {!leftCollapsed && uiError ? <div style={{ marginTop: 10, fontSize: 12, color: "#b91c1c" }}>{uiError}</div> : null}
         </div>
 
         <div style={{ overflow: "auto", minHeight: 0 }}>
@@ -359,6 +385,7 @@ export default function ChatPage() {
               {threads.map((t) => {
                 const isActive = t.id === effectiveThreadId;
                 const isEditing = t.id === editingThreadId;
+                const collapsedLabel = String(t.title || "").trim().slice(0, 1).toUpperCase() || "•";
                 return (
                   <div
                     key={t.id}
@@ -372,6 +399,7 @@ export default function ChatPage() {
                       gap: 8,
                     }}
                     onClick={() => setActiveThreadId(t.id)}
+                    title={leftCollapsed ? t.title : undefined}
                   >
                     {isEditing ? (
                       <input
@@ -400,9 +428,12 @@ export default function ChatPage() {
                         placeholder="Topic name"
                       />
                     ) : (
-                      <div style={{ fontWeight: 800 }}>{t.title}</div>
+                      <div style={{ fontWeight: 800, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                        {leftCollapsed ? collapsedLabel : t.title}
+                      </div>
                     )}
-                    <div style={{ display: "flex", gap: 10 }}>
+                    {!leftCollapsed ? (
+                      <div style={{ display: "flex", gap: 10 }}>
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -451,7 +482,8 @@ export default function ChatPage() {
                       >
                         Archive
                       </button>
-                    </div>
+                      </div>
+                    ) : null}
                   </div>
                 );
               })}
@@ -467,8 +499,28 @@ export default function ChatPage() {
       </div>
 
       <div style={{ display: "grid", gridTemplateRows: "auto 1fr", minHeight: 0, overflow: "hidden" }}>
-        <div style={{ padding: 14, borderBottom: "1px solid #e2e8f0", background: "white" }}>
-          <div style={{ fontSize: 16, fontWeight: 900 }}>{threads.find((t) => t.id === effectiveThreadId)?.title ?? "Select a topic"}</div>
+        <div style={{ padding: 14, borderBottom: "1px solid #e2e8f0", background: "white", display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10 }}>
+          <div style={{ fontSize: 16, fontWeight: 900, minWidth: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+            {threads.find((t) => t.id === effectiveThreadId)?.title ?? "Select a topic"}
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button
+              onClick={() => setLeftCollapsed((v) => !v)}
+              title={leftCollapsed ? "Expand topics" : "Collapse topics"}
+              style={{ border: "1px solid #e2e8f0", background: "white", borderRadius: 10, padding: "6px 8px", cursor: "pointer", fontSize: 12, fontWeight: 900 }}
+            >
+              {leftCollapsed ? "⟩" : "⟨"}
+            </button>
+            {activeUiToolId ? (
+              <button
+                onClick={() => setActiveUiToolId(null)}
+                title="Close tool panel"
+                style={{ border: "1px solid #e2e8f0", background: "white", borderRadius: 10, padding: "6px 8px", cursor: "pointer", fontSize: 12, fontWeight: 900 }}
+              >
+                Tool ✕
+              </button>
+            ) : null}
+          </div>
           <div style={{ color: "#64748b", fontSize: 12 }}>A2A threads/messages in D1; streaming tokens.</div>
         </div>
 
@@ -531,6 +583,17 @@ export default function ChatPage() {
                 campus_id: identity.campus_id ?? null,
                 timezone: identity.timezone ?? null,
                 persona_id: null,
+              }}
+              onClose={() => setActiveUiToolId(null)}
+            />
+          ) : activeUiToolId === "kids_checkin" ? (
+            <KidsCheckinPanel
+              identity={{
+                tenant_id: identity.tenant_id,
+                user_id: identity.user_id,
+                role: identity.role,
+                campus_id: identity.campus_id ?? null,
+                timezone: identity.timezone ?? null,
               }}
               onClose={() => setActiveUiToolId(null)}
             />
