@@ -14,6 +14,7 @@ import { TeamsSkillsPanel } from "./TeamsSkillsPanel";
 import { CarePastoralPanel } from "./CarePastoralPanel";
 import { KidsSafetyPanel } from "./KidsSafetyPanel";
 import { MemoryManagerPanel } from "./MemoryManagerPanel";
+import { GuidePanel } from "./GuidePanel";
 
 type ThreadMeta = { id: string; title: string; status: string; updatedAt?: string; createdAt?: string };
 
@@ -197,6 +198,8 @@ export default function ChatPage() {
                             ? "Kids safety"
                             : p.toolId === "memory_manager"
                               ? "Memory manager"
+                    : p.toolId === "guide"
+                      ? "Guide"
                               : p.toolId;
           return (
             <span key={i} style={{ display: "inline-flex", margin: "0 6px", verticalAlign: "middle" }}>
@@ -799,6 +802,19 @@ export default function ChatPage() {
                 persona_id: null,
               }}
               onClose={() => setActiveUiToolId(null)}
+            />
+          ) : activeUiToolId === "guide" ? (
+            <GuidePanel
+              identity={{
+                tenant_id: identity.tenant_id,
+                user_id: identity.user_id,
+                role: identity.role,
+                campus_id: identity.campus_id ?? null,
+                timezone: identity.timezone ?? null,
+                persona_id: null,
+              }}
+              onClose={() => setActiveUiToolId(null)}
+              onOpenTool={(toolId: string) => setActiveUiToolId(toolId)}
             />
           ) : (
             <div style={{ padding: 14, color: "#64748b", background: "white", height: "100%" }}>

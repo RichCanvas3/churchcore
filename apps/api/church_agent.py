@@ -136,6 +136,17 @@ def _ui_handoff_for_user_text(user_text: str) -> list[dict[str, Any]]:
             }
         ]
 
+    guideish = any(k in u for k in ["guide", "talk with a guide", "mentor", "pastor", "someone to talk to", "meet with someone"])
+    if guideish:
+        return [
+            {
+                "type": "ui_tool",
+                "tool_id": "guide",
+                "title": "Guide",
+                "instructions": "Open the guide panel (journey + next steps + resources).",
+            }
+        ]
+
     careish = any(k in u for k in ["prayer", "pray for", "care", "pastoral", "counseling", "counselling"])
     if careish:
         return [
@@ -505,6 +516,7 @@ async def handle_seeker_skill(
             "Client UI tools available (use handoff items when helpful):\n"
             "- household_manager: manage household members (add/edit/remove kids, allergies, special needs).\n"
             "- kids_checkin: run kids check-in flow (find family, preview rooms, commit check-in).\n"
+            "- guide: show journey position + next steps + resources.\n"
             "- memory_manager: manage person memory areas (hub).\n"
             "- identity_contact: view/edit preferred name + email/phone.\n"
             "- faith_journey: view/edit faith journey phase and milestones (Seeker, New Believer, Growing, etc.).\n"

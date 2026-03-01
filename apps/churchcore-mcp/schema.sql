@@ -668,3 +668,17 @@ CREATE TABLE IF NOT EXISTS journey_resource_link (
 );
 CREATE INDEX IF NOT EXISTS idx_journey_resource_link_node ON journey_resource_link(church_id, node_id);
 
+-- Link journey nodes to ChurchCore entities (groups/events/opportunities/resources/content_docs/etc.)
+CREATE TABLE IF NOT EXISTS journey_entity_link (
+  link_id TEXT PRIMARY KEY,
+  church_id TEXT NOT NULL,
+  node_id TEXT NOT NULL,
+  entity_type TEXT NOT NULL, -- group|event|opportunity|resource|content_doc|person|class|custom
+  entity_id TEXT NOT NULL,
+  relevance REAL DEFAULT 1.0,
+  metadata_json TEXT,
+  created_at TEXT NOT NULL,
+  FOREIGN KEY(node_id) REFERENCES journey_node(node_id)
+);
+CREATE INDEX IF NOT EXISTS idx_journey_entity_link_node ON journey_entity_link(church_id, node_id, entity_type);
+

@@ -194,15 +194,50 @@ INSERT OR REPLACE INTO journey_node (node_id, church_id, node_type, title, summa
 
 ('pr_bible','demo-church','Practice','Bible Reading','Regular Scripture intake.','{}',datetime('now'),datetime('now')),
 ('pr_prayer','demo-church','Practice','Prayer','Daily prayer rhythm.','{}',datetime('now'),datetime('now')),
+('pr_worship_gathering','demo-church','Practice','Worship Gathering','Regular Sunday gathering participation.','{}',datetime('now'),datetime('now')),
+('pr_community','demo-church','Practice','Community Participation','Meaningful relationships and mutual care.','{}',datetime('now'),datetime('now')),
+('pr_generosity','demo-church','Practice','Generosity','Regular generosity as worship and love of neighbor.','{}',datetime('now'),datetime('now')),
+('pr_serving','demo-church','Practice','Serving','Using gifts to build up the church.','{}',datetime('now'),datetime('now')),
+('pr_evangelism','demo-church','Practice','Evangelism','Prayerfully sharing faith and inviting others.','{}',datetime('now'),datetime('now')),
+('pr_sabbath','demo-church','Practice','Sabbath/Rest','Healthy rhythms of rest and trust.','{}',datetime('now'),datetime('now')),
+('pr_scripture_memory','demo-church','Practice','Scripture Memory','Hiding God’s word in your heart.','{}',datetime('now'),datetime('now')),
+('pr_confession','demo-church','Practice','Confession & Repentance','Regular honesty and turning back to God.','{}',datetime('now'),datetime('now')),
 
 ('topic_gospel','demo-church','DoctrineTopic','The Gospel','Jesus, sin, grace, faith, new life.','{}',datetime('now'),datetime('now')),
 ('topic_assurance','demo-church','DoctrineTopic','Assurance of Salvation','Confidence grounded in Christ.','{}',datetime('now'),datetime('now')),
+('topic_scripture','demo-church','DoctrineTopic','Scripture (Authority & Reading)','Why the Bible matters and how to read it.','{}',datetime('now'),datetime('now')),
+('topic_trinity','demo-church','DoctrineTopic','Trinity','Father, Son, and Holy Spirit.','{}',datetime('now'),datetime('now')),
+('topic_jesus','demo-church','DoctrineTopic','Jesus (Person & Work)','Incarnation, atonement, resurrection.','{}',datetime('now'),datetime('now')),
+('topic_salvation','demo-church','DoctrineTopic','Salvation (Grace/Faith)','Justification and sanctification.','{}',datetime('now'),datetime('now')),
+('topic_holy_spirit','demo-church','DoctrineTopic','Holy Spirit','New birth, empowerment, guidance.','{}',datetime('now'),datetime('now')),
+('topic_church','demo-church','DoctrineTopic','Church & Ordinances','Community, baptism, communion.','{}',datetime('now'),datetime('now')),
+('topic_prayer','demo-church','DoctrineTopic','Prayer','Talking with God, dependence, intercession.','{}',datetime('now'),datetime('now')),
+('topic_suffering','demo-church','DoctrineTopic','Suffering & Evil','God’s goodness amid pain.','{}',datetime('now'),datetime('now')),
+('topic_ethics','demo-church','DoctrineTopic','Christian Ethics','Holiness, love of neighbor, integrity.','{}',datetime('now'),datetime('now')),
+('topic_mission','demo-church','DoctrineTopic','Mission','Making disciples and blessing the world.','{}',datetime('now'),datetime('now')),
 
 ('barrier_doubt','demo-church','Barrier','Doubt/Uncertainty','Questions about faith, truth, or salvation.','{}',datetime('now'),datetime('now')),
 ('barrier_shame','demo-church','Barrier','Shame/Guilt','Feels unworthy or stuck in regret.','{}',datetime('now'),datetime('now')),
+('barrier_church_hurt','demo-church','Barrier','Church Hurt','Painful experiences with church/Christians.','{}',datetime('now'),datetime('now')),
+('barrier_assurance_anxiety','demo-church','Barrier','Assurance Anxiety','Fear about salvation / “am I really saved?”.','{}',datetime('now'),datetime('now')),
+('barrier_addictions','demo-church','Barrier','Addictions/Habits','Stuck patterns that feel stronger than willpower.','{}',datetime('now'),datetime('now')),
+('barrier_loneliness','demo-church','Barrier','Loneliness','Lack of meaningful community.','{}',datetime('now'),datetime('now')),
+('barrier_relationship_conflict','demo-church','Barrier','Relationship Conflict','Marriage/family/friend conflict and strain.','{}',datetime('now'),datetime('now')),
+('barrier_anxiety_depression','demo-church','Barrier','Anxiety/Depression','Persistent anxiety/depression symptoms (handle carefully).','{\"safety\":\"route_to_humans\"}',datetime('now'),datetime('now')),
 
 ('step_talk_to_guide','demo-church','ActionStep','Talk with a Guide','Schedule a 15-minute conversation with a church guide.','{\"cta\":\"Talk with a guide\",\"tool\":\"guide\"}',datetime('now'),datetime('now')),
-('step_join_group','demo-church','ActionStep','Join a Small Group','Pick a group and attend this week.','{\"cta\":\"Find a group\",\"tool\":\"groups\"}',datetime('now'),datetime('now'));
+('step_attend_sunday','demo-church','ActionStep','Attend a Sunday Gathering','Pick a service time and attend in person.','{\"cta\":\"Plan a visit\",\"tool\":\"chat\"}',datetime('now'),datetime('now')),
+('step_join_group','demo-church','ActionStep','Join a Small Group','Pick a group and attend this week.','{\"cta\":\"Find a group\",\"tool\":\"groups\"}',datetime('now'),datetime('now')),
+('step_start_bible_plan','demo-church','ActionStep','Start a Bible Reading Plan','Choose a simple plan and start this week.','{\"cta\":\"Start a plan\",\"tool\":\"faith_journey\"}',datetime('now'),datetime('now')),
+('step_request_prayer','demo-church','ActionStep','Request Prayer','Share a prayer request and we’ll pray with you.','{\"cta\":\"Request prayer\",\"tool\":\"care_pastoral\"}',datetime('now'),datetime('now')),
+('step_foundations_class','demo-church','ActionStep','Join Foundations Class','Join the next Foundations class cohort.','{\"cta\":\"Join class\",\"tool\":\"groups\"}',datetime('now'),datetime('now')),
+('step_interest_serving','demo-church','ActionStep','Explore Serving','Tell us where you’d like to serve.','{\"cta\":\"Serve\",\"tool\":\"teams_skills\"}',datetime('now'),datetime('now'));
+
+-- Resources / communities tied to real ChurchCore records
+INSERT OR REPLACE INTO journey_node (node_id, church_id, node_type, title, summary, metadata_json, created_at, updated_at) VALUES
+('res_what_to_expect','demo-church','Resource','What to expect on Sunday','A simple overview of what a Sunday gathering is like.','{\"entity_type\":\"resource\",\"entity_id\":\"res1\",\"tool\":\"resource\"}',datetime('now'),datetime('now')),
+('res_next_steps','demo-church','Resource','Next steps','Suggested next steps at Demo Church.','{\"entity_type\":\"resource\",\"entity_id\":\"res2\",\"tool\":\"resource\"}',datetime('now'),datetime('now')),
+('comm_parents_group','demo-church','Community','Parents Group','Monthly support + prayer.','{\"entity_type\":\"group\",\"entity_id\":\"g2\",\"tool\":\"groups\"}',datetime('now'),datetime('now'));
 
 INSERT OR REPLACE INTO journey_edge (edge_id, church_id, from_node_id, to_node_id, edge_type, weight, metadata_json, created_at, updated_at) VALUES
 ('e1','demo-church','stage_seeker','stage_gospel_clarity','NEXT_STAGE',1.0,'{}',datetime('now'),datetime('now')),
@@ -214,25 +249,44 @@ INSERT OR REPLACE INTO journey_edge (edge_id, church_id, from_node_id, to_node_i
 ('e7','demo-church','stage_serving','stage_multiplying','NEXT_STAGE',1.0,'{}',datetime('now'),datetime('now')),
 ('e8','demo-church','stage_multiplying','stage_leader','NEXT_STAGE',1.0,'{}',datetime('now'),datetime('now')),
 
+('rec_seeker_guide','demo-church','stage_seeker','step_talk_to_guide','RECOMMENDS',1.3,'{}',datetime('now'),datetime('now')),
+('rec_seeker_gospel','demo-church','stage_seeker','topic_gospel','RECOMMENDS',1.2,'{}',datetime('now'),datetime('now')),
+('rec_seeker_expect','demo-church','stage_seeker','res_what_to_expect','RECOMMENDS',1.1,'{}',datetime('now'),datetime('now')),
+('rec_seeker_attend','demo-church','stage_seeker','step_attend_sunday','RECOMMENDS',1.15,'{}',datetime('now'),datetime('now')),
+('rec_seeker_prayer','demo-church','stage_seeker','step_request_prayer','RECOMMENDS',1.05,'{}',datetime('now'),datetime('now')),
+
 ('r1','demo-church','stage_gospel_clarity','ms_understood_gospel','REQUIRES',1.2,'{}',datetime('now'),datetime('now')),
+('rec_gospel_scripture','demo-church','stage_gospel_clarity','topic_scripture','RECOMMENDS',1.05,'{}',datetime('now'),datetime('now')),
+('rec_gospel_next','demo-church','stage_gospel_clarity','res_next_steps','RECOMMENDS',1.0,'{}',datetime('now'),datetime('now')),
 ('r2','demo-church','stage_conversion','ms_profession_faith','REQUIRES',1.2,'{}',datetime('now'),datetime('now')),
+('rec_conversion_guide','demo-church','stage_conversion','step_talk_to_guide','RECOMMENDS',1.2,'{}',datetime('now'),datetime('now')),
 ('r3','demo-church','stage_new_believer','pr_bible','REQUIRES',1.0,'{}',datetime('now'),datetime('now')),
 ('r4','demo-church','stage_new_believer','pr_prayer','REQUIRES',1.0,'{}',datetime('now'),datetime('now')),
+('rec_newbeliever_assurance','demo-church','stage_new_believer','topic_assurance','RECOMMENDS',1.15,'{}',datetime('now'),datetime('now')),
+('rec_newbeliever_bibleplan','demo-church','stage_new_believer','step_start_bible_plan','RECOMMENDS',1.1,'{}',datetime('now'),datetime('now')),
 ('r5','demo-church','stage_connected','ms_joined_group','REQUIRES',1.1,'{}',datetime('now'),datetime('now')),
+('rec_connected_group','demo-church','stage_connected','step_join_group','RECOMMENDS',1.2,'{}',datetime('now'),datetime('now')),
 ('r6','demo-church','stage_growing','ms_foundations_class','REQUIRES',1.0,'{}',datetime('now'),datetime('now')),
+('rec_growing_foundations','demo-church','stage_growing','step_foundations_class','RECOMMENDS',1.15,'{}',datetime('now'),datetime('now')),
 ('r7','demo-church','stage_serving','ms_started_serving','REQUIRES',1.0,'{}',datetime('now'),datetime('now')),
+('rec_serving_explore','demo-church','stage_serving','step_interest_serving','RECOMMENDS',1.15,'{}',datetime('now'),datetime('now')),
 
 ('b1','demo-church','stage_gospel_clarity','barrier_doubt','BLOCKED_BY',1.0,'{}',datetime('now'),datetime('now')),
 ('b2','demo-church','stage_conversion','barrier_shame','BLOCKED_BY',1.0,'{}',datetime('now'),datetime('now')),
 
 ('rec1','demo-church','barrier_doubt','step_talk_to_guide','RESOLVED_BY',1.3,'{}',datetime('now'),datetime('now')),
+('rec1b','demo-church','barrier_doubt','topic_scripture','RESOLVED_BY',1.1,'{}',datetime('now'),datetime('now')),
 ('rec2','demo-church','stage_connected','step_join_group','RECOMMENDS',1.2,'{}',datetime('now'),datetime('now')),
 ('rec3','demo-church','stage_new_believer','topic_assurance','RECOMMENDS',1.1,'{}',datetime('now'),datetime('now')),
 ('rec4','demo-church','stage_gospel_clarity','topic_gospel','RECOMMENDS',1.1,'{}',datetime('now'),datetime('now')),
+('rec_connected_parents','demo-church','stage_connected','comm_parents_group','RECOMMENDS',1.05,'{}',datetime('now'),datetime('now')),
 ('u1','demo-church','ms_baptism','stage_connected','UNLOCKS',1.0,'{}',datetime('now'),datetime('now'));
 
 -- Journey content docs (KB-friendly) + linkages
 INSERT OR REPLACE INTO content_docs (id, church_id, entity_type, entity_id, locale, title, body_markdown, created_at, updated_at) VALUES
+('doc_scripture_john3_16','demo-church','scripture_ref','John 3:16','en','John 3:16','Reference only (no stored translation text).\\n\\n- Ref: John 3:16\\n- Link: https://www.openbible.info/labs/cross-references/search?q=John%203%3A16',datetime('now'),datetime('now')),
+('doc_scripture_eph2_8_9','demo-church','scripture_ref','Ephesians 2:8-9','en','Ephesians 2:8–9','Reference only (no stored translation text).\\n\\n- Ref: Ephesians 2:8–9\\n- Link: https://www.openbible.info/labs/cross-references/search?q=Ephesians%202%3A8-9',datetime('now'),datetime('now')),
+('doc_scripture_rom3_23_24','demo-church','scripture_ref','Romans 3:23-24','en','Romans 3:23–24','Reference only (no stored translation text).\\n\\n- Ref: Romans 3:23–24\\n- Link: https://www.openbible.info/labs/cross-references/search?q=Romans%203%3A23-24',datetime('now'),datetime('now')),
 ('doc_journey_topic_gospel','demo-church','journey_topic','topic_gospel','en','The Gospel',
  '## The Gospel\\n\\nThe gospel is the good news that **Jesus Christ** lived the life we could not, died for our sins, and rose again. Salvation is **by grace through faith**, not by works.\\n\\n**Next step**: if you want, tell me what you think the gospel is in your own words.',
  datetime('now'),datetime('now')),
@@ -247,10 +301,21 @@ INSERT OR REPLACE INTO content_docs (id, church_id, entity_type, entity_id, loca
  datetime('now'),datetime('now'));
 
 INSERT OR REPLACE INTO journey_resource_link (link_id, church_id, node_id, resource_id, relevance, created_at) VALUES
+('jrl_s1','demo-church','stage_seeker','doc_scripture_john3_16',1.0,datetime('now')),
+('jrl_s2','demo-church','topic_gospel','doc_scripture_eph2_8_9',1.0,datetime('now')),
+('jrl_s3','demo-church','topic_gospel','doc_scripture_rom3_23_24',0.9,datetime('now')),
 ('jrl1','demo-church','topic_gospel','doc_journey_topic_gospel',1.0,datetime('now')),
 ('jrl2','demo-church','topic_assurance','doc_journey_topic_assurance',1.0,datetime('now')),
 ('jrl3','demo-church','step_talk_to_guide','doc_journey_step_talk_to_guide',1.0,datetime('now')),
 ('jrl4','demo-church','step_join_group','doc_journey_step_join_group',1.0,datetime('now'));
+
+-- Link journey nodes to real ChurchCore entities (for CTAs in UI)
+INSERT OR REPLACE INTO journey_entity_link (link_id, church_id, node_id, entity_type, entity_id, relevance, metadata_json, created_at) VALUES
+('jel1','demo-church','res_what_to_expect','resource','res1',1.0,'{}',datetime('now')),
+('jel2','demo-church','res_next_steps','resource','res2',1.0,'{}',datetime('now')),
+('jel3','demo-church','comm_parents_group','group','g2',1.0,'{}',datetime('now')),
+('jel4','demo-church','step_join_group','group','g2',0.9,'{\"cta\":\"Join Parents Group\"}',datetime('now')),
+('jel5','demo-church','step_interest_serving','opportunity','opp1',0.9,'{\"cta\":\"Serve in Kids Check-in\"}',datetime('now'));
 
 -- Person journey instance (seed)
 INSERT OR REPLACE INTO person_journey_state (church_id, person_id, current_stage_id, confidence, updated_at) VALUES

@@ -10,12 +10,14 @@
     "d1:remote:schema": "wrangler d1 execute churchcore --remote --file ./schema.sql",
     "d1:remote:seed": "wrangler d1 execute churchcore --remote --file ./seed.sql",
     "d1:remote:setup": "pnpm run d1:remote:schema && pnpm run d1:remote:seed",
+    "openbible:import": "node ./tools/openbible-import.mjs",
     "deploy": "wrangler deploy",
     "lint": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.26.0",
     "agents": "^0.6.0",
+    "fflate": "^0.8.2",
     "zod": "^4.3.6"
   },
   "devDependencies": {
@@ -24,4 +26,3 @@
     "wrangler": "^4.69.0"
   }
 }
-

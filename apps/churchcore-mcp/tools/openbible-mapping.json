@@ -1,0 +1,21 @@
+{
+  "churchId": "demo-church",
+  "nodeTopics": {
+    "topic_gospel": ["gospel", "salvation", "grace"],
+    "topic_assurance": ["assurance", "eternal_life"],
+    "topic_scripture": ["bible", "scripture"],
+    "topic_prayer": ["prayer"],
+    "topic_church": ["church"],
+    "topic_mission": ["evangelism", "missions"],
+    "barrier_doubt": ["doubt"],
+    "barrier_shame": ["guilt", "shame"],
+    "barrier_loneliness": ["loneliness"],
+    "pr_prayer": ["prayer"],
+    "pr_bible": ["bible"],
+    "stage_seeker": ["seeking", "faith", "jesus"]
+  },
+  "limits": {
+    "maxVersesPerNode": 200
+  }
+}
+

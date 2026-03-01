@@ -481,6 +481,13 @@ async function handleJourneyGetState(req: Request, env: Env) {
   const currentStageId = state.currentStageId ?? "stage_seeker";
   const currentStage = await getJourneyNode(env, { churchId, nodeId: currentStageId });
   const completed = await listPersonJourneyCompleted(env, { churchId, personId });
+  const currentStageDocs = await listJourneyLinkedContentDocs(env, { churchId, nodeId: currentStageId, limit: 6 });
+  const currentStageEntityLinks = await listJourneyEntityLinks(env, { churchId, nodeId: currentStageId, limit: 5 });
+  const currentStageEntities: any[] = [];
+  for (const l of currentStageEntityLinks) {
+    const resolved = await resolveEntityByLink(env, { churchId, entityType: l.entityType, entityId: l.entityId });
+    if (resolved) currentStageEntities.push({ ...resolved, relevance: l.relevance, metadata: l.metadata ?? null });
+  }
 
   return json({
     ok: true,
@@ -488,6 +495,8 @@ async function handleJourneyGetState(req: Request, env: Env) {
     current_stage: currentStage,
     stages,
     completed_node_ids: Array.from(completed.completedNodeIds.values()),
+    current_stage_docs: currentStageDocs,
+    current_stage_entities: currentStageEntities,
     confidence: state.confidence,
     updated_at: state.updatedAt,
     actor: { userId, role },
@@ -512,7 +521,21 @@ async function handleJourneyNextSteps(req: Request, env: Env) {
   const currentStageId = state.currentStageId ?? "stage_seeker";
   const nextSteps = await computeJourneyNextSteps(env, { churchId, personId, currentStageId, limit });
 
-  return json({ ok: true, person_id: personId, current_stage_id: currentStageId, next_steps: nextSteps, actor: { userId, role } });
+  const enriched: any[] = [];
+  for (const s of nextSteps as any[]) {
+    const nodeId = String(s?.node?.id ?? "");
+    const docs = nodeId ? await listJourneyLinkedContentDocs(env, { churchId, nodeId, limit: 4 }) : [];
+    const nodeEntityLinks = nodeId ? await listJourneyEntityLinks(env, { churchId, nodeId, limit: 5 }) : [];
+    const entities: any[] = [];
+    for (const l of nodeEntityLinks) {
+      const resolved = await resolveEntityByLink(env, { churchId, entityType: l.entityType, entityId: l.entityId });
+      if (resolved) entities.push({ ...resolved, relevance: l.relevance, metadata: l.metadata ?? null });
+    }
+    const legacyEntity = await resolveJourneyNodeEntity(env, { churchId, node: s?.node ?? null });
+    enriched.push({ ...s, linked: { docs, entities, legacyEntity } });
+  }
+
+  return json({ ok: true, person_id: personId, current_stage_id: currentStageId, next_steps: enriched, actor: { userId, role } });
 }
 
 async function handleJourneyCompleteStep(req: Request, env: Env) {
@@ -600,6 +623,118 @@ async function getJourneyNode(env: Env, args: { churchId: string; nodeId: string
     : null;
 }
 
+async function listJourneyLinkedContentDocs(env: Env, args: { churchId: string; nodeId: string; limit: number }) {
+  const lim = Math.max(1, Math.min(20, args.limit));
+  const rows =
+    (
+      await env.churchcore
+        .prepare(
+          `SELECT cd.id AS docId, cd.entity_type AS entityType, cd.entity_id AS entityId, cd.locale, cd.title, cd.body_markdown AS bodyMarkdown, jr.relevance
+           FROM journey_resource_link jr
+           JOIN content_docs cd ON cd.id = jr.resource_id
+           WHERE jr.church_id=?1 AND jr.node_id=?2
+           ORDER BY jr.relevance DESC, cd.updated_at DESC
+           LIMIT ${lim}`,
+        )
+        .bind(args.churchId, args.nodeId)
+        .all()
+    ).results ?? [];
+
+  return (rows as any[]).map((r) => ({
+    docId: String(r.docId),
+    entityType: String(r.entityType),
+    entityId: String(r.entityId),
+    locale: r.locale ?? "en",
+    title: r.title ?? null,
+    bodyMarkdown: String(r.bodyMarkdown ?? ""),
+    relevance: typeof r.relevance === "number" ? r.relevance : 1.0,
+  }));
+}
+
+async function listJourneyEntityLinks(env: Env, args: { churchId: string; nodeId: string; limit: number }) {
+  const lim = Math.max(1, Math.min(20, args.limit));
+  const rows =
+    (
+      await env.churchcore
+        .prepare(
+          `SELECT entity_type AS entityType, entity_id AS entityId, relevance, metadata_json AS metadataJson
+           FROM journey_entity_link
+           WHERE church_id=?1 AND node_id=?2
+           ORDER BY relevance DESC
+           LIMIT ${lim}`,
+        )
+        .bind(args.churchId, args.nodeId)
+        .all()
+    ).results ?? [];
+  return (rows as any[]).map((r) => ({
+    entityType: String(r.entityType),
+    entityId: String(r.entityId),
+    relevance: typeof r.relevance === "number" ? r.relevance : 1.0,
+    metadata: typeof r.metadataJson === "string" ? safeJsonParse(r.metadataJson) : null,
+  }));
+}
+
+async function resolveJourneyNodeEntity(env: Env, args: { churchId: string; node: any }) {
+  const meta = args?.node?.metadata;
+  const entityType = typeof meta?.entity_type === "string" ? meta.entity_type : typeof meta?.entityType === "string" ? meta.entityType : "";
+  const entityId = typeof meta?.entity_id === "string" ? meta.entity_id : typeof meta?.entityId === "string" ? meta.entityId : "";
+  if (!entityType || !entityId) return null;
+
+  if (entityType === "group") {
+    const row = (await env.churchcore.prepare(`SELECT * FROM groups WHERE church_id=?1 AND id=?2`).bind(args.churchId, entityId).first()) as any;
+    return row ? { type: "group", group: row } : null;
+  }
+  if (entityType === "resource") {
+    const row = (await env.churchcore.prepare(`SELECT * FROM resources WHERE church_id=?1 AND id=?2`).bind(args.churchId, entityId).first()) as any;
+    return row ? { type: "resource", resource: row } : null;
+  }
+  if (entityType === "opportunity") {
+    const row = (
+      await env.churchcore.prepare(`SELECT * FROM opportunities WHERE church_id=?1 AND id=?2`).bind(args.churchId, entityId).first()
+    ) as any;
+    return row ? { type: "opportunity", opportunity: row } : null;
+  }
+  if (entityType === "event") {
+    const row = (await env.churchcore.prepare(`SELECT * FROM events WHERE church_id=?1 AND id=?2`).bind(args.churchId, entityId).first()) as any;
+    return row ? { type: "event", event: row } : null;
+  }
+  if (entityType === "content_doc") {
+    const row = (await env.churchcore.prepare(`SELECT * FROM content_docs WHERE church_id=?1 AND id=?2`).bind(args.churchId, entityId).first()) as any;
+    return row ? { type: "content_doc", doc: row } : null;
+  }
+  return null;
+}
+
+async function resolveEntityByLink(env: Env, args: { churchId: string; entityType: string; entityId: string }) {
+  const entityType = String(args.entityType || "").trim();
+  const entityId = String(args.entityId || "").trim();
+  if (!entityType || !entityId) return null;
+
+  if (entityType === "group") {
+    const row = (await env.churchcore.prepare(`SELECT * FROM groups WHERE church_id=?1 AND id=?2`).bind(args.churchId, entityId).first()) as any;
+    return row ? { type: "group", group: row } : null;
+  }
+  if (entityType === "resource") {
+    const row = (await env.churchcore.prepare(`SELECT * FROM resources WHERE church_id=?1 AND id=?2`).bind(args.churchId, entityId).first()) as any;
+    return row ? { type: "resource", resource: row } : null;
+  }
+  if (entityType === "opportunity") {
+    const row = (
+      await env.churchcore.prepare(`SELECT * FROM opportunities WHERE church_id=?1 AND id=?2`).bind(args.churchId, entityId).first()
+    ) as any;
+    return row ? { type: "opportunity", opportunity: row } : null;
+  }
+  if (entityType === "event") {
+    const row = (await env.churchcore.prepare(`SELECT * FROM events WHERE church_id=?1 AND id=?2`).bind(args.churchId, entityId).first()) as any;
+    return row ? { type: "event", event: row } : null;
+  }
+  if (entityType === "content_doc") {
+    const row = (await env.churchcore.prepare(`SELECT * FROM content_docs WHERE church_id=?1 AND id=?2`).bind(args.churchId, entityId).first()) as any;
+    return row ? { type: "content_doc", doc: row } : null;
+  }
+  return null;
+}
+
 async function getPersonJourneyState(env: Env, args: { churchId: string; personId: string }) {
   const row = (
     await env.churchcore
@@ -643,6 +778,23 @@ async function listPersonJourneyCompleted(env: Env, args: { churchId: string; pe
   const set = new Set<string>();
   for (const r of rows ?? []) set.add(String(r.nodeId));
   return { completedNodeIds: set, completedRows: rows ?? [] };
+}
+
+async function listPersonJourneyRecentEvents(env: Env, args: { churchId: string; personId: string; limit: number }) {
+  const lim = Math.max(1, Math.min(500, args.limit));
+  const rows = (
+    await env.churchcore
+      .prepare(
+        `SELECT node_id AS nodeId, event_type AS eventType, value_json AS valueJson, created_at AS createdAt
+         FROM person_journey_event
+         WHERE church_id=?1 AND person_id=?2
+         ORDER BY created_at DESC
+         LIMIT ${lim}`,
+      )
+      .bind(args.churchId, args.personId)
+      .all()
+  ).results as any[];
+  return rows ?? [];
 }
 
 async function listJourneyEdgesFrom(env: Env, args: { churchId: string; fromNodeId: string }) {
@@ -702,29 +854,71 @@ async function ensurePersonJourneyState(env: Env, args: { churchId: string; pers
 
 async function computeJourneyNextSteps(env: Env, args: { churchId: string; personId: string; currentStageId: string; limit: number }) {
   const { completedNodeIds } = await listPersonJourneyCompleted(env, { churchId: args.churchId, personId: args.personId });
-  const edges = await listJourneyEdgesFrom(env, { churchId: args.churchId, fromNodeId: args.currentStageId });
+  const stageEdges = await listJourneyEdgesFrom(env, { churchId: args.churchId, fromNodeId: args.currentStageId });
 
-  const candidates: Array<{ nodeId: string; edgeType: string; weight: number; why: string }> = [];
-  for (const e of edges) {
+  const candidates: Array<{ nodeId: string; edgeType: string; score: number; why: string }> = [];
+  for (const e of stageEdges) {
     const edgeType = String(e.edgeType);
     const weight = typeof e.weight === "number" ? e.weight : 1.0;
     if (edgeType === "REQUIRES") {
-      if (!completedNodeIds.has(e.toNodeId)) candidates.push({ nodeId: e.toNodeId, edgeType, weight, why: "Required for this stage" });
+      if (!completedNodeIds.has(e.toNodeId)) candidates.push({ nodeId: e.toNodeId, edgeType, score: weight + 0.2, why: "Required for this stage" });
     } else if (edgeType === "RECOMMENDS") {
-      candidates.push({ nodeId: e.toNodeId, edgeType, weight, why: "Recommended next step" });
+      candidates.push({ nodeId: e.toNodeId, edgeType, score: weight, why: "Recommended next step" });
     }
   }
 
-  candidates.sort((a, b) => (b.weight ?? 1) - (a.weight ?? 1));
-  const top = candidates.slice(0, Math.max(1, args.limit));
-
-  const out: any[] = [];
-  for (const c of top) {
-    const node = await getJourneyNode(env, { churchId: args.churchId, nodeId: c.nodeId });
-    if (!node) continue;
-    out.push({ node, edgeType: c.edgeType, score: c.weight, why: c.why });
+  // Barrier-aware: if the person has an active barrier event, add RESOLVED_BY edges as priority candidates.
+  const recent = await listPersonJourneyRecentEvents(env, { churchId: args.churchId, personId: args.personId, limit: 80 });
+  const activeBarrierNodeIds: string[] = [];
+  for (const ev of recent) {
+    const nodeId = String(ev?.nodeId ?? "");
+    if (!nodeId) continue;
+    if (String(ev?.eventType ?? "") !== "ASSESSMENT" && String(ev?.eventType ?? "") !== "NOTE") continue;
+    const v = typeof ev?.valueJson === "string" ? safeJsonParse(ev.valueJson) : null;
+    const active = v && typeof v === "object" ? Boolean(v.active) || (typeof v.score === "number" && v.score >= 0.6) : false;
+    if (!active) continue;
+    const node = await getJourneyNode(env, { churchId: args.churchId, nodeId });
+    if (node && node.type === "Barrier") activeBarrierNodeIds.push(nodeId);
   }
-  return out;
+  for (const barrierId of Array.from(new Set(activeBarrierNodeIds)).slice(0, 3)) {
+    const edges = await listJourneyEdgesFrom(env, { churchId: args.churchId, fromNodeId: barrierId });
+    for (const e of edges) {
+      if (String(e.edgeType) !== "RESOLVED_BY") continue;
+      const weight = typeof e.weight === "number" ? e.weight : 1.0;
+      candidates.push({ nodeId: e.toNodeId, edgeType: "RESOLVED_BY", score: weight + 0.5, why: "Helps address a current barrier" });
+    }
+  }
+
+  // Fetch nodes and pick a balanced set: ActionStep + Community + Resource/Doctrine/Practice, then fill by score.
+  const dedup = new Map<string, { node: any; edgeType: string; score: number; why: string }>();
+  for (const c of candidates) {
+    if (!c.nodeId) continue;
+    if (completedNodeIds.has(c.nodeId) && c.edgeType === "REQUIRES") continue;
+    const existing = dedup.get(c.nodeId);
+    if (!existing || c.score > existing.score) {
+      const node = await getJourneyNode(env, { churchId: args.churchId, nodeId: c.nodeId });
+      if (!node) continue;
+      dedup.set(c.nodeId, { node, edgeType: c.edgeType, score: c.score, why: c.why });
+    }
+  }
+
+  const all = Array.from(dedup.values()).sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
+  const actions = all.filter((x) => x.node?.type === "ActionStep");
+  const communities = all.filter((x) => x.node?.type === "Community");
+  const resources = all.filter((x) => ["Resource", "DoctrineTopic", "Practice", "Milestone"].includes(String(x.node?.type ?? "")));
+
+  const picked: any[] = [];
+  if (actions[0]) picked.push(actions[0]);
+  if (communities[0]) picked.push(communities[0]);
+  if (resources[0]) picked.push(resources[0]);
+
+  for (const x of all) {
+    if (picked.length >= Math.max(1, args.limit)) break;
+    if (picked.some((p) => p.node?.id === x.node?.id)) continue;
+    picked.push(x);
+  }
+
+  return picked.map((p) => ({ node: p.node, edgeType: p.edgeType, score: p.score, why: p.why }));
 }
 
 async function requireOwnedThread(env: Env, args: { churchId: string; userId: string; threadId: string }) {
