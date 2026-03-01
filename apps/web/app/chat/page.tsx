@@ -4,19 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ComposerPrimitive, MessagePrimitive, ThreadPrimitive } from "@assistant-ui/react";
 import type { Session } from "../../lib/types";
 import { A2AChatRuntime } from "./A2AChatRuntime";
-
-function defaultSession(): Session {
-  return {
-    churchId: "demo-church",
-    campusId: "campus_main",
-    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
-    userId: "demo_user_noah",
-    personId: "p_seeker_2",
-    role: "seeker",
-    auth: { isAuthenticated: false, roles: [] },
-    threadId: null,
-  };
-}
+import { useDemoIdentity } from "../../components/DemoIdentityProvider";
 
 type ThreadMeta = { id: string; title: string; status: string; updatedAt?: string; createdAt?: string };
 
@@ -85,7 +73,17 @@ function Composer() {
 }
 
 export default function ChatPage() {
-  const [session] = useState<Session>(() => defaultSession());
+  const { identity } = useDemoIdentity();
+  const [session, setSession] = useState<Session>(() => ({
+    churchId: identity.tenant_id,
+    campusId: identity.campus_id ?? "campus_main",
+    timezone: identity.timezone ?? (Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"),
+    userId: identity.user_id,
+    personId: null,
+    role: "seeker",
+    auth: { isAuthenticated: false, roles: [] },
+    threadId: null,
+  }));
   const [threads, setThreads] = useState<ThreadMeta[]>([]);
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
@@ -123,9 +121,22 @@ export default function ChatPage() {
   }
 
   useEffect(() => {
+    setSession({
+      churchId: identity.tenant_id,
+      campusId: identity.campus_id ?? "campus_main",
+      timezone: identity.timezone ?? (Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"),
+      userId: identity.user_id,
+      personId: null,
+      role: "seeker",
+      auth: { isAuthenticated: false, roles: [] },
+      threadId: null,
+    });
+    setThreads([]);
+    setActiveThreadId(null);
+    setMePerson(null);
     refreshThreads().catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [identity.user_id]);
 
   async function createThread() {
     const out = await postJson<{ thread_id?: string }>("/api/a2a/thread/create", {

@@ -45,15 +45,20 @@ INSERT OR REPLACE INTO households (id, church_id, name, created_at, updated_at) 
 
 INSERT OR REPLACE INTO household_contacts (id, church_id, household_id, contact_type, contact_value, is_primary, created_at, updated_at) VALUES
 ('hc_noah_phone','demo-church','hh_noah_1','phone','+15550000002',1,datetime('now'),datetime('now')),
-('hc_noah_email','demo-church','hh_noah_1','email','noah.seeker@example.com',1,datetime('now'),datetime('now'));
+('hc_noah_email','demo-church','hh_noah_1','email','noah.seeker@example.com',1,datetime('now'),datetime('now')),
+('hc_ava_phone','demo-church','hh_noah_1','phone','+15550000001',0,datetime('now'),datetime('now')),
+('hc_ava_email','demo-church','hh_noah_1','email','ava.seeker@example.com',0,datetime('now'),datetime('now'));
 
 INSERT OR REPLACE INTO household_members (household_id, person_id, role) VALUES
 ('hh_noah_1','p_seeker_2','adult'),
+('hh_noah_1','p_seeker_1','adult'),
 ('hh_noah_1','p_child_1','child');
 
 INSERT OR REPLACE INTO person_relationships (id, church_id, from_person_id, to_person_id, relationship_type, status, notes, created_at, updated_at) VALUES
 ('rel_noah_guardian','demo-church','p_seeker_2','p_child_1','guardian','active',NULL,datetime('now'),datetime('now')),
-('rel_noah_pickup','demo-church','p_seeker_2','p_child_1','authorized_pickup','active',NULL,datetime('now'),datetime('now'));
+('rel_noah_pickup','demo-church','p_seeker_2','p_child_1','authorized_pickup','active',NULL,datetime('now'),datetime('now')),
+('rel_ava_guardian','demo-church','p_seeker_1','p_child_1','guardian','active',NULL,datetime('now'),datetime('now')),
+('rel_ava_pickup','demo-church','p_seeker_1','p_child_1','authorized_pickup','active',NULL,datetime('now'),datetime('now'));
 
 INSERT OR REPLACE INTO child_profiles (person_id, church_id, grade, allergies, medical_notes, special_needs, custody_notes, created_at, updated_at) VALUES
 ('p_child_1','demo-church',NULL,'peanuts',NULL,0,NULL,datetime('now'),datetime('now'));
@@ -63,6 +68,10 @@ INSERT OR REPLACE INTO roles (id, church_id, user_id, role, created_at) VALUES
 ('r1','demo-church','local-guide','guide',datetime('now')),
 ('r2','demo-church','local-guide','staff',datetime('now'));
 
+-- Volunteer role for Ava (kids classroom check-in assistant)
+INSERT OR REPLACE INTO roles (id, church_id, user_id, role, created_at) VALUES
+('r3','demo-church','demo_user_ava','volunteer',datetime('now'));
+
 INSERT OR REPLACE INTO memberships (id, church_id, user_id, status, updated_at) VALUES
 ('m1','demo-church','local-user','guest',datetime('now')),
 ('m2','demo-church','local-guide','member',datetime('now'));
@@ -70,6 +79,10 @@ INSERT OR REPLACE INTO memberships (id, church_id, user_id, status, updated_at) 
 -- Default app-user -> person binding (Noah Seeker)
 INSERT OR REPLACE INTO user_person_bindings (church_id, user_id, person_id, created_at, updated_at) VALUES
 ('demo-church','demo_user_noah','p_seeker_2',datetime('now'),datetime('now'));
+
+-- Default app-user -> person binding (Ava Seeker)
+INSERT OR REPLACE INTO user_person_bindings (church_id, user_id, person_id, created_at, updated_at) VALUES
+('demo-church','demo_user_ava','p_seeker_1',datetime('now'),datetime('now'));
 
 -- Seed chat topics for Noah
 INSERT OR REPLACE INTO chat_threads (id, church_id, user_id, title, status, created_at, updated_at) VALUES

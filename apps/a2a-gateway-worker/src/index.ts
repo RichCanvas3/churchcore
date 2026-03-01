@@ -63,6 +63,17 @@ async function parseJson(req: Request) {
   return raw;
 }
 
+async function getUserRoles(env: Env, args: { churchId: string; userId: string }) {
+  const rows =
+    (
+      await env.churchcore
+        .prepare(`SELECT role FROM roles WHERE church_id=?1 AND user_id=?2`)
+        .bind(args.churchId, args.userId)
+        .all()
+    ).results ?? [];
+  return new Set((rows as any[]).map((r) => String(r.role || "")).filter(Boolean));
+}
+
 async function resolvePerson(env: Env, identity: z.infer<typeof IdentitySchema>) {
   const churchId = identity.tenant_id;
   const userId = identity.user_id;
@@ -657,12 +668,13 @@ async function handleHouseholdIdentify(req: Request, env: Env) {
   const churchId = identity.tenant_id;
   const userId = identity.user_id;
   const role = (identity.role ?? "seeker") as string;
+  const roles = await getUserRoles(env, { churchId, userId });
 
   const phone = normalizePhone(parsed.data.phone);
   const otp = (parsed.data.otp_code ?? "").trim();
 
-  // Assisted stations (guide) can search without OTP in this MVP.
-  const isAssisted = String(role).toLowerCase() === "guide";
+  // Assisted stations: guide or volunteer can search without OTP in this MVP.
+  const isAssisted = String(role).toLowerCase() === "guide" || roles.has("volunteer") || roles.has("staff");
 
   if (!isAssisted) {
     // Demo OTP rule: accept 000000. If not provided, tell client to request OTP.
@@ -928,6 +940,7 @@ async function handleCheckinCommit(req: Request, env: Env) {
   const churchId = identity.tenant_id;
   const userId = identity.user_id;
   const role = (identity.role ?? "seeker") as string;
+  const roles = await getUserRoles(env, { churchId, userId });
 
   const checkinId = crypto.randomUUID();
   const now = nowIso();
@@ -946,8 +959,8 @@ async function handleCheckinCommit(req: Request, env: Env) {
       parsed.data.area_id,
       parsed.data.household_id,
       userId,
-      role,
-      String(role).toLowerCase() === "guide" ? "assisted" : "self",
+      roles.has("staff") || String(role).toLowerCase() === "guide" ? "guide" : roles.has("volunteer") ? "volunteer" : "seeker",
+      roles.has("staff") || String(role).toLowerCase() === "guide" || roles.has("volunteer") ? "assisted" : "self",
       securityCode,
       now,
     )

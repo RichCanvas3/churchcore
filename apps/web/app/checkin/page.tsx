@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useDemoIdentity } from "../../components/DemoIdentityProvider";
 
 type Identity = {
   tenant_id: string;
@@ -19,16 +20,16 @@ async function postJson<T>(url: string, body: unknown): Promise<T> {
 }
 
 export default function CheckinPage() {
+  const { identity: demo } = useDemoIdentity();
   const identity = useMemo<Identity>(
     () => ({
-      tenant_id: "demo-church",
-      user_id: "demo_user_noah",
-      role: "seeker",
-      campus_id: "campus_main",
-      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
-      persona_id: "p_seeker_2",
+      tenant_id: demo.tenant_id,
+      user_id: demo.user_id,
+      role: demo.role,
+      campus_id: demo.campus_id,
+      timezone: demo.timezone,
     }),
-    [],
+    [demo],
   );
 
   // demo service/area (seed.sql)
@@ -55,6 +56,20 @@ export default function CheckinPage() {
   const [checkinId, setCheckinId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    setPhone(identity.user_id === "demo_user_ava" ? "+15550000001" : "+15550000002");
+    setOtp("");
+    setHousehold(null);
+    setKids([]);
+    setNeedsOtp(false);
+    setCreateMode(false);
+    setPlacements([]);
+    setSelections({});
+    setSecurityCode(null);
+    setCheckinId(null);
+    setError(null);
+  }, [identity.user_id]);
 
   useEffect(() => {
     // Try to pre-load rooms (start context)

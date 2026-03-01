@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useDemoIdentity } from "./DemoIdentityProvider";
 
 type Person = { first_name?: string | null; last_name?: string | null; id?: string | null } | null;
 
@@ -14,17 +15,7 @@ async function postJson<T>(url: string, body: unknown): Promise<T> {
 export function AppHeader(props: { height?: number }) {
   const h = props.height ?? 56;
 
-  // Demo “logged-in” identity for now.
-  const identity = useMemo(
-    () => ({
-      tenant_id: "demo-church",
-      user_id: "demo_user_noah",
-      role: "seeker" as const,
-      campus_id: "campus_main",
-      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
-    }),
-    [],
-  );
+  const { identity, accounts, setIdentity } = useDemoIdentity();
 
   const [person, setPerson] = useState<Person>(null);
 
@@ -85,6 +76,29 @@ export function AppHeader(props: { height?: number }) {
           <a href="/guide" style={{ fontSize: 14 }}>
             Guide
           </a>
+          <div style={{ display: "grid", gap: 6 }}>
+            <div style={{ fontSize: 12, color: "#64748b" }}>Switch account</div>
+            <div style={{ display: "grid", gap: 6 }}>
+              {accounts.map((a) => (
+                <button
+                  key={a.identity.user_id}
+                  onClick={() => setIdentity(a.identity)}
+                  style={{
+                    textAlign: "left",
+                    border: "1px solid #e2e8f0",
+                    background: a.identity.user_id === identity.user_id ? "#f1f5f9" : "white",
+                    borderRadius: 10,
+                    padding: "8px 10px",
+                    cursor: "pointer",
+                    fontSize: 12,
+                    fontWeight: 800,
+                  }}
+                >
+                  {a.label}
+                </button>
+              ))}
+            </div>
+          </div>
           <div style={{ fontSize: 12, color: "#64748b" }}>
             churchId={identity.tenant_id}
             <br />
