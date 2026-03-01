@@ -90,6 +90,9 @@ export default function ChatPage() {
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [mePerson, setMePerson] = useState<Record<string, unknown> | null>(null);
+  const [editingThreadId, setEditingThreadId] = useState<string | null>(null);
+  const [editingTitle, setEditingTitle] = useState<string>("");
+  const [renaming, setRenaming] = useState(false);
 
   const meLabel = useMemo(() => {
     const first = typeof (mePerson as any)?.first_name === "string" ? String((mePerson as any).first_name) : "";
@@ -154,6 +157,32 @@ export default function ChatPage() {
     });
     setActiveThreadId(null);
     await refreshThreads();
+  }
+
+  async function renameThread(threadId: string, nextTitle: string) {
+    const title = String(nextTitle ?? "").trim();
+    if (!title) return;
+    setRenaming(true);
+    try {
+      await postJson("/api/a2a/thread/rename", {
+        identity: {
+          tenant_id: session.churchId,
+          user_id: session.userId,
+          role: session.role,
+          campus_id: session.campusId ?? undefined,
+          timezone: session.timezone,
+          persona_id: session.personId ?? undefined,
+        },
+        thread_id: threadId,
+        title,
+      });
+      setThreads((prev) => prev.map((t) => (t.id === threadId ? { ...t, title } : t)));
+      await refreshThreads();
+    } finally {
+      setRenaming(false);
+      setEditingThreadId(null);
+      setEditingTitle("");
+    }
   }
 
   const historyAdapter = useMemo(() => {
@@ -286,6 +315,7 @@ export default function ChatPage() {
             <div style={{ padding: 10, display: "grid", gap: 6 }}>
               {threads.map((t) => {
                 const isActive = t.id === activeThreadId;
+                const isEditing = t.id === editingThreadId;
                 return (
                   <div
                     key={t.id}
@@ -300,8 +330,75 @@ export default function ChatPage() {
                     }}
                     onClick={() => setActiveThreadId(t.id)}
                   >
-                    <div style={{ fontWeight: 800 }}>{t.title}</div>
+                    {isEditing ? (
+                      <input
+                        value={editingTitle}
+                        autoFocus
+                        onChange={(e) => setEditingTitle(e.target.value)}
+                        onClick={(e) => e.stopPropagation()}
+                        onKeyDown={(e) => {
+                          if (e.key === "Escape") {
+                            e.preventDefault();
+                            setEditingThreadId(null);
+                            setEditingTitle("");
+                          }
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            renameThread(t.id, editingTitle).catch(() => {});
+                          }
+                        }}
+                        style={{
+                          width: "100%",
+                          border: "1px solid #cbd5e1",
+                          borderRadius: 10,
+                          padding: "8px 10px",
+                          fontWeight: 800,
+                        }}
+                        placeholder="Topic name"
+                      />
+                    ) : (
+                      <div style={{ fontWeight: 800 }}>{t.title}</div>
+                    )}
                     <div style={{ display: "flex", gap: 10 }}>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditingThreadId(t.id);
+                          setEditingTitle(t.title);
+                        }}
+                        style={{
+                          border: "1px solid #e2e8f0",
+                          background: "white",
+                          borderRadius: 10,
+                          padding: "6px 8px",
+                          cursor: "pointer",
+                          fontSize: 12,
+                        }}
+                      >
+                        Rename
+                      </button>
+
+                      {isEditing ? (
+                        <button
+                          disabled={renaming}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            renameThread(t.id, editingTitle).catch(() => {});
+                          }}
+                          style={{
+                            border: "1px solid #0f172a",
+                            background: renaming ? "#334155" : "#0f172a",
+                            color: "white",
+                            borderRadius: 10,
+                            padding: "6px 8px",
+                            cursor: renaming ? "not-allowed" : "pointer",
+                            fontSize: 12,
+                          }}
+                        >
+                          Save
+                        </button>
+                      ) : null}
+
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
