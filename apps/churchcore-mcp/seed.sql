@@ -33,6 +33,31 @@ INSERT OR REPLACE INTO people (
 ('p_seeker_2','demo-church','campus_main','Noah','Seeker','noah.seeker@example.com','+15550000002',datetime('now'),datetime('now')),
 ('p_leader_1','demo-church','campus_main','Grace','Leader','grace.leader@example.com','+15550000003',datetime('now'),datetime('now'));
 
+INSERT OR REPLACE INTO people (
+  id, church_id, campus_id, first_name, last_name, birthdate,
+  created_at, updated_at
+) VALUES
+('p_child_1','demo-church','campus_main','Mia','Seeker','2021-06-01',datetime('now'),datetime('now'));
+
+-- Household for Noah + child (kids check-in demo)
+INSERT OR REPLACE INTO households (id, church_id, name, created_at, updated_at) VALUES
+('hh_noah_1','demo-church','Seeker Household',datetime('now'),datetime('now'));
+
+INSERT OR REPLACE INTO household_contacts (id, church_id, household_id, contact_type, contact_value, is_primary, created_at, updated_at) VALUES
+('hc_noah_phone','demo-church','hh_noah_1','phone','+15550000002',1,datetime('now'),datetime('now')),
+('hc_noah_email','demo-church','hh_noah_1','email','noah.seeker@example.com',1,datetime('now'),datetime('now'));
+
+INSERT OR REPLACE INTO household_members (household_id, person_id, role) VALUES
+('hh_noah_1','p_seeker_2','adult'),
+('hh_noah_1','p_child_1','child');
+
+INSERT OR REPLACE INTO person_relationships (id, church_id, from_person_id, to_person_id, relationship_type, status, notes, created_at, updated_at) VALUES
+('rel_noah_guardian','demo-church','p_seeker_2','p_child_1','guardian','active',NULL,datetime('now'),datetime('now')),
+('rel_noah_pickup','demo-church','p_seeker_2','p_child_1','authorized_pickup','active',NULL,datetime('now'),datetime('now'));
+
+INSERT OR REPLACE INTO child_profiles (person_id, church_id, grade, allergies, medical_notes, special_needs, custody_notes, created_at, updated_at) VALUES
+('p_child_1','demo-church',NULL,'peanuts',NULL,0,NULL,datetime('now'),datetime('now'));
+
 -- Roles for guide demo userId=local-guide
 INSERT OR REPLACE INTO roles (id, church_id, user_id, role, created_at) VALUES
 ('r1','demo-church','local-guide','guide',datetime('now')),
@@ -66,6 +91,17 @@ INSERT OR REPLACE INTO services (
 -- Service plan (example run-of-show)
 INSERT OR REPLACE INTO service_plans (id, church_id, campus_id, service_id, title, starts_at, ends_at, created_at, updated_at) VALUES
 ('plan1','demo-church','campus_main','svc1','Sunday Gathering Plan',datetime('now','+2 days'),datetime('now','+2 days','+90 minutes'),datetime('now'),datetime('now'));
+
+-- Kids check-in config
+INSERT OR REPLACE INTO checkin_areas (id, church_id, campus_id, name, kind, created_at, updated_at) VALUES
+('area_kids_main','demo-church','campus_main','Kids Check-in','kids',datetime('now'),datetime('now'));
+
+INSERT OR REPLACE INTO checkin_rooms (id, church_id, campus_id, area_id, name, min_age_months, max_age_months, min_grade, max_grade, capacity, notes, created_at, updated_at) VALUES
+('room_kids_preschool','demo-church','campus_main','area_kids_main','Preschool (3-5)',36,71,NULL,NULL,24,'Allergies must be shown on label',datetime('now'),datetime('now')),
+('room_kids_early','demo-church','campus_main','area_kids_main','Early Elementary (K-2)',72,119,'K','2',30,NULL,datetime('now'),datetime('now'));
+
+INSERT OR REPLACE INTO checkin_schedules (id, church_id, campus_id, service_plan_id, area_id, opens_at, closes_at, created_at, updated_at) VALUES
+('sched_plan1_kids','demo-church','campus_main','plan1','area_kids_main',datetime('now','+2 days','-30 minutes'),datetime('now','+2 days','+30 minutes'),datetime('now'),datetime('now'));
 
 INSERT OR REPLACE INTO service_plan_items (id, church_id, plan_id, sort_order, item_type, title, notes, duration_minutes, created_at, updated_at) VALUES
 ('item1','demo-church','plan1',10,'welcome','Welcome','Quick welcome + announcements',3,datetime('now'),datetime('now')),
@@ -122,6 +158,16 @@ INSERT OR REPLACE INTO assignments (id, church_id, seeker_id, guide_user_id, ass
 INSERT OR REPLACE INTO journey_state (id, church_id, seeker_id, state_json, updated_at) VALUES
 ('js1','demo-church','p_seeker_1','{\"stage\":\"new\",\"lastTouch\":\"seed\"}',datetime('now')),
 ('js2','demo-church','p_seeker_2','{\"stage\":\"visit_planned\",\"lastTouch\":\"seed\"}',datetime('now'));
+
+-- Person memory (seed from journey_state)
+INSERT OR REPLACE INTO person_memory (church_id, person_id, memory_json, created_at, updated_at) VALUES
+(
+  'demo-church',
+  'p_seeker_2',
+  '{"version":1,"summary":"Noah is exploring faith and planning a first visit.","identity":{"preferredName":"Noah","campusId":"campus_main"},"spiritualJourney":{"stage":"visit_planned","milestones":[]},"intentProfile":{"exploringFaith":true,"wantsCommunity":true},"pastoralCare":{"notes":[]},"updatedAt":"seed"}',
+  datetime('now'),
+  datetime('now')
+);
 
 -- Requests queue seed
 INSERT OR REPLACE INTO requests (id, church_id, campus_id, user_id, type, status, payload_json, assigned_to_user_id, created_at, updated_at) VALUES

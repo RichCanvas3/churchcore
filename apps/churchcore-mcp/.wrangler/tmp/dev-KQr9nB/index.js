@@ -72669,6 +72669,26 @@ function nowIso() {
   return (/* @__PURE__ */ new Date()).toISOString();
 }
 __name(nowIso, "nowIso");
+function normalizePhone(input) {
+  const raw = String(input ?? "").trim();
+  const digits = raw.replace(/[^\d+]/g, "");
+  const justDigits = digits.replace(/[^\d]/g, "");
+  if (justDigits.length === 10) return `+1${justDigits}`;
+  if (justDigits.length === 11 && justDigits.startsWith("1")) return `+${justDigits}`;
+  if (raw.startsWith("+") && justDigits.length >= 8) return `+${justDigits}`;
+  return raw || `+${justDigits}`;
+}
+__name(normalizePhone, "normalizePhone");
+function ageMonthsFromBirthdate(birthdate) {
+  if (!birthdate) return null;
+  const d2 = new Date(String(birthdate));
+  if (Number.isNaN(d2.getTime())) return null;
+  const now2 = /* @__PURE__ */ new Date();
+  let months = (now2.getFullYear() - d2.getFullYear()) * 12 + (now2.getMonth() - d2.getMonth());
+  if (now2.getDate() < d2.getDate()) months -= 1;
+  return months < 0 ? 0 : months;
+}
+__name(ageMonthsFromBirthdate, "ageMonthsFromBirthdate");
 function jsonText(obj) {
   return {
     content: [{ type: "text", text: JSON.stringify(obj) }]
@@ -73769,6 +73789,184 @@ function createServer(env3) {
       const parsed = external_exports3.object({ churchId: external_exports3.string().min(1), personId: external_exports3.string().min(1) }).parse(args);
       const row = await env3.churchcore.prepare(`SELECT * FROM people WHERE church_id=?1 AND id=?2`).bind(parsed.churchId, parsed.personId).first();
       return jsonText({ person: row ?? null });
+    }
+  );
+  server.tool(
+    "churchcore_household_find_by_phone",
+    "Find a household by phone number (normalized). Returns members + child profiles.",
+    { churchId: external_exports3.string().min(1), phone: external_exports3.string().min(6) },
+    async (args) => {
+      const parsed = external_exports3.object({ churchId: external_exports3.string().min(1), phone: external_exports3.string().min(6) }).parse(args);
+      const phone = normalizePhone(parsed.phone);
+      const row = await env3.churchcore.prepare(
+        `SELECT household_id AS householdId
+             FROM household_contacts
+             WHERE church_id=?1 AND contact_type='phone' AND contact_value=?2
+             ORDER BY is_primary DESC
+             LIMIT 1`
+      ).bind(parsed.churchId, phone).first();
+      const householdId = typeof row?.householdId === "string" ? row.householdId : null;
+      if (!householdId) return jsonText({ household: null, members: [], children: [] });
+      const household = await env3.churchcore.prepare(`SELECT * FROM households WHERE church_id=?1 AND id=?2`).bind(parsed.churchId, householdId).first();
+      const members = (await env3.churchcore.prepare(
+        `SELECT p.*, hm.role AS household_role
+               FROM household_members hm
+               JOIN people p ON p.id = hm.person_id
+               WHERE p.church_id=?1 AND hm.household_id=?2
+               ORDER BY (hm.role='adult') DESC, p.last_name ASC, p.first_name ASC`
+      ).bind(parsed.churchId, householdId).all()).results ?? [];
+      const children = (await env3.churchcore.prepare(
+        `SELECT p.id, p.first_name, p.last_name, p.birthdate, cp.grade, cp.allergies, cp.medical_notes, cp.special_needs
+               FROM household_members hm
+               JOIN people p ON p.id = hm.person_id
+               LEFT JOIN child_profiles cp ON cp.person_id = p.id AND cp.church_id = p.church_id
+               WHERE p.church_id=?1 AND hm.household_id=?2 AND hm.role='child'`
+      ).bind(parsed.churchId, householdId).all()).results ?? [];
+      return jsonText({ household, members, children, phone });
+    }
+  );
+  server.tool(
+    "churchcore_household_create_quick",
+    "Create a lightweight household + parent + children for check-in (visitor friendly).",
+    {
+      churchId: external_exports3.string().min(1),
+      campusId: external_exports3.string().min(1).optional().nullable(),
+      householdName: external_exports3.string().optional().nullable(),
+      primaryPhone: external_exports3.string().min(6),
+      primaryEmail: external_exports3.string().optional().nullable(),
+      parentFirstName: external_exports3.string().min(1),
+      parentLastName: external_exports3.string().min(1).optional().nullable(),
+      children: external_exports3.array(
+        external_exports3.object({
+          firstName: external_exports3.string().min(1),
+          lastName: external_exports3.string().optional().nullable(),
+          birthdate: external_exports3.string().optional().nullable(),
+          // YYYY-MM-DD
+          allergies: external_exports3.string().optional().nullable(),
+          specialNeeds: external_exports3.boolean().optional().nullable()
+        })
+      ).min(1),
+      actorUserId: external_exports3.string().optional().nullable()
+    },
+    async (args) => {
+      const parsed = external_exports3.object({
+        churchId: external_exports3.string().min(1),
+        campusId: external_exports3.string().min(1).optional().nullable(),
+        householdName: external_exports3.string().optional().nullable(),
+        primaryPhone: external_exports3.string().min(6),
+        primaryEmail: external_exports3.string().optional().nullable(),
+        parentFirstName: external_exports3.string().min(1),
+        parentLastName: external_exports3.string().optional().nullable(),
+        children: external_exports3.array(
+          external_exports3.object({
+            firstName: external_exports3.string().min(1),
+            lastName: external_exports3.string().optional().nullable(),
+            birthdate: external_exports3.string().optional().nullable(),
+            allergies: external_exports3.string().optional().nullable(),
+            specialNeeds: external_exports3.boolean().optional().nullable()
+          })
+        ).min(1),
+        actorUserId: external_exports3.string().optional().nullable()
+      }).parse(args);
+      const now2 = nowIso();
+      const householdId = crypto.randomUUID();
+      await env3.churchcore.prepare(`INSERT INTO households (id, church_id, name, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5)`).bind(householdId, parsed.churchId, (parsed.householdName ?? "New Household").trim() || "New Household", now2, now2).run();
+      const phone = normalizePhone(parsed.primaryPhone);
+      await env3.churchcore.prepare(
+        `INSERT INTO household_contacts (id, church_id, household_id, contact_type, contact_value, is_primary, created_at, updated_at)
+           VALUES (?1, ?2, ?3, 'phone', ?4, 1, ?5, ?6)`
+      ).bind(crypto.randomUUID(), parsed.churchId, householdId, phone, now2, now2).run();
+      if (parsed.primaryEmail) {
+        const email3 = String(parsed.primaryEmail).trim().toLowerCase();
+        if (email3) {
+          await env3.churchcore.prepare(
+            `INSERT INTO household_contacts (id, church_id, household_id, contact_type, contact_value, is_primary, created_at, updated_at)
+               VALUES (?1, ?2, ?3, 'email', ?4, 1, ?5, ?6)`
+          ).bind(crypto.randomUUID(), parsed.churchId, householdId, email3, now2, now2).run();
+        }
+      }
+      const parentId = crypto.randomUUID();
+      await env3.churchcore.prepare(
+        `INSERT INTO people (id, church_id, campus_id, first_name, last_name, email, phone, created_at, updated_at)
+           VALUES (?1, ?2, ?3, ?4, ?5, NULL, ?6, ?7, ?8)`
+      ).bind(parentId, parsed.churchId, parsed.campusId ?? null, parsed.parentFirstName, parsed.parentLastName ?? null, phone, now2, now2).run();
+      await env3.churchcore.prepare(`INSERT INTO household_members (household_id, person_id, role) VALUES (?1, ?2, 'adult')`).bind(householdId, parentId).run();
+      const childIds = [];
+      for (const c of parsed.children) {
+        const childId = crypto.randomUUID();
+        childIds.push(childId);
+        await env3.churchcore.prepare(
+          `INSERT INTO people (id, church_id, campus_id, first_name, last_name, birthdate, created_at, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)`
+        ).bind(childId, parsed.churchId, parsed.campusId ?? null, c.firstName, c.lastName ?? null, c.birthdate ?? null, now2, now2).run();
+        await env3.churchcore.prepare(`INSERT INTO household_members (household_id, person_id, role) VALUES (?1, ?2, 'child')`).bind(householdId, childId).run();
+        await env3.churchcore.prepare(
+          `INSERT INTO child_profiles (person_id, church_id, allergies, special_needs, created_at, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6)`
+        ).bind(childId, parsed.churchId, c.allergies ?? null, c.specialNeeds ? 1 : 0, now2, now2).run();
+        await env3.churchcore.prepare(
+          `INSERT INTO person_relationships (id, church_id, from_person_id, to_person_id, relationship_type, status, created_at, updated_at)
+             VALUES (?1, ?2, ?3, ?4, 'guardian', 'active', ?5, ?6)`
+        ).bind(crypto.randomUUID(), parsed.churchId, parentId, childId, now2, now2).run();
+        await env3.churchcore.prepare(
+          `INSERT INTO person_relationships (id, church_id, from_person_id, to_person_id, relationship_type, status, created_at, updated_at)
+             VALUES (?1, ?2, ?3, ?4, 'authorized_pickup', 'active', ?5, ?6)`
+        ).bind(crypto.randomUUID(), parsed.churchId, parentId, childId, now2, now2).run();
+      }
+      await auditAppend(env3, {
+        churchId: parsed.churchId,
+        actorUserId: parsed.actorUserId ?? null,
+        action: "household.create.quick",
+        entityType: "households",
+        entityId: householdId,
+        payload: { householdId, parentId, childIds, phone }
+      });
+      return jsonText({ ok: true, householdId, parentId, childIds, phone });
+    }
+  );
+  server.tool(
+    "churchcore_checkin_preview",
+    "Preview kids check-in eligibility (rooms) for the household.",
+    {
+      churchId: external_exports3.string().min(1),
+      servicePlanId: external_exports3.string().min(1),
+      areaId: external_exports3.string().min(1),
+      householdId: external_exports3.string().min(1)
+    },
+    async (args) => {
+      const parsed = external_exports3.object({ churchId: external_exports3.string().min(1), servicePlanId: external_exports3.string().min(1), areaId: external_exports3.string().min(1), householdId: external_exports3.string().min(1) }).parse(args);
+      const rooms = (await env3.churchcore.prepare(
+        `SELECT id,name,min_age_months AS minAgeMonths,max_age_months AS maxAgeMonths,capacity
+               FROM checkin_rooms
+               WHERE church_id=?1 AND area_id=?2`
+      ).bind(parsed.churchId, parsed.areaId).all()).results ?? [];
+      const kids = (await env3.churchcore.prepare(
+        `SELECT p.id, p.first_name, p.last_name, p.birthdate, cp.allergies, cp.special_needs
+               FROM household_members hm
+               JOIN people p ON p.id = hm.person_id
+               LEFT JOIN child_profiles cp ON cp.person_id=p.id AND cp.church_id=p.church_id
+               WHERE p.church_id=?1 AND hm.household_id=?2 AND hm.role='child'`
+      ).bind(parsed.churchId, parsed.householdId).all()).results ?? [];
+      const placements = kids.map((k) => {
+        const months = ageMonthsFromBirthdate(k.birthdate ?? null);
+        const eligible = rooms.filter((r2) => {
+          if (months === null) return true;
+          const min = typeof r2.minAgeMonths === "number" ? r2.minAgeMonths : null;
+          const max = typeof r2.maxAgeMonths === "number" ? r2.maxAgeMonths : null;
+          if (min !== null && months < min) return false;
+          if (max !== null && months > max) return false;
+          return true;
+        });
+        return {
+          personId: k.id,
+          name: `${k.first_name ?? ""} ${k.last_name ?? ""}`.trim(),
+          ageMonths: months,
+          allergies: k.allergies ?? null,
+          specialNeeds: Boolean(k.special_needs),
+          eligibleRooms: eligible.map((r2) => ({ id: r2.id, name: r2.name }))
+        };
+      });
+      return jsonText({ rooms, kids, placements });
     }
   );
   return server;

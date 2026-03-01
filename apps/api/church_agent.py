@@ -196,6 +196,116 @@ def _missing_mcp(tool_name: str) -> OutputEnvelope:
     )
 
 
+def _memory_context_from_args(args: dict[str, Any]) -> tuple[dict[str, Any] | None, str]:
+    """
+    A2A gateway injects person-scoped memory into args.__context.person_memory.
+    We treat it as a read-only snapshot and (optionally) propose MemoryOps back.
+    """
+    ctx = args.get("__context")
+    if not isinstance(ctx, dict):
+        return None, ""
+    mem = ctx.get("person_memory")
+    if not isinstance(mem, dict):
+        return None, ""
+    summary = mem.get("summary")
+    if isinstance(summary, str) and summary.strip():
+        return mem, summary.strip()
+
+    # Fallback: build a tiny summary from common fields.
+    stage = ""
+    sj = mem.get("spiritualJourney")
+    if isinstance(sj, dict) and isinstance(sj.get("stage"), str):
+        stage = str(sj.get("stage") or "").strip()
+    intent = mem.get("intentProfile")
+    intent_keys = []
+    if isinstance(intent, dict):
+        intent_keys = [k for k, v in intent.items() if bool(v) and isinstance(k, str)]
+    bits = []
+    if stage:
+        bits.append(f"stage={stage}")
+    if intent_keys:
+        bits.append("intents=" + ",".join(intent_keys[:6]))
+    return mem, ("; ".join(bits)).strip()
+
+
+def _household_context_from_args(args: dict[str, Any]) -> str:
+    ctx = args.get("__context")
+    if not isinstance(ctx, dict):
+        return ""
+    hh = ctx.get("household")
+    if not isinstance(hh, dict):
+        return ""
+    s = hh.get("summary")
+    return str(s).strip() if isinstance(s, str) else ""
+
+
+def _safe_json_loads(text: str) -> Any:
+    try:
+        return json.loads(text)
+    except Exception:
+        return None
+
+
+async def _propose_memory_ops(
+    *,
+    model: ChatOpenAI,
+    role: str,
+    existing_memory: dict[str, Any] | None,
+    user_text: str,
+    assistant_text: str,
+) -> list[dict[str, Any]]:
+    """
+    Ask the model to propose MemoryOps (gateway applies policy + persistence).
+    Keep this small and schema-first.
+    """
+    role = (role or "seeker").strip().lower()
+    sys = (
+        "You extract durable person-memory updates from a chat turn.\n"
+        "Return STRICT JSON only (no markdown), with shape:\n"
+        '{\"memory_ops\":[{\"op\":\"set|append\",\"path\":\"a.b\",\"value\":...,\"visibility\":\"self|team|pastoral|restricted\",\"confidence\":0.0}]}\n'
+        "Rules:\n"
+        "- Only include ops that are strongly supported by the user's message.\n"
+        "- Prefer updating: summary, spiritualJourney.stage, intentProfile.*, identity.preferredName.\n"
+        "- If role=seeker: visibility must be \"self\" only.\n"
+        "- If role=guide: you may use team/pastoral/restricted when appropriate.\n"
+    )
+    payload = {
+        "role": role,
+        "existing_memory": existing_memory or {},
+        "user_text": user_text,
+        "assistant_text": assistant_text,
+    }
+    r = await model.ainvoke([("system", sys), ("user", json.dumps(payload, ensure_ascii=False)[:8000])])
+    raw = str(getattr(r, "content", "") or "").strip()
+    j = _safe_json_loads(raw)
+    ops = j.get("memory_ops") if isinstance(j, dict) else None
+    out = ops if isinstance(ops, list) else []
+
+    # Minimal normalization + role-based clamp.
+    clean: list[dict[str, Any]] = []
+    for op in out:
+        if not isinstance(op, dict):
+            continue
+        o = str(op.get("op") or "").strip()
+        p = str(op.get("path") or "").strip()
+        if o not in {"set", "append"} or not p:
+            continue
+        vis = str(op.get("visibility") or "self").strip()
+        if role != "guide":
+            vis = "self"
+        conf = op.get("confidence")
+        clean.append(
+            {
+                "op": o,
+                "path": p,
+                "value": op.get("value"),
+                "visibility": vis,
+                "confidence": float(conf) if isinstance(conf, (int, float)) else None,
+            }
+        )
+    return clean[:20]
+
+
 async def handle_seeker_skill(
     *,
     skill: str,
@@ -210,6 +320,8 @@ async def handle_seeker_skill(
     if skill in {"chat", "chat.stream"}:
         model = ChatOpenAI(model=os.environ.get("OPENAI_MODEL", "gpt-5.2"))
         user = (message or "").strip()
+        mem, mem_summary = _memory_context_from_args(args)
+        hh_summary = _household_context_from_args(args)
 
         # Always ground church-specific questions in authoritative ChurchCore D1 data.
         # (No hallucinated service times/events/groups/resources.)
@@ -233,6 +345,8 @@ async def handle_seeker_skill(
             "You are Church Agent in seeker role. Help the person explore faith and take next steps.\n"
             "Do not invent service times, events, groups, or volunteer opportunities. Use ONLY the provided church data excerpt.\n"
             "Always be warm, concise, and propose 1-3 next actions.\n\n"
+            + (("Known person memory (shared across topics):\n" + mem_summary + "\n\n") if mem_summary else "")
+            + (("Household context:\n" + hh_summary + "\n\n") if hh_summary else "")
             + (("Authoritative church data excerpt:\n" + church_context + "\n\n") if church_context else "")
             + (kb_text + "\n\n" if kb_text else "")
         )
@@ -247,8 +361,21 @@ async def handle_seeker_skill(
             )
         r = await model.ainvoke([("system", sys), ("user", user)])
         txt = getattr(r, "content", "") if r else ""
+        out_text = str(txt or "").strip() or "How can I help?"
+        memory_ops: list[dict[str, Any]] = []
+        try:
+            memory_ops = await _propose_memory_ops(
+                model=model,
+                role=str(session.role or "seeker"),
+                existing_memory=mem,
+                user_text=user,
+                assistant_text=out_text,
+            )
+        except Exception:
+            memory_ops = []
+
         return OutputEnvelope(
-            message=str(txt or "").strip() or "How can I help?",
+            message=out_text,
             suggested_next_actions=[
                 NextAction(title="Service times", skill="discover.service_times"),
                 NextAction(title="Upcoming events", skill="discover.events"),
@@ -256,6 +383,7 @@ async def handle_seeker_skill(
             ],
             cards=_cards_from_export_docs(relevant_docs),
             citations=([{"sourceId": h.sourceId, "snippet": h.snippet} for h in kb_hits] if kb_hits else _citations_from_docs(relevant_docs)),
+            data={"memory_ops": memory_ops, "memory_summary_used": mem_summary},
         )
 
     # Aliases (spec names)

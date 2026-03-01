@@ -286,7 +286,7 @@ export default function ChatPage() {
   }, [activeThreadId, session]);
 
   return (
-    <div style={{ height: "100dvh", background: "#f8fafc", display: "grid", gridTemplateColumns: "320px 1fr", overflow: "hidden" }}>
+    <div style={{ height: "100%", background: "#f8fafc", display: "grid", gridTemplateColumns: "320px 1fr", overflow: "hidden" }}>
       <div
         style={{
           borderRight: "1px solid #e2e8f0",

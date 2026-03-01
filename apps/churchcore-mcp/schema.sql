@@ -84,6 +84,21 @@ CREATE TABLE IF NOT EXISTS households (
   updated_at TEXT NOT NULL
 );
 
+-- Household contact points (fast lookup by phone/email)
+CREATE TABLE IF NOT EXISTS household_contacts (
+  id TEXT PRIMARY KEY,
+  church_id TEXT NOT NULL,
+  household_id TEXT NOT NULL,
+  contact_type TEXT NOT NULL, -- phone|email
+  contact_value TEXT NOT NULL, -- normalized (e.g. +1555..., lowercased email)
+  is_primary INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  FOREIGN KEY (household_id) REFERENCES households(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_household_contacts_lookup ON household_contacts(church_id, contact_type, contact_value);
+CREATE INDEX IF NOT EXISTS idx_household_contacts_household ON household_contacts(church_id, household_id, is_primary);
+
 CREATE TABLE IF NOT EXISTS household_members (
   household_id TEXT NOT NULL,
   person_id TEXT NOT NULL,
@@ -92,6 +107,148 @@ CREATE TABLE IF NOT EXISTS household_members (
   FOREIGN KEY (household_id) REFERENCES households(id) ON DELETE CASCADE,
   FOREIGN KEY (person_id) REFERENCES people(id) ON DELETE CASCADE
 );
+
+-- Person relationships (guardian, spouse, emergency contact, etc.)
+CREATE TABLE IF NOT EXISTS person_relationships (
+  id TEXT PRIMARY KEY,
+  church_id TEXT NOT NULL,
+  from_person_id TEXT NOT NULL,
+  to_person_id TEXT NOT NULL,
+  relationship_type TEXT NOT NULL, -- guardian|spouse|emergency_contact|authorized_pickup
+  status TEXT NOT NULL DEFAULT 'active', -- active|inactive
+  notes TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  FOREIGN KEY (from_person_id) REFERENCES people(id) ON DELETE CASCADE,
+  FOREIGN KEY (to_person_id) REFERENCES people(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_person_relationships_from ON person_relationships(church_id, from_person_id, relationship_type, status);
+CREATE INDEX IF NOT EXISTS idx_person_relationships_to ON person_relationships(church_id, to_person_id, relationship_type, status);
+
+-- Child profile (kids ministry) – check-in relevant data
+CREATE TABLE IF NOT EXISTS child_profiles (
+  person_id TEXT PRIMARY KEY,
+  church_id TEXT NOT NULL,
+  grade TEXT, -- e.g. K, 1, 2, ...
+  allergies TEXT, -- short freeform or comma-separated; later normalize
+  medical_notes TEXT,
+  special_needs INTEGER NOT NULL DEFAULT 0,
+  custody_notes TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  FOREIGN KEY (person_id) REFERENCES people(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_child_profiles_church ON child_profiles(church_id, person_id);
+
+-- Check-in configuration
+CREATE TABLE IF NOT EXISTS checkin_areas (
+  id TEXT PRIMARY KEY,
+  church_id TEXT NOT NULL,
+  campus_id TEXT,
+  name TEXT NOT NULL,
+  kind TEXT NOT NULL DEFAULT 'kids', -- kids|general
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_checkin_areas ON checkin_areas(church_id, campus_id);
+
+CREATE TABLE IF NOT EXISTS checkin_rooms (
+  id TEXT PRIMARY KEY,
+  church_id TEXT NOT NULL,
+  campus_id TEXT,
+  area_id TEXT NOT NULL,
+  name TEXT NOT NULL,
+  min_age_months INTEGER, -- inclusive
+  max_age_months INTEGER, -- inclusive
+  min_grade TEXT,
+  max_grade TEXT,
+  capacity INTEGER,
+  notes TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  FOREIGN KEY (area_id) REFERENCES checkin_areas(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_checkin_rooms_area ON checkin_rooms(church_id, area_id);
+
+-- Which check-in areas are open for a given service plan/time
+CREATE TABLE IF NOT EXISTS checkin_schedules (
+  id TEXT PRIMARY KEY,
+  church_id TEXT NOT NULL,
+  campus_id TEXT,
+  service_plan_id TEXT, -- ties to a specific service time instance
+  area_id TEXT NOT NULL,
+  opens_at TEXT NOT NULL, -- ISO
+  closes_at TEXT NOT NULL, -- ISO
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  FOREIGN KEY (service_plan_id) REFERENCES service_plans(id) ON DELETE SET NULL,
+  FOREIGN KEY (area_id) REFERENCES checkin_areas(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_checkin_schedules ON checkin_schedules(church_id, campus_id, opens_at, closes_at);
+
+-- OTP verification (demo-safe; real SMS provider later)
+CREATE TABLE IF NOT EXISTS phone_verifications (
+  id TEXT PRIMARY KEY,
+  church_id TEXT NOT NULL,
+  phone TEXT NOT NULL, -- normalized
+  otp_code TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending', -- pending|verified|expired
+  expires_at TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_phone_verifications_lookup ON phone_verifications(church_id, phone, status, expires_at);
+
+-- Check-in transactions
+CREATE TABLE IF NOT EXISTS checkins (
+  id TEXT PRIMARY KEY,
+  church_id TEXT NOT NULL,
+  campus_id TEXT,
+  service_plan_id TEXT,
+  area_id TEXT NOT NULL,
+  household_id TEXT,
+  created_by_user_id TEXT, -- assistant station user id or app user id
+  created_by_role TEXT, -- seeker|guide
+  mode TEXT NOT NULL DEFAULT 'self', -- self|assisted
+  security_code TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'open', -- open|complete|cancelled
+  created_at TEXT NOT NULL,
+  completed_at TEXT,
+  FOREIGN KEY (service_plan_id) REFERENCES service_plans(id) ON DELETE SET NULL,
+  FOREIGN KEY (area_id) REFERENCES checkin_areas(id) ON DELETE CASCADE,
+  FOREIGN KEY (household_id) REFERENCES households(id) ON DELETE SET NULL
+);
+CREATE INDEX IF NOT EXISTS idx_checkins_by_household ON checkins(church_id, household_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_checkins_by_service ON checkins(church_id, service_plan_id, created_at);
+
+CREATE TABLE IF NOT EXISTS checkin_items (
+  id TEXT PRIMARY KEY,
+  church_id TEXT NOT NULL,
+  checkin_id TEXT NOT NULL,
+  person_id TEXT NOT NULL,
+  room_id TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'checked_in', -- checked_in|checked_out
+  checked_in_at TEXT NOT NULL,
+  checked_out_at TEXT,
+  FOREIGN KEY (checkin_id) REFERENCES checkins(id) ON DELETE CASCADE,
+  FOREIGN KEY (person_id) REFERENCES people(id) ON DELETE CASCADE,
+  FOREIGN KEY (room_id) REFERENCES checkin_rooms(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_checkin_items_checkin ON checkin_items(church_id, checkin_id);
+CREATE INDEX IF NOT EXISTS idx_checkin_items_person ON checkin_items(church_id, person_id, status, checked_in_at);
+
+-- Mobile pass / QR token (rotatable)
+CREATE TABLE IF NOT EXISTS checkin_pass_tokens (
+  id TEXT PRIMARY KEY,
+  church_id TEXT NOT NULL,
+  household_id TEXT NOT NULL,
+  token TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'active', -- active|revoked|expired
+  expires_at TEXT,
+  created_at TEXT NOT NULL,
+  FOREIGN KEY (household_id) REFERENCES households(id) ON DELETE CASCADE
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_checkin_pass_token_unique ON checkin_pass_tokens(church_id, token);
+CREATE INDEX IF NOT EXISTS idx_checkin_pass_household ON checkin_pass_tokens(church_id, household_id, status);
 
 -- Roles bound to a client userId (session.userId)
 CREATE TABLE IF NOT EXISTS roles (
@@ -388,6 +545,34 @@ CREATE TABLE IF NOT EXISTS audit_log (
   created_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_audit_church ON audit_log(church_id, created_at);
+
+-- Person-level memory (canonical, shared across threads)
+-- Stores a durable profile/journey/intent snapshot for (church_id, person_id).
+CREATE TABLE IF NOT EXISTS person_memory (
+  church_id TEXT NOT NULL,
+  person_id TEXT NOT NULL,
+  memory_json TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (church_id, person_id),
+  FOREIGN KEY (person_id) REFERENCES people(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_person_memory ON person_memory(church_id, person_id, updated_at);
+
+-- Audit trail for proposed/applied memory ops (for safety + debugging)
+CREATE TABLE IF NOT EXISTS person_memory_audit (
+  id TEXT PRIMARY KEY,
+  church_id TEXT NOT NULL,
+  person_id TEXT NOT NULL,
+  thread_id TEXT,
+  turn_id TEXT,
+  actor_user_id TEXT,
+  actor_role TEXT,
+  ops_json TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  FOREIGN KEY (person_id) REFERENCES people(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_person_memory_audit ON person_memory_audit(church_id, person_id, created_at);
 
 -- Knowledge base chunks (persisted embeddings; built by hosted agent)
 CREATE TABLE IF NOT EXISTS kb_chunks (
