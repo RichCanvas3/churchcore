@@ -5,3 +5,24 @@ node_modules
 apps/a2a-gateway-worker/.dev.vars
 .venv
 __pycache__
+
+# Next.js
+.next
+out
+.vercel
+.next/*
+
+# Monorepo-specific Next build outputs
+apps/web/.next
+apps/web/out
+
+# Wrangler local state
+.wrangler
+**/.wrangler
+
+# Logs
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.log
