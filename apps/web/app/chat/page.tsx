@@ -15,6 +15,7 @@ import { CarePastoralPanel } from "./CarePastoralPanel";
 import { KidsSafetyPanel } from "./KidsSafetyPanel";
 import { MemoryManagerPanel } from "./MemoryManagerPanel";
 import { GuidePanel } from "./GuidePanel";
+import styles from "./ChatLayout.module.css";
 
 type ThreadMeta = { id: string; title: string; status: string; updatedAt?: string; createdAt?: string };
 
@@ -68,6 +69,46 @@ export default function ChatPage() {
   const [uiError, setUiError] = useState<string | null>(null);
   const [activeUiToolId, setActiveUiToolId] = useState<string | null>(null);
   const [leftCollapsed, setLeftCollapsed] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+  const [isThreadsOpenMobile, setIsThreadsOpenMobile] = useState(false);
+  const [isToolsOpenMobile, setIsToolsOpenMobile] = useState(false);
+
+  const closeTool = () => {
+    setActiveUiToolId(null);
+    setIsToolsOpenMobile(false);
+  };
+
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 768px)");
+    const onChange = () => setIsMobile(Boolean(mq.matches));
+    onChange();
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
+
+  // On mobile, if a UI tool becomes active, open the tools sheet.
+  useEffect(() => {
+    if (isMobile && activeUiToolId) setIsToolsOpenMobile(true);
+    if (!activeUiToolId) setIsToolsOpenMobile(false);
+    if (!isMobile) {
+      setIsThreadsOpenMobile(false);
+      setIsToolsOpenMobile(false);
+    }
+  }, [activeUiToolId, isMobile]);
+
+  // Lock background scroll when overlays are open on mobile.
+  useEffect(() => {
+    if (!isMobile) return;
+    const open = isThreadsOpenMobile || isToolsOpenMobile;
+    if (!open) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [isMobile, isThreadsOpenMobile, isToolsOpenMobile]);
+
+  const effectiveLeftCollapsed = isMobile ? false : leftCollapsed;
 
   const effectiveThreadId = useMemo(() => {
     if (threadsOwnerUserId !== identity.user_id) return null;
@@ -448,63 +489,82 @@ export default function ChatPage() {
 
   return (
     <div
-      style={{
-        height: "100%",
-        background: "#f8fafc",
-        display: "grid",
-        gridTemplateColumns: activeUiToolId
-          ? `${leftCollapsed ? "72px" : "320px"} 1fr minmax(420px, 40%)`
-          : `${leftCollapsed ? "72px" : "320px"} 1fr`,
-        overflow: "hidden",
-      }}
+      className={styles.root}
+      style={
+        {
+          ["--left-width" as any]: effectiveLeftCollapsed ? "72px" : "320px",
+          ["--right-width" as any]: activeUiToolId ? "minmax(420px, 40%)" : "0px",
+        } as any
+      }
     >
+      {/* Mobile: threads drawer backdrop */}
       <div
-        style={{
-          borderRight: "1px solid #e2e8f0",
-          background: "white",
-          display: "grid",
-          gridTemplateRows: "auto 1fr auto",
-          minHeight: 0,
-          overflow: "hidden",
-        }}
-      >
-        <div style={{ padding: leftCollapsed ? 8 : 14, borderBottom: "1px solid #e2e8f0" }}>
+        className={`${styles.backdrop} ${isMobile && isThreadsOpenMobile ? styles.backdropOpen : ""}`}
+        onClick={() => setIsThreadsOpenMobile(false)}
+      />
+
+      {/* Mobile: tools sheet backdrop */}
+      <div
+        className={`${styles.backdrop} ${isMobile && isToolsOpenMobile ? styles.backdropOpen : ""}`}
+        onClick={() => setIsToolsOpenMobile(false)}
+        style={{ zIndex: 55 }}
+      />
+
+      <div className={`${styles.leftPane} ${isMobile && isThreadsOpenMobile ? styles.leftPaneOpen : ""}`}>
+        <div style={{ padding: effectiveLeftCollapsed ? 8 : 14, borderBottom: "1px solid #e2e8f0" }}>
           <div
             style={{
               display: "flex",
               alignItems: "center",
-              justifyContent: leftCollapsed ? "center" : "space-between",
+              justifyContent: effectiveLeftCollapsed ? "center" : "space-between",
               gap: 10,
             }}
           >
-            {leftCollapsed ? null : <div style={{ fontSize: 16, fontWeight: 900 }}>Messages</div>}
+            {effectiveLeftCollapsed ? null : <div style={{ fontSize: 16, fontWeight: 900 }}>Messages</div>}
             <button
+              className={styles.desktopOnly}
               onClick={() => setLeftCollapsed((v) => !v)}
-              title={leftCollapsed ? "Expand topics" : "Collapse topics"}
+              title={effectiveLeftCollapsed ? "Expand topics" : "Collapse topics"}
               style={{
                 border: "1px solid #e2e8f0",
                 background: "white",
                 borderRadius: 10,
-                padding: leftCollapsed ? "6px 0" : "6px 8px",
-                width: leftCollapsed ? "100%" : undefined,
+                padding: effectiveLeftCollapsed ? "6px 0" : "6px 8px",
+                width: effectiveLeftCollapsed ? "100%" : undefined,
                 cursor: "pointer",
                 fontSize: 12,
                 fontWeight: 900,
               }}
             >
-              {leftCollapsed ? "⟩" : "⟨"}
+              {effectiveLeftCollapsed ? "⟩" : "⟨"}
+            </button>
+            <button
+              className={styles.mobileOnly}
+              onClick={() => setIsThreadsOpenMobile(false)}
+              title="Close topics"
+              style={{
+                border: "1px solid #e2e8f0",
+                background: "white",
+                borderRadius: 10,
+                padding: "6px 8px",
+                cursor: "pointer",
+                fontSize: 12,
+                fontWeight: 900,
+              }}
+            >
+              ✕
             </button>
           </div>
-          {!leftCollapsed ? <div style={{ color: "#64748b", fontSize: 12 }}>{meLabel}</div> : null}
+          {!effectiveLeftCollapsed ? <div style={{ color: "#64748b", fontSize: 12 }}>{meLabel}</div> : null}
           <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
             <button
               onClick={() => createThread()}
               style={{ border: "1px solid #0f172a", background: "#0f172a", color: "white", padding: "8px 10px", borderRadius: 10, cursor: "pointer" }}
             >
-              {leftCollapsed ? "+" : "New topic"}
+              {effectiveLeftCollapsed ? "+" : "New topic"}
             </button>
           </div>
-          {!leftCollapsed && uiError ? <div style={{ marginTop: 10, fontSize: 12, color: "#b91c1c" }}>{uiError}</div> : null}
+          {!effectiveLeftCollapsed && uiError ? <div style={{ marginTop: 10, fontSize: 12, color: "#b91c1c" }}>{uiError}</div> : null}
         </div>
 
         <div style={{ overflow: "auto", minHeight: 0 }}>
@@ -526,8 +586,11 @@ export default function ChatPage() {
                       display: "grid",
                       gap: 8,
                     }}
-                    onClick={() => setActiveThreadId(t.id)}
-                    title={leftCollapsed ? t.title : undefined}
+                    onClick={() => {
+                      setActiveThreadId(t.id);
+                      if (isMobile) setIsThreadsOpenMobile(false);
+                    }}
+                    title={effectiveLeftCollapsed ? t.title : undefined}
                   >
                     {isEditing ? (
                       <input
@@ -557,10 +620,10 @@ export default function ChatPage() {
                       />
                     ) : (
                       <div style={{ fontWeight: 800, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                        {leftCollapsed ? collapsedLabel : t.title}
+                        {effectiveLeftCollapsed ? collapsedLabel : t.title}
                       </div>
                     )}
-                    {!leftCollapsed ? (
+                    {!effectiveLeftCollapsed ? (
                       <div style={{ display: "flex", gap: 10 }}>
                       <button
                         onClick={(e) => {
@@ -626,21 +689,50 @@ export default function ChatPage() {
         </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateRows: "auto 1fr", minHeight: 0, overflow: "hidden" }}>
+      <div className={styles.centerPane}>
         <div style={{ padding: 14, borderBottom: "1px solid #e2e8f0", background: "white", display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10 }}>
+          <button
+            className={styles.mobileOnly}
+            onClick={() => setIsThreadsOpenMobile(true)}
+            title="Topics"
+            style={{
+              border: "1px solid #e2e8f0",
+              background: "white",
+              borderRadius: 10,
+              padding: "6px 8px",
+              cursor: "pointer",
+              fontSize: 12,
+              fontWeight: 900,
+            }}
+          >
+            ☰
+          </button>
           <div style={{ fontSize: 16, fontWeight: 900, minWidth: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
             {threads.find((t) => t.id === effectiveThreadId)?.title ?? "Select a topic"}
           </div>
           {activeUiToolId ? (
-            <button
-              onClick={() => setActiveUiToolId(null)}
-              title="Close tool panel"
-              style={{ border: "1px solid #e2e8f0", background: "white", borderRadius: 10, padding: "6px 8px", cursor: "pointer", fontSize: 12, fontWeight: 900 }}
-            >
-              Tool ✕
-            </button>
+            <>
+              <button
+                className={styles.mobileOnly}
+                onClick={() => setIsToolsOpenMobile(true)}
+                title="Open tools"
+                style={{ border: "1px solid #e2e8f0", background: "white", borderRadius: 10, padding: "6px 8px", cursor: "pointer", fontSize: 12, fontWeight: 900 }}
+              >
+                Tools
+              </button>
+              <button
+                className={styles.desktopOnly}
+                onClick={closeTool}
+                title="Close tool panel"
+                style={{ border: "1px solid #e2e8f0", background: "white", borderRadius: 10, padding: "6px 8px", cursor: "pointer", fontSize: 12, fontWeight: 900 }}
+              >
+                Tool ✕
+              </button>
+            </>
           ) : null}
-          <div style={{ color: "#64748b", fontSize: 12 }}>A2A threads/messages in D1; streaming tokens.</div>
+          <div className={styles.desktopOnly} style={{ color: "#64748b", fontSize: 12 }}>
+            A2A threads/messages in D1; streaming tokens.
+          </div>
         </div>
 
         {effectiveThreadId ? (
@@ -675,7 +767,7 @@ export default function ChatPage() {
                 <ThreadPrimitive.ScrollToBottom style={{ alignSelf: "center" }}>Scroll to bottom</ThreadPrimitive.ScrollToBottom>
               </ThreadPrimitive.Root>
 
-              <div style={{ padding: 14, borderTop: "1px solid #e2e8f0", background: "white", display: "grid", gap: 10 }}>
+              <div className={styles.composerWrap} style={{ padding: 14, display: "grid", gap: 10 }}>
                 {sending ? <div style={{ fontSize: 12, color: "#64748b" }}>Generating…</div> : null}
 
                 <div
@@ -694,7 +786,7 @@ export default function ChatPage() {
       </div>
 
       {activeUiToolId ? (
-        <div style={{ borderLeft: "1px solid #e2e8f0", minHeight: 0, overflow: "hidden" }}>
+        <div className={`${styles.toolPane} ${isMobile && isToolsOpenMobile ? styles.toolPaneOpen : ""}`}>
           {activeUiToolId === "household_manager" ? (
             <HouseholdManagerPanel
               identity={{
@@ -705,7 +797,7 @@ export default function ChatPage() {
                 timezone: identity.timezone ?? null,
                 persona_id: null,
               }}
-              onClose={() => setActiveUiToolId(null)}
+              onClose={closeTool}
             />
           ) : activeUiToolId === "kids_checkin" ? (
             <KidsCheckinPanel
@@ -716,7 +808,7 @@ export default function ChatPage() {
                 campus_id: identity.campus_id ?? null,
                 timezone: identity.timezone ?? null,
               }}
-              onClose={() => setActiveUiToolId(null)}
+              onClose={closeTool}
             />
           ) : activeUiToolId === "memory_manager" ? (
             <MemoryManagerPanel
@@ -728,7 +820,7 @@ export default function ChatPage() {
                 timezone: identity.timezone ?? null,
                 persona_id: null,
               }}
-              onClose={() => setActiveUiToolId(null)}
+              onClose={closeTool}
               onOpenTool={(toolId) => setActiveUiToolId(toolId)}
             />
           ) : activeUiToolId === "faith_journey" ? (
@@ -741,7 +833,7 @@ export default function ChatPage() {
                 timezone: identity.timezone ?? null,
                 persona_id: null,
               }}
-              onClose={() => setActiveUiToolId(null)}
+              onClose={closeTool}
             />
           ) : activeUiToolId === "identity_contact" ? (
             <IdentityContactPanel
@@ -753,7 +845,7 @@ export default function ChatPage() {
                 timezone: identity.timezone ?? null,
                 persona_id: null,
               }}
-              onClose={() => setActiveUiToolId(null)}
+              onClose={closeTool}
             />
           ) : activeUiToolId === "comm_prefs" ? (
             <CommPrefsPanel
@@ -765,7 +857,7 @@ export default function ChatPage() {
                 timezone: identity.timezone ?? null,
                 persona_id: null,
               }}
-              onClose={() => setActiveUiToolId(null)}
+              onClose={closeTool}
             />
           ) : activeUiToolId === "care_pastoral" ? (
             <CarePastoralPanel
@@ -777,7 +869,7 @@ export default function ChatPage() {
                 timezone: identity.timezone ?? null,
                 persona_id: null,
               }}
-              onClose={() => setActiveUiToolId(null)}
+              onClose={closeTool}
             />
           ) : activeUiToolId === "teams_skills" ? (
             <TeamsSkillsPanel
@@ -789,7 +881,7 @@ export default function ChatPage() {
                 timezone: identity.timezone ?? null,
                 persona_id: null,
               }}
-              onClose={() => setActiveUiToolId(null)}
+              onClose={closeTool}
             />
           ) : activeUiToolId === "kids_safety" ? (
             <KidsSafetyPanel
@@ -801,7 +893,7 @@ export default function ChatPage() {
                 timezone: identity.timezone ?? null,
                 persona_id: null,
               }}
-              onClose={() => setActiveUiToolId(null)}
+              onClose={closeTool}
             />
           ) : activeUiToolId === "guide" ? (
             <GuidePanel
@@ -813,7 +905,7 @@ export default function ChatPage() {
                 timezone: identity.timezone ?? null,
                 persona_id: null,
               }}
-              onClose={() => setActiveUiToolId(null)}
+              onClose={closeTool}
               onOpenTool={(toolId: string) => setActiveUiToolId(toolId)}
             />
           ) : (

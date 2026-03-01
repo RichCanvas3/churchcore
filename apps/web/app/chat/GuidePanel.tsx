@@ -51,9 +51,43 @@ function snippet(md: string, max = 240) {
     .replace(/\r/g, "")
     .replace(/^> /gm, "")
     .replace(/[#*_`]/g, "")
+    .replace(/\\n+/g, " ")
     .replace(/\n+/g, " ")
     .trim();
   return t.length > max ? t.slice(0, max).trim() + "…" : t;
+}
+
+function LinkifiedText(props: { text: string }) {
+  const text = String(props.text || "");
+  if (!text) return null;
+
+  const re = /https?:\/\/[^\s)]+/g;
+  const parts: Array<{ kind: "text"; value: string } | { kind: "url"; url: string }> = [];
+  let last = 0;
+  for (;;) {
+    const m = re.exec(text);
+    if (!m) break;
+    const idx = m.index;
+    if (idx > last) parts.push({ kind: "text", value: text.slice(last, idx) });
+    parts.push({ kind: "url", url: String(m[0]) });
+    last = idx + m[0].length;
+  }
+  if (last < text.length) parts.push({ kind: "text", value: text.slice(last) });
+
+  if (parts.length <= 1) return <span>{text}</span>;
+
+  return (
+    <span>
+      {parts.map((p, i) => {
+        if (p.kind === "text") return <span key={i}>{p.value}</span>;
+        return (
+          <a key={i} href={p.url} target="_blank" rel="noreferrer" style={{ color: "#2563eb", textDecoration: "underline" }}>
+            {p.url}
+          </a>
+        );
+      })}
+    </span>
+  );
 }
 
 export function GuidePanel(props: { identity: Identity; onClose: () => void; onOpenTool?: (toolId: string) => void }) {
@@ -192,7 +226,11 @@ export function GuidePanel(props: { identity: Identity; onClose: () => void; onO
                   {d.entityType === "scripture_ref" ? "Scripture: " : ""}
                   {d.title ?? d.docId}
                 </div>
-                {d.bodyMarkdown ? <div style={{ fontSize: 12, color: "#64748b", marginTop: 6 }}>{snippet(d.bodyMarkdown)}</div> : null}
+                {d.bodyMarkdown ? (
+                  <div style={{ fontSize: 12, color: "#64748b", marginTop: 6 }}>
+                    <LinkifiedText text={snippet(d.bodyMarkdown)} />
+                  </div>
+                ) : null}
               </div>
             ))}
           </div>
@@ -243,7 +281,9 @@ export function GuidePanel(props: { identity: Identity; onClose: () => void; onO
                   {d.entityType === "scripture_ref" ? "Scripture: " : ""}
                   {d.title ?? d.docId}
                 </div>
-                <div style={{ fontSize: 12, color: "#64748b", marginTop: 6 }}>{snippet(d.bodyMarkdown)}</div>
+                <div style={{ fontSize: 12, color: "#64748b", marginTop: 6 }}>
+                  <LinkifiedText text={snippet(d.bodyMarkdown)} />
+                </div>
               </div>
             ))}
             {stageEntities.length ? (
