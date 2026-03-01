@@ -11,6 +11,95 @@ from .mcp_tools import load_mcp_tools_from_env
 from .models import Input, NextAction, OutputEnvelope, Session
 
 
+def _as_text(v: Any, max_len: int = 8000) -> str:
+    s = str(v or "")
+    if len(s) <= max_len:
+        return s
+    return s[: max(0, max_len - 20)] + "\n...(truncated)..."
+
+
+def _score_doc_for_query(doc: dict[str, Any], q: str) -> int:
+    q = (q or "").strip().lower()
+    if not q:
+        return 0
+    sid = str(doc.get("sourceId") or "").lower()
+    txt = str(doc.get("text") or "").lower()
+    score = 0
+    for token in {t for t in q.replace("?", " ").replace(",", " ").split() if len(t) >= 3}:
+        if token in sid:
+            score += 6
+        if token in txt:
+            score += 1
+    # Boost common church question categories
+    if any(k in q for k in ["service", "times", "sunday", "gathering"]) and "services" in sid:
+        score += 10
+    if any(k in q for k in ["event", "events", "lunch", "night"]) and "events" in sid:
+        score += 10
+    if any(k in q for k in ["group", "groups", "small group"]) and "groups" in sid:
+        score += 10
+    if any(k in q for k in ["serve", "volunteer", "opportunit"]) and ("groups" in sid or "resources" in sid):
+        score += 4
+    return score
+
+
+def _pick_relevant_docs(exported_docs: list[dict[str, Any]], query: str, k: int = 3) -> list[dict[str, Any]]:
+    scored = sorted(exported_docs, key=lambda d: _score_doc_for_query(d, query), reverse=True)
+    top = [d for d in scored if _score_doc_for_query(d, query) > 0][:k]
+    if top:
+        return top
+    # Fallback to the most generally useful docs
+    preferred = {"church/church.json", "church/services.json", "church/events.json", "church/groups.json"}
+    out: list[dict[str, Any]] = []
+    for d in exported_docs:
+        if str(d.get("sourceId")) in preferred:
+            out.append(d)
+    return out[:k]
+
+
+def _citations_from_docs(docs: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    for d in docs:
+        sid = d.get("sourceId")
+        txt = d.get("text")
+        if isinstance(sid, str) and isinstance(txt, str) and sid.strip():
+            out.append({"sourceId": sid, "snippet": txt.strip().replace("\n", " ")[:400]})
+    return out
+
+
+def _cards_from_export_docs(docs: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    cards: list[dict[str, Any]] = []
+    for d in docs:
+        sid = str(d.get("sourceId") or "")
+        txt = d.get("text")
+        if not isinstance(txt, str) or not txt.strip():
+            continue
+        if sid == "church/services.json":
+            try:
+                j = json.loads(txt)
+                services = j.get("services")
+                if isinstance(services, list):
+                    cards.append({"type": "services", "title": "Service times", "items": services})
+            except Exception:
+                pass
+        if sid == "church/events.json":
+            try:
+                j = json.loads(txt)
+                events = j.get("events")
+                if isinstance(events, list):
+                    cards.append({"type": "events", "title": "Events", "items": events})
+            except Exception:
+                pass
+        if sid == "church/groups.json":
+            try:
+                j = json.loads(txt)
+                groups = j.get("groups")
+                if isinstance(groups, list):
+                    cards.append({"type": "groups", "title": "Groups", "items": groups})
+            except Exception:
+                pass
+    return cards
+
+
 def _tool_raw_to_json(raw: Any) -> Optional[dict[str, Any]]:
     """
     MCP tools commonly return:
@@ -120,16 +209,33 @@ async def handle_seeker_skill(
 
     if skill in {"chat", "chat.stream"}:
         model = ChatOpenAI(model=os.environ.get("OPENAI_MODEL", "gpt-5.2"))
-        kb_ttl = int(float(os.environ.get("KB_INDEX_TTL_SECONDS", "300") or "300"))
-        kb_index = await ensure_index_with_mcp(church_id=session.churchId, ttl_seconds=max(30, kb_ttl))
-        kb_text, kb_hits = search_kb(kb_index, (message or "").strip(), k=4) if (message or "").strip() and kb_index else ("", [])
+        user = (message or "").strip()
+
+        # Always ground church-specific questions in authoritative ChurchCore D1 data.
+        # (No hallucinated service times/events/groups/resources.)
+        exported = await _call_tool_json(tools, "churchcore_kb_export_docs", {"churchId": session.churchId, "limitPerTable": 200})
+        exported_docs = exported.get("docs") if isinstance(exported, dict) else None
+        exported_docs_list = exported_docs if isinstance(exported_docs, list) else []
+        relevant_docs = _pick_relevant_docs([d for d in exported_docs_list if isinstance(d, dict)], user, k=3) if user else []
+        church_context = "\n\n".join([f"SOURCE {d.get('sourceId')}:\n{_as_text(d.get('text'), 6000)}" for d in relevant_docs])
+
+        # If embeddings are configured, also do semantic KB search (for better grounding).
+        kb_text = ""
+        kb_hits: list[Any] = []
+        try:
+            kb_ttl = int(float(os.environ.get("KB_INDEX_TTL_SECONDS", "300") or "300"))
+            kb_index = await ensure_index_with_mcp(church_id=session.churchId, ttl_seconds=max(30, kb_ttl))
+            kb_text, kb_hits = search_kb(kb_index, user, k=4) if user and kb_index else ("", [])
+        except Exception:
+            kb_text, kb_hits = ("", [])
+
         sys = (
             "You are Church Agent in seeker role. Help the person explore faith and take next steps.\n"
-            "Do not invent service times, events, groups, or volunteer opportunities; instead suggest discover skills.\n"
+            "Do not invent service times, events, groups, or volunteer opportunities. Use ONLY the provided church data excerpt.\n"
             "Always be warm, concise, and propose 1-3 next actions.\n\n"
+            + (("Authoritative church data excerpt:\n" + church_context + "\n\n") if church_context else "")
             + (kb_text + "\n\n" if kb_text else "")
         )
-        user = (message or "").strip()
         if not user:
             return OutputEnvelope(
                 message="What’s on your mind today?",
@@ -148,7 +254,8 @@ async def handle_seeker_skill(
                 NextAction(title="Upcoming events", skill="discover.events"),
                 NextAction(title="Request contact", skill="connect.request_contact"),
             ],
-            citations=[{"sourceId": h.sourceId, "snippet": h.snippet} for h in kb_hits],
+            cards=_cards_from_export_docs(relevant_docs),
+            citations=([{"sourceId": h.sourceId, "snippet": h.snippet} for h in kb_hits] if kb_hits else _citations_from_docs(relevant_docs)),
         )
 
     # Aliases (spec names)
