@@ -91,7 +91,7 @@ export function makeA2AChatModelAdapter(args: {
       for await (const ev of readSseEvents(res)) {
         if (ev.event === "token") {
           fullText += ev.data;
-          yield { content: [{ type: "text", text: fullText }] };
+          yield ({ content: [{ type: "text", text: fullText }] } as any);
         } else if (ev.event === "final") {
           try {
             finalEnv = JSON.parse(ev.data) as OutputEnvelope;
@@ -101,7 +101,16 @@ export function makeA2AChatModelAdapter(args: {
           const finalText = typeof finalEnv?.message === "string" ? finalEnv.message : fullText;
           fullText = finalText;
           if (onFinalEnvelope) onFinalEnvelope(finalEnv);
-          yield { content: [{ type: "text", text: fullText }] };
+          const handoff = Array.isArray((finalEnv as any)?.handoff) ? ((finalEnv as any).handoff as any[]) : [];
+          const tools = handoff
+            .filter((h) => h && typeof h === "object" && String((h as any).type || "").toLowerCase() === "ui_tool" && typeof (h as any).tool_id === "string")
+            .map((h) => ({
+              toolId: String((h as any).tool_id),
+              title: typeof (h as any).title === "string" ? String((h as any).title) : String((h as any).tool_id),
+            }));
+          yield ({
+            content: tools.length ? [{ type: "text", text: fullText }, { type: "uiToolButtons", tools }] : [{ type: "text", text: fullText }],
+          } as any);
         } else if (ev.event === "error") {
           throw new Error(ev.data || "A2A stream error");
         }

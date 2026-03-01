@@ -28,6 +28,7 @@ export function KidsCheckinPanel(props: { identity: Identity; onClose: () => voi
   const [otp, setOtp] = useState("");
   const [household, setHousehold] = useState<any | null>(null);
   const [kids, setKids] = useState<any[]>([]);
+  const [members, setMembers] = useState<any[]>([]);
   const [needsOtp, setNeedsOtp] = useState(false);
   const [createMode, setCreateMode] = useState(false);
 
@@ -36,6 +37,13 @@ export function KidsCheckinPanel(props: { identity: Identity; onClose: () => voi
   const [childFirst, setChildFirst] = useState("Mia");
   const [childBirthdate, setChildBirthdate] = useState("2021-06-01");
   const [childAllergies, setChildAllergies] = useState("peanuts");
+
+  const [addChildFirst, setAddChildFirst] = useState("");
+  const [addChildLast, setAddChildLast] = useState("");
+  const [addChildBirthdate, setAddChildBirthdate] = useState("");
+  const [addChildAllergies, setAddChildAllergies] = useState("");
+  const [addChildSpecialNeeds, setAddChildSpecialNeeds] = useState(false);
+  const [addChildExpanded, setAddChildExpanded] = useState(false);
 
   const [placements, setPlacements] = useState<any[]>([]);
   const [rooms, setRooms] = useState<any[]>([]);
@@ -52,6 +60,7 @@ export function KidsCheckinPanel(props: { identity: Identity; onClose: () => voi
     setOtp("");
     setHousehold(null);
     setKids([]);
+    setMembers([]);
     setNeedsOtp(false);
     setCreateMode(false);
     setPlacements([]);
@@ -59,6 +68,12 @@ export function KidsCheckinPanel(props: { identity: Identity; onClose: () => voi
     setSecurityCode(null);
     setCheckinId(null);
     setError(null);
+    setAddChildFirst("");
+    setAddChildLast("");
+    setAddChildBirthdate("");
+    setAddChildAllergies("");
+    setAddChildSpecialNeeds(false);
+    setAddChildExpanded(false);
   }, [defaultPhone]);
 
   useEffect(() => {
@@ -81,7 +96,48 @@ export function KidsCheckinPanel(props: { identity: Identity; onClose: () => voi
       setNeedsOtp(false);
       setHousehold(out?.household ?? null);
       setKids(Array.isArray(out?.children) ? out.children : []);
+      setMembers(Array.isArray(out?.members) ? out.members : []);
       setCreateMode(!out?.household);
+    } catch (e: any) {
+      setError(String(e?.message ?? e ?? "error"));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function addChildToHousehold() {
+    setError(null);
+    setLoading(true);
+    try {
+      const householdId = String(household?.id ?? "");
+      if (!householdId) throw new Error("Missing household.");
+      const first = addChildFirst.trim();
+      if (!first) throw new Error("Child first name is required.");
+      const defaultLast = String(members.find((m: any) => String(m?.household_role ?? "").toLowerCase() === "adult")?.last_name ?? "").trim();
+      const last = addChildLast.trim() || defaultLast;
+      if (!last) throw new Error("Child last name is required.");
+
+      await postJson("/api/a2a/household/member/upsert", {
+        identity,
+        household_id: householdId,
+        member: {
+          role: "child",
+          first_name: first,
+          last_name: last,
+          birthdate: addChildBirthdate.trim() || null,
+          allergies: addChildAllergies.trim() || null,
+          special_needs: Boolean(addChildSpecialNeeds),
+        },
+      });
+      setAddChildFirst("");
+      setAddChildLast("");
+      setAddChildBirthdate("");
+      setAddChildAllergies("");
+      setAddChildSpecialNeeds(false);
+      setAddChildExpanded(false);
+
+      // Refresh household + kids list so room selection picks it up.
+      await identifyHousehold();
     } catch (e: any) {
       setError(String(e?.message ?? e ?? "error"));
     } finally {
@@ -161,6 +217,37 @@ export function KidsCheckinPanel(props: { identity: Identity; onClose: () => voi
     }
   }
 
+  const primaryBtn: React.CSSProperties = {
+    border: "1px solid #0f172a",
+    background: "#0f172a",
+    color: "white",
+    padding: "8px 10px",
+    borderRadius: 12,
+    cursor: "pointer",
+    fontSize: 12,
+    fontWeight: 900,
+  };
+
+  const secondaryBtn: React.CSSProperties = {
+    border: "1px solid #e2e8f0",
+    background: "white",
+    color: "#0f172a",
+    padding: "8px 10px",
+    borderRadius: 12,
+    cursor: "pointer",
+    fontSize: 12,
+    fontWeight: 900,
+  };
+
+  function kidLabel(personId: string) {
+    const hit = kids.find((k: any) => String(k?.id ?? "") === personId);
+    if (hit) {
+      const name = `${hit?.first_name ?? ""} ${hit?.last_name ?? ""}`.trim();
+      return name || personId;
+    }
+    return personId;
+  }
+
   return (
     <div style={{ height: "100%", background: "white", display: "grid", gridTemplateRows: "auto 1fr", overflow: "hidden" }}>
       <div style={{ padding: 14, borderBottom: "1px solid #e2e8f0", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
@@ -168,13 +255,18 @@ export function KidsCheckinPanel(props: { identity: Identity; onClose: () => voi
           <div style={{ fontSize: 14, fontWeight: 900 }}>Kids check-in</div>
           <div style={{ fontSize: 12, color: "#64748b" }}>Demo OTP: 000000</div>
         </div>
-        <button onClick={props.onClose} style={{ border: "1px solid #e2e8f0", background: "white", borderRadius: 10, padding: "6px 10px", cursor: "pointer", fontSize: 12 }}>
+        <button onClick={props.onClose} style={{ border: "1px solid #e2e8f0", background: "white", borderRadius: 10, padding: "6px 10px", cursor: "pointer", fontSize: 12, fontWeight: 900 }}>
           Close
         </button>
       </div>
 
-      <div style={{ padding: 14, overflow: "auto", display: "grid", gap: 14, background: "#f8fafc" }}>
+      <div style={{ padding: 14, overflow: "auto", display: "grid", gap: 14, alignContent: "start", background: "#f8fafc" }}>
         {error ? <div style={{ color: "#b91c1c", fontSize: 12 }}>{error}</div> : null}
+
+        <div style={{ fontSize: 12, color: "#64748b", lineHeight: 1.35 }}>
+          <div style={{ fontWeight: 900, color: "#0f172a" }}>Step 1</div>
+          Enter a phone number, click <b>Find family</b>. If it asks for OTP, paste the code and click <b>Find family</b> again.
+        </div>
 
         <div style={{ background: "white", border: "1px solid #e2e8f0", borderRadius: 14, padding: 12, display: "grid", gap: 10 }}>
           <div style={{ display: "grid", gap: 6 }}>
@@ -184,14 +276,22 @@ export function KidsCheckinPanel(props: { identity: Identity; onClose: () => voi
 
           {needsOtp ? (
             <div style={{ display: "grid", gap: 6 }}>
-              <div style={{ fontSize: 12, color: "#64748b" }}>OTP</div>
-              <input value={otp} onChange={(e) => setOtp(e.target.value)} style={{ border: "1px solid #cbd5e1", borderRadius: 12, padding: "10px 12px" }} />
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
+                <div style={{ fontSize: 12, color: "#64748b" }}>OTP</div>
+                <div style={{ fontSize: 12, color: "#64748b" }}>Paste SMS code</div>
+              </div>
+              <input value={otp} onChange={(e) => setOtp(e.target.value)} placeholder="000000" style={{ border: "1px solid #cbd5e1", borderRadius: 12, padding: "10px 12px" }} />
             </div>
           ) : null}
 
-          <button disabled={loading} onClick={() => void identifyHousehold()} style={{ border: "1px solid #0f172a", background: "#0f172a", color: "white", padding: "10px 12px", borderRadius: 12, cursor: "pointer" }}>
-            Find family
-          </button>
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            <button disabled={loading} onClick={() => void identifyHousehold()} style={{ ...primaryBtn, opacity: loading ? 0.7 : 1 }}>
+              Find family
+            </button>
+            {needsOtp ? (
+              <div style={{ fontSize: 12, color: "#64748b", alignSelf: "center" }}>After OTP, click “Find family” again.</div>
+            ) : null}
+          </div>
 
           {household ? (
             <div style={{ fontSize: 12, color: "#64748b" }}>
@@ -216,7 +316,7 @@ export function KidsCheckinPanel(props: { identity: Identity; onClose: () => voi
               <input value={childBirthdate} onChange={(e) => setChildBirthdate(e.target.value)} style={{ border: "1px solid #cbd5e1", borderRadius: 12, padding: "10px 12px" }} />
               <input value={childAllergies} onChange={(e) => setChildAllergies(e.target.value)} style={{ border: "1px solid #cbd5e1", borderRadius: 12, padding: "10px 12px" }} />
             </div>
-            <button disabled={loading} onClick={() => void createHousehold()} style={{ border: "1px solid #0f172a", background: "#0f172a", color: "white", padding: "10px 12px", borderRadius: 12, cursor: "pointer" }}>
+            <button disabled={loading} onClick={() => void createHousehold()} style={{ ...primaryBtn, opacity: loading ? 0.7 : 1 }}>
               Create family
             </button>
           </div>
@@ -233,9 +333,74 @@ export function KidsCheckinPanel(props: { identity: Identity; onClose: () => voi
                 </div>
               ))}
             </div>
-            <button disabled={loading} onClick={() => void previewEligibility()} style={{ border: "1px solid #0f172a", background: "#0f172a", color: "white", padding: "10px 12px", borderRadius: 12, cursor: "pointer" }}>
-              Preview rooms
-            </button>
+            <div style={{ fontSize: 12, color: "#64748b", lineHeight: 1.35 }}>
+              <div style={{ fontWeight: 900, color: "#0f172a" }}>Step 2</div>
+              Preview eligible rooms, then pick a room for each child.
+            </div>
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+              <button disabled={loading} onClick={() => void previewEligibility()} style={{ ...secondaryBtn, opacity: loading ? 0.7 : 1 }}>
+                Preview rooms
+              </button>
+            </div>
+          </div>
+        ) : null}
+
+        {household ? (
+          <div style={{ background: "white", border: "1px solid #e2e8f0", borderRadius: 14, padding: 12, display: "grid", gap: 10 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10 }}>
+              <div style={{ fontWeight: 900 }}>Add child to household</div>
+              <button
+                onClick={() => setAddChildExpanded((v) => !v)}
+                style={{ border: "1px solid #e2e8f0", background: "white", borderRadius: 10, padding: "6px 10px", cursor: "pointer", fontSize: 12, fontWeight: 900 }}
+                title={addChildExpanded ? "Collapse" : "Expand"}
+              >
+                {addChildExpanded ? "−" : "+"}
+              </button>
+            </div>
+
+            {addChildExpanded ? (
+              <>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                  <div style={{ display: "grid", gap: 6 }}>
+                    <div style={{ fontSize: 12, color: "#64748b" }}>First name</div>
+                    <input value={addChildFirst} onChange={(e) => setAddChildFirst(e.target.value)} style={{ border: "1px solid #cbd5e1", borderRadius: 12, padding: "10px 12px" }} />
+                  </div>
+                  <div style={{ display: "grid", gap: 6 }}>
+                    <div style={{ fontSize: 12, color: "#64748b" }}>Last name</div>
+                    <input
+                      value={addChildLast}
+                      onChange={(e) => setAddChildLast(e.target.value)}
+                      placeholder={
+                        String(members.find((m: any) => String(m?.household_role ?? "").toLowerCase() === "adult")?.last_name ?? "").trim()
+                          ? "Default from parent"
+                          : "Required"
+                      }
+                      style={{ border: "1px solid #cbd5e1", borderRadius: 12, padding: "10px 12px" }}
+                    />
+                  </div>
+                </div>
+                <div style={{ display: "grid", gap: 6 }}>
+                  <div style={{ fontSize: 12, color: "#64748b" }}>Birthdate (optional)</div>
+                  <input value={addChildBirthdate} onChange={(e) => setAddChildBirthdate(e.target.value)} placeholder="YYYY-MM-DD" style={{ border: "1px solid #cbd5e1", borderRadius: 12, padding: "10px 12px" }} />
+                </div>
+                <div style={{ display: "grid", gap: 6 }}>
+                  <div style={{ fontSize: 12, color: "#64748b" }}>Allergies (optional)</div>
+                  <input value={addChildAllergies} onChange={(e) => setAddChildAllergies(e.target.value)} placeholder="e.g., peanuts" style={{ border: "1px solid #cbd5e1", borderRadius: 12, padding: "10px 12px" }} />
+                </div>
+                <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <input type="checkbox" checked={addChildSpecialNeeds} onChange={(e) => setAddChildSpecialNeeds(e.target.checked)} />
+                  <span style={{ fontSize: 12, color: "#0f172a", fontWeight: 900 }}>Special needs</span>
+                </label>
+                <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                  <button disabled={loading || !addChildFirst.trim()} onClick={() => void addChildToHousehold()} style={{ ...primaryBtn, opacity: loading ? 0.7 : 1 }}>
+                    Add child
+                  </button>
+                  <div style={{ fontSize: 12, color: "#64748b", alignSelf: "center" }}>After adding, click “Preview rooms” again.</div>
+                </div>
+              </>
+            ) : (
+              <div style={{ fontSize: 12, color: "#64748b" }}>Click + to add a child to this household.</div>
+            )}
           </div>
         ) : null}
 
@@ -244,7 +409,8 @@ export function KidsCheckinPanel(props: { identity: Identity; onClose: () => voi
             <div style={{ fontWeight: 900 }}>Room selection</div>
             {placements.map((p: any) => (
               <div key={String(p.person_id)} style={{ border: "1px solid #e2e8f0", borderRadius: 12, padding: 10, display: "grid", gap: 8 }}>
-                <div style={{ fontWeight: 800 }}>{p.person_name ?? p.person_id}</div>
+                <div style={{ fontWeight: 900 }}>{kidLabel(String(p.person_id ?? ""))}</div>
+                <div style={{ fontSize: 12, color: "#64748b" }}>{String(p.person_id ?? "")}</div>
                 <select
                   value={selections[String(p.person_id)] ?? ""}
                   onChange={(e) => setSelections((s) => ({ ...s, [String(p.person_id)]: e.target.value }))}
@@ -258,9 +424,15 @@ export function KidsCheckinPanel(props: { identity: Identity; onClose: () => voi
                 </select>
               </div>
             ))}
-            <button disabled={loading} onClick={() => void commitCheckin()} style={{ border: "1px solid #0f172a", background: "#0f172a", color: "white", padding: "10px 12px", borderRadius: 12, cursor: "pointer" }}>
-              Check in
-            </button>
+            <div style={{ fontSize: 12, color: "#64748b", lineHeight: 1.35 }}>
+              <div style={{ fontWeight: 900, color: "#0f172a" }}>Step 3</div>
+              Check in to generate your pickup code.
+            </div>
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+              <button disabled={loading} onClick={() => void commitCheckin()} style={{ ...primaryBtn, opacity: loading ? 0.7 : 1 }}>
+                Check in
+              </button>
+            </div>
           </div>
         ) : null}
 

@@ -29,34 +29,7 @@ function parseD1Date(value: unknown): Date {
   return Number.isNaN(d.getTime()) ? new Date() : d;
 }
 
-function TextPart(props: any) {
-  const text = typeof props?.text === "string" ? props.text : "";
-  return <span style={{ whiteSpace: "pre-wrap" }}>{text}</span>;
-}
-
-function UserMessage() {
-  return (
-    <MessagePrimitive.Root>
-      <div style={{ display: "flex", justifyContent: "flex-end" }}>
-        <div style={{ maxWidth: 760, background: "#0f172a", color: "white", borderRadius: 14, padding: "10px 12px" }}>
-          <MessagePrimitive.Parts components={{ Text: TextPart } as any} />
-        </div>
-      </div>
-    </MessagePrimitive.Root>
-  );
-}
-
-function AssistantMessage() {
-  return (
-    <MessagePrimitive.Root>
-      <div style={{ display: "flex", justifyContent: "flex-start" }}>
-        <div style={{ maxWidth: 760, background: "white", color: "#0f172a", border: "1px solid #e2e8f0", borderRadius: 14, padding: "10px 12px" }}>
-          <MessagePrimitive.Parts components={{ Text: TextPart } as any} />
-        </div>
-      </div>
-    </MessagePrimitive.Root>
-  );
-}
+// NOTE: TextPart is defined inside ChatPage so it can render tool buttons.
 
 function Composer() {
   return (
@@ -155,6 +128,117 @@ export default function ChatPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [identity.user_id]);
 
+  function ToolButton(props: { toolId: string; title?: string }) {
+    return (
+      <button
+        onClick={() => setActiveUiToolId(props.toolId)}
+        style={{
+          border: "1px solid #0f172a",
+          background: "#0f172a",
+          color: "white",
+          borderRadius: 10,
+          padding: "6px 10px",
+          cursor: "pointer",
+          fontSize: 12,
+          fontWeight: 900,
+        }}
+      >
+        Open {props.title || props.toolId}
+      </button>
+    );
+  }
+
+  function TextPart(props: any) {
+    const text = typeof props?.text === "string" ? props.text : "";
+    if (!text) return null;
+
+    // Replace inline {"type":"ui_tool","tool_id":"kids_checkin"} snippets with buttons.
+    const re = /\{\s*"type"\s*:\s*"ui_tool"\s*,\s*"tool_id"\s*:\s*"([^"]+)"\s*\}/g;
+    const parts: Array<{ kind: "text"; value: string } | { kind: "tool"; toolId: string }> = [];
+    let last = 0;
+    for (;;) {
+      const m = re.exec(text);
+      if (!m) break;
+      const idx = m.index;
+      if (idx > last) parts.push({ kind: "text", value: text.slice(last, idx) });
+      parts.push({ kind: "tool", toolId: String(m[1] || "").trim() });
+      last = idx + m[0].length;
+    }
+    if (last < text.length) parts.push({ kind: "text", value: text.slice(last) });
+    if (parts.length <= 1) return <span style={{ whiteSpace: "pre-wrap" }}>{text}</span>;
+
+    return (
+      <span style={{ whiteSpace: "pre-wrap" }}>
+        {parts.map((p, i) => {
+          if (p.kind === "text") return <span key={i}>{p.value}</span>;
+          const title = p.toolId === "kids_checkin" ? "Kids check-in" : p.toolId === "household_manager" ? "Household" : p.toolId;
+          return (
+            <span key={i} style={{ display: "inline-flex", margin: "0 6px", verticalAlign: "middle" }}>
+              <ToolButton toolId={p.toolId} title={title} />
+            </span>
+          );
+        })}
+      </span>
+    );
+  }
+
+  function UiToolButtonsPart(props: any) {
+    const toolsLike = Array.isArray(props?.tools) ? props.tools : Array.isArray(props?.part?.tools) ? props.part.tools : [];
+    const tools = (toolsLike as any[])
+      .map((t) => ({
+        toolId: typeof t?.toolId === "string" ? t.toolId : typeof t?.tool_id === "string" ? t.tool_id : "",
+        title: typeof t?.title === "string" ? t.title : "",
+      }))
+      .filter((t) => t.toolId);
+    if (!tools.length) return null;
+
+    return (
+      <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap" }}>
+        {tools.map((t) => (
+          <button
+            key={t.toolId}
+            onClick={() => setActiveUiToolId(t.toolId)}
+            style={{
+              border: "1px solid #0f172a",
+              background: "#0f172a",
+              color: "white",
+              borderRadius: 10,
+              padding: "6px 10px",
+              cursor: "pointer",
+              fontSize: 12,
+              fontWeight: 900,
+            }}
+          >
+            Open {t.title || t.toolId}
+          </button>
+        ))}
+      </div>
+    );
+  }
+
+  function UserMessage() {
+    return (
+      <MessagePrimitive.Root>
+        <div style={{ display: "flex", justifyContent: "flex-end" }}>
+          <div style={{ maxWidth: 760, background: "#0f172a", color: "white", borderRadius: 14, padding: "10px 12px" }}>
+            <MessagePrimitive.Parts components={{ Text: TextPart } as any} />
+          </div>
+        </div>
+      </MessagePrimitive.Root>
+    );
+  }
+
+  function AssistantMessage() {
+    return (
+      <MessagePrimitive.Root>
+        <div style={{ display: "flex", justifyContent: "flex-start" }}>
+          <div style={{ maxWidth: 760, background: "white", color: "#0f172a", border: "1px solid #e2e8f0", borderRadius: 14, padding: "10px 12px" }}>
+            <MessagePrimitive.Parts components={{ Text: TextPart, UiToolButtons: UiToolButtonsPart } as any} />
+          </div>
+        </div>
+      </MessagePrimitive.Root>
+    );
+  }
   async function createThread() {
     const out = await postJson<{ thread_id?: string }>("/api/a2a/thread/create", {
       identity: {
@@ -253,6 +337,7 @@ export default function ChatPage() {
               role,
               // ThreadHistoryAdapter expects ThreadMessageLike, not already-parsed parts.
               content: text,
+              envelope: m?.envelope ?? null,
               createdAt: parseD1Date(m?.createdAt),
             };
           })
@@ -289,7 +374,17 @@ export default function ChatPage() {
             id,
             role: "assistant",
             createdAt,
-            content: [{ type: "text", text }],
+            content: (() => {
+              const handoff = Array.isArray((like as any)?.envelope?.handoff) ? (((like as any).envelope.handoff as any[]) || []) : [];
+              const tools = handoff
+                .filter((h) => h && typeof h === "object" && String((h as any).type || "").toLowerCase() === "ui_tool" && typeof (h as any).tool_id === "string")
+                .map((h) => ({
+                  toolId: String((h as any).tool_id),
+                  title: typeof (h as any).title === "string" ? String((h as any).title) : String((h as any).tool_id),
+                }))
+                .filter((t) => t.toolId);
+              return tools.length ? [{ type: "text", text }, { type: "uiToolButtons", tools }] : [{ type: "text", text }];
+            })(),
             status: { type: "complete", reason: "stop" },
             metadata: {
               unstable_state: null,
@@ -344,13 +439,16 @@ export default function ChatPage() {
           overflow: "hidden",
         }}
       >
-        <div style={{ padding: 14, borderBottom: "1px solid #e2e8f0" }}>
-          <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10 }}>
-            {leftCollapsed ? (
-              <div style={{ fontSize: 16, fontWeight: 900 }}>⋯</div>
-            ) : (
-              <div style={{ fontSize: 16, fontWeight: 900 }}>Messages</div>
-            )}
+        <div style={{ padding: leftCollapsed ? 8 : 14, borderBottom: "1px solid #e2e8f0" }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: leftCollapsed ? "center" : "space-between",
+              gap: 10,
+            }}
+          >
+            {leftCollapsed ? null : <div style={{ fontSize: 16, fontWeight: 900 }}>Messages</div>}
             <button
               onClick={() => setLeftCollapsed((v) => !v)}
               title={leftCollapsed ? "Expand topics" : "Collapse topics"}
@@ -358,7 +456,8 @@ export default function ChatPage() {
                 border: "1px solid #e2e8f0",
                 background: "white",
                 borderRadius: 10,
-                padding: "6px 8px",
+                padding: leftCollapsed ? "6px 0" : "6px 8px",
+                width: leftCollapsed ? "100%" : undefined,
                 cursor: "pointer",
                 fontSize: 12,
                 fontWeight: 900,
@@ -503,24 +602,15 @@ export default function ChatPage() {
           <div style={{ fontSize: 16, fontWeight: 900, minWidth: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
             {threads.find((t) => t.id === effectiveThreadId)?.title ?? "Select a topic"}
           </div>
-          <div style={{ display: "flex", gap: 8 }}>
+          {activeUiToolId ? (
             <button
-              onClick={() => setLeftCollapsed((v) => !v)}
-              title={leftCollapsed ? "Expand topics" : "Collapse topics"}
+              onClick={() => setActiveUiToolId(null)}
+              title="Close tool panel"
               style={{ border: "1px solid #e2e8f0", background: "white", borderRadius: 10, padding: "6px 8px", cursor: "pointer", fontSize: 12, fontWeight: 900 }}
             >
-              {leftCollapsed ? "⟩" : "⟨"}
+              Tool ✕
             </button>
-            {activeUiToolId ? (
-              <button
-                onClick={() => setActiveUiToolId(null)}
-                title="Close tool panel"
-                style={{ border: "1px solid #e2e8f0", background: "white", borderRadius: 10, padding: "6px 8px", cursor: "pointer", fontSize: 12, fontWeight: 900 }}
-              >
-                Tool ✕
-              </button>
-            ) : null}
-          </div>
+          ) : null}
           <div style={{ color: "#64748b", fontSize: 12 }}>A2A threads/messages in D1; streaming tokens.</div>
         </div>
 
@@ -535,7 +625,9 @@ export default function ChatPage() {
               const handoff = Array.isArray((env as any)?.handoff) ? ((env as any).handoff as any[]) : [];
               const uiTool = handoff.find((h) => h && typeof h === "object" && String((h as any).type || "").toLowerCase() === "ui_tool");
               const toolId = uiTool && typeof (uiTool as any).tool_id === "string" ? String((uiTool as any).tool_id) : null;
-              if (toolId) setActiveUiToolId(toolId);
+              if (toolId) {
+                setActiveUiToolId(toolId);
+              }
               refreshThreads().catch(() => {});
             }}
           >

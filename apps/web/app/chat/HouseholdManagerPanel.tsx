@@ -185,7 +185,7 @@ export function HouseholdManagerPanel(props: { identity: Identity; onClose: () =
         </div>
       </div>
 
-      <div style={{ padding: 14, overflow: "auto", display: "grid", gap: 14 }}>
+      <div style={{ padding: 14, overflow: "auto", display: "grid", gap: 14, alignContent: "start" }}>
         {uiError ? <div style={{ color: "#b91c1c", fontSize: 12 }}>{uiError}</div> : null}
 
         <div style={{ display: "grid", gap: 8 }}>
