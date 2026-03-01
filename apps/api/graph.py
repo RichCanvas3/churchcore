@@ -10,18 +10,33 @@ from apps.api.models import Input, OutputEnvelope, Session
 
 
 class GraphState(TypedDict, total=False):
+    # LangGraph initializes state from the API `input` payload.
+    # Our Next.js proxy sends {skill, message, args, session} at the top level.
+    skill: str
+    message: Any
+    args: Any
+    session: dict[str, Any]
+
+    # Back-compat: some clients may nest under `input`.
     input: dict[str, Any]
+
     output: dict[str, Any]
     messages: list[BaseMessage]
 
 
 async def assistant_node(state: GraphState) -> GraphState:
-    input_dict = state.get("input") or {}
-    if not isinstance(input_dict, dict):
-        out = OutputEnvelope(message="Invalid input.").model_dump()
-        return {"output": out, "messages": [AIMessage(content=out["message"])]}
+    input_dict = state.get("input")
+    if isinstance(input_dict, dict):
+        payload = input_dict
+    else:
+        payload = {
+            "skill": state.get("skill"),
+            "message": state.get("message"),
+            "args": state.get("args"),
+            "session": state.get("session"),
+        }
 
-    session_dict = input_dict.get("session") or {}
+    session_dict = payload.get("session") or {}
     if not isinstance(session_dict, dict):
         out = OutputEnvelope(message="Missing session.").model_dump()
         return {"output": out, "messages": [AIMessage(content=out["message"])]}
@@ -29,9 +44,9 @@ async def assistant_node(state: GraphState) -> GraphState:
     try:
         session = Session(**session_dict)
         inp = Input(
-            skill=str(input_dict.get("skill") or "chat"),
-            message=input_dict.get("message"),
-            args=input_dict.get("args"),
+            skill=str(payload.get("skill") or "chat"),
+            message=payload.get("message"),
+            args=payload.get("args"),
             session=session,
         )
     except Exception as e:
