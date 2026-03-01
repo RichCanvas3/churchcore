@@ -56,9 +56,8 @@ function snippet(md: string, max = 240) {
   return t.length > max ? t.slice(0, max).trim() + "…" : t;
 }
 
-export function GuidePanel(props: { identity: Identity; onClose: () => void }) {
-  const { identity, onClose } = props;
-  const onOpenTool = (props as any)?.onOpenTool as undefined | ((toolId: string) => void);
+export function GuidePanel(props: { identity: Identity; onClose: () => void; onOpenTool?: (toolId: string) => void }) {
+  const { identity, onClose, onOpenTool } = props;
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
