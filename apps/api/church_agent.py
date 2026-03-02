@@ -665,6 +665,46 @@ async def _weather_daily(tools: list[Any], *, lat: float, lon: float, days: int 
         return None
 
 
+def _campus_latlon(campus_id: Optional[str]) -> tuple[float, float, str]:
+    cid = str(campus_id or "").strip()
+    # Approximate coordinates for weather context.
+    # (We keep these here rather than in DB so weather works even if events lack lat/lon.)
+    if cid == "campus_erie":
+        return 40.0506, -105.0496, "Erie Campus"
+    if cid == "campus_thornton":
+        return 39.9183, -104.9453, "Thornton Campus"
+    return 40.0403, -105.2539, "Boulder Campus"
+
+
+def _weather_summary_from_hourly(hourly: list[dict[str, Any]], label: str) -> str:
+    # Pick a few upcoming hours and summarize.
+    if not isinstance(hourly, list) or not hourly:
+        return f"Weather ({label}): no forecast data available."
+    rows: list[str] = []
+    for h in hourly[:6]:
+        if not isinstance(h, dict):
+            continue
+        dt = h.get("dt")
+        try:
+            ts = datetime.fromtimestamp(int(dt), tz=timezone.utc).strftime("%-I%p UTC") if isinstance(dt, int) else ""
+        except Exception:
+            ts = ""
+        temp = h.get("temp")
+        pop = h.get("pop")
+        w = h.get("weather")
+        desc = ""
+        if isinstance(w, list) and w and isinstance(w[0], dict) and isinstance(w[0].get("description"), str):
+            desc = str(w[0].get("description"))
+        ttxt = f"{float(temp):.0f}°F" if isinstance(temp, (int, float)) else "?°F"
+        ptxt = f"{int(round(float(pop) * 100))}% precip" if isinstance(pop, (int, float)) else "?% precip"
+        bits = " • ".join([b for b in [ts, desc, ttxt, ptxt] if b])
+        if bits:
+            rows.append(f"- {bits}")
+    if not rows:
+        return f"Weather ({label}): no usable forecast points."
+    return "\n".join([f"Weather ({label}) next ~6h:", *rows])
+
+
 def _safe_json_loads(text: str) -> Any:
     try:
         return json.loads(text)
@@ -865,6 +905,45 @@ async def handle_seeker_skill(
         mem, mem_summary = _memory_context_from_args(args)
         hh_summary = _household_context_from_args(args)
         journey, journey_summary = _journey_context_from_args(args)
+
+        # Deterministic: if the user asks for weather, use weather MCP directly.
+        u = user.lower()
+        if user and any(k in u for k in ["weather", "forecast", "rain", "snow", "wind"]) and not any(
+            k in u for k in ["whether", "whatever"]
+        ):
+            lat, lon, label = _campus_latlon(session.campusId)
+            hourly = await _weather_hourly(tools, lat=lat, lon=lon, hours=24) or {}
+            hourly_list = hourly.get("hourly") if isinstance(hourly, dict) else None
+            pts = [x for x in hourly_list if isinstance(x, dict)] if isinstance(hourly_list, list) else []
+            txt = _weather_summary_from_hourly(pts, label)
+            return OutputEnvelope(
+                message=txt,
+                suggested_next_actions=[
+                    NextAction(title="Open calendar", skill="chat", args=None),
+                ],
+                handoff=[{"type": "ui_tool", "tool_id": "calendar", "title": "Calendar"}],
+                data={"weather": hourly or {}, "campus": session.campusId},
+            )
+
+        # Deterministic: if the user asks to email/remind, send to their own email (if on file).
+        if user and any(k in u for k in ["email me", "send me an email", "remind me"]) and "@" not in u:
+            person_id = str(session.personId or "").strip()
+            person = None
+            if person_id:
+                person_resp = await _call_tool_json(tools, "churchcore_people_get", {"churchId": session.churchId, "personId": person_id})
+                person = person_resp.get("person") if isinstance(person_resp, dict) else None
+            email = str(person.get("email") or "").strip() if isinstance(person, dict) else ""
+            if not email:
+                return OutputEnvelope(
+                    message="I can email you, but I don’t have an email address on file yet. Add it in Identity & contact.",
+                    handoff=[{"type": "ui_tool", "tool_id": "identity_contact", "title": "Identity & contact"}],
+                )
+            # Best-effort: send immediate email (scheduling handled in guide role for now).
+            body = f"Reminder:\n\n{user}\n\n— Church Agent"
+            tool_txt = await _call_tool_text(tools, "sendEmail", {"to": email, "subject": "Reminder", "text": body})
+            if tool_txt is None:
+                return _missing_mcp("sendgrid_sendEmail")
+            return OutputEnvelope(message=f"{tool_txt or 'Email sent.'} (to {email})")
 
         # Only ground with authoritative church data when the user is asking church questions.
         relevant_docs: list[dict[str, Any]] = []
@@ -1193,6 +1272,27 @@ async def handle_guide_skill(
         if tool_txt is None:
             return _missing_mcp("sendgrid_sendEmail")
         return OutputEnvelope(message=tool_txt or "Email sent.", data={"to": to, "subject": subject})
+
+    if skill == "notify.schedule_email":
+        to = str(args.get("to") or "").strip()
+        subject = str(args.get("subject") or "").strip() or "Reminder"
+        text = str(args.get("text") or "").strip()
+        send_at = args.get("send_at")
+        try:
+            send_at_i = int(send_at) if isinstance(send_at, (int, float, str)) and str(send_at).strip() else 0
+        except Exception:
+            send_at_i = 0
+        if not to:
+            return OutputEnvelope(message="Missing required arg: to", data={"skill": skill})
+        if send_at_i <= 0:
+            return OutputEnvelope(message="Missing/invalid required arg: send_at (unix seconds)", data={"skill": skill})
+        payload: dict[str, Any] = {"to": to, "subject": subject, "send_at": send_at_i}
+        if text:
+            payload["text"] = text
+        tool_txt = await _call_tool_text(tools, "scheduleEmail", payload)
+        if tool_txt is None:
+            return _missing_mcp("sendgrid_scheduleEmail")
+        return OutputEnvelope(message=tool_txt or f"Email scheduled (send_at={send_at_i}).", data={"to": to, "subject": subject, "send_at": send_at_i})
 
     if not await _require_guide_permission(session, tools):
         return _permission_denied()

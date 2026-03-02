@@ -137,18 +137,23 @@ function createServer(env: Env) {
       const fromIso = typeof (args as any).fromIso === "string" ? (args as any).fromIso : nowIso();
       const toIso = typeof (args as any).toIso === "string" ? (args as any).toIso : null;
 
+      // IMPORTANT: event timestamps in D1 may not be canonical ISO (some rows have no "Z"/ms or use "YYYY-MM-DD HH:MM:SS").
+      // To avoid lexicographic timestamp comparison bugs, filter by date prefix for week/range views.
+      const fromDate = String(fromIso).slice(0, 10);
+      const toDate = toIso ? String(toIso).slice(0, 10) : null;
+
       let sql = `SELECT id,campus_id,title,description,start_at,end_at,location_name,location_address,is_outdoor,lat,lon
                  FROM events
-                 WHERE church_id=?1 AND start_at >= ?2`;
-      const binds: any[] = [churchId, fromIso];
+                 WHERE church_id=?1 AND substr(start_at,1,10) >= ?2`;
+      const binds: any[] = [churchId, fromDate];
 
       if (campusId) {
         sql += ` AND campus_id=?${binds.length + 1}`;
         binds.push(campusId);
       }
-      if (toIso) {
-        sql += ` AND start_at <= ?${binds.length + 1}`;
-        binds.push(toIso);
+      if (toDate) {
+        sql += ` AND substr(start_at,1,10) <= ?${binds.length + 1}`;
+        binds.push(toDate);
       }
 
       sql += ` ORDER BY start_at ASC LIMIT 50`;
