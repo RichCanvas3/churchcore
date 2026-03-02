@@ -47,10 +47,18 @@ function Composer() {
     <ComposerPrimitive.Root style={{ display: "flex", gap: 10, alignItems: "flex-end" }}>
       <ComposerPrimitive.Input
         placeholder="Message Church Agent…"
-        style={{ flex: 1, border: "1px solid #cbd5e1", borderRadius: 12, padding: "10px 12px" }}
+        style={{ flex: 1, border: "1px solid #cbd5e1", borderRadius: 12, padding: "10px 12px", fontSize: 16 }}
       />
       <ComposerPrimitive.Send
-        style={{ border: "1px solid #0f172a", background: "#0f172a", color: "white", padding: "10px 12px", borderRadius: 12, cursor: "pointer" }}
+        style={{
+          border: "1px solid #0f172a",
+          background: "#0f172a",
+          color: "white",
+          padding: "10px 12px",
+          borderRadius: 12,
+          cursor: "pointer",
+          touchAction: "manipulation",
+        }}
       >
         Send
       </ComposerPrimitive.Send>
