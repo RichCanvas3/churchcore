@@ -47,7 +47,7 @@ function Composer() {
     <ComposerPrimitive.Root style={{ display: "flex", gap: 10, alignItems: "flex-end" }}>
       <ComposerPrimitive.Input
         placeholder="Message Church Agent…"
-        style={{ flex: 1, border: "1px solid #cbd5e1", borderRadius: 12, padding: "10px 12px", fontSize: 16 }}
+        style={{ flex: 1, minWidth: 0, border: "1px solid #cbd5e1", borderRadius: 12, padding: "10px 12px", fontSize: 16 }}
       />
       <ComposerPrimitive.Send
         style={{
@@ -237,10 +237,11 @@ export default function ChatPage() {
       last = idx + m[0].length;
     }
     if (last < text.length) parts.push({ kind: "text", value: text.slice(last) });
-    if (parts.length <= 1) return <span style={{ whiteSpace: "pre-wrap" }}>{text}</span>;
+    const textStyle: React.CSSProperties = { whiteSpace: "pre-wrap", overflowWrap: "anywhere", wordBreak: "break-word" };
+    if (parts.length <= 1) return <span style={textStyle}>{text}</span>;
 
     return (
-      <span style={{ whiteSpace: "pre-wrap" }}>
+      <span style={textStyle}>
         {parts.map((p, i) => {
           if (p.kind === "text") return <span key={i}>{p.value}</span>;
           const title =
