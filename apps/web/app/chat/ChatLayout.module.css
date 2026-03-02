@@ -25,7 +25,16 @@
 .toolPane {
   border-left: 1px solid #e2e8f0;
   min-height: 0;
-  overflow: hidden;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow-y: scroll;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(15, 23, 42, 0.35) transparent;
   background: white;
 }
 
@@ -94,6 +103,7 @@
     left: 0;
     right: 0;
     bottom: 0;
+    height: 92dvh;
     max-height: 92dvh;
     transform: translateY(105%);
     transition: transform 180ms ease;

@@ -261,7 +261,7 @@ export function GuidePanel(props: { identity: Identity; onClose: () => void; onO
         </div>
       </div>
 
-      <div style={{ padding: 14, overflow: "auto", display: "grid", gap: 14, alignContent: "start", background: "#f8fafc" }}>
+      <div style={{ padding: 14, overflow: "auto", minHeight: 0, display: "grid", gap: 14, alignContent: "start", background: "#f8fafc" }}>
         {error ? <div style={{ color: "#dc2626", fontSize: 13 }}>{error}</div> : null}
         {loading ? <div style={{ color: "#64748b" }}>Loading…</div> : null}
 

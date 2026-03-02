@@ -75,8 +75,21 @@ export function ChurchOverviewPanel(props: { identity: Identity; onClose: () => 
   }, [data]);
 
   return (
-    <div style={{ background: "white", height: "100%", display: "flex", flexDirection: "column" }}>
-      <div style={{ padding: 14, borderBottom: "1px solid #e2e8f0", display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10 }}>
+    <div style={{ background: "white", minHeight: 0 }}>
+      <div
+        style={{
+          position: "sticky",
+          top: 0,
+          zIndex: 2,
+          padding: 14,
+          borderBottom: "1px solid #e2e8f0",
+          background: "white",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "baseline",
+          gap: 10,
+        }}
+      >
         <div style={{ fontWeight: 900, fontSize: 14 }}>Church</div>
         <button
           onClick={props.onClose}
@@ -87,7 +100,7 @@ export function ChurchOverviewPanel(props: { identity: Identity; onClose: () => 
         </button>
       </div>
 
-      <div style={{ padding: 14, overflow: "auto", minHeight: 0, display: "grid", gap: 12 }}>
+      <div style={{ padding: 14, display: "grid", gap: 12 }}>
         {loading ? <div style={{ color: "#64748b", fontSize: 12 }}>Loading…</div> : null}
         {error ? <div style={{ color: "#b91c1c", fontSize: 12 }}>{error}</div> : null}
 

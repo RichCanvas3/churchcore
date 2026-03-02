@@ -13,7 +13,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       <body style={{ margin: 0, fontFamily: "ui-sans-serif, system-ui", height: "100dvh", display: "flex", flexDirection: "column" }}>
         <DemoIdentityProvider>
           <AppHeader />
-          <div style={{ flex: 1, minHeight: 0 }}>{children}</div>
+          <div style={{ flex: 1, minHeight: 0, overflow: "hidden" }}>{children}</div>
         </DemoIdentityProvider>
       </body>
     </html>

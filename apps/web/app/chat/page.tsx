@@ -179,22 +179,35 @@ export default function ChatPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [identity.user_id]);
 
-  function ToolButton(props: { toolId: string; title?: string }) {
+  // Close the right-side tool when switching topics.
+  useEffect(() => {
+    setActiveUiToolId(null);
+    setIsToolsOpenMobile(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [effectiveThreadId]);
+
+  function ToolButton(props: { toolId: string; title?: string; variant?: "inline" | "cta" }) {
+    const variant = props.variant ?? "inline";
+    const label = props.title || props.toolId;
     return (
       <button
         onClick={() => setActiveUiToolId(props.toolId)}
         style={{
-          border: "1px solid #0f172a",
-          background: "#0f172a",
-          color: "white",
-          borderRadius: 10,
-          padding: "6px 10px",
+          border: variant === "cta" ? "1px solid #0f172a" : "1px solid #cbd5e1",
+          background: variant === "cta" ? "#0f172a" : "#f8fafc",
+          color: variant === "cta" ? "white" : "#0f172a",
+          borderRadius: 999,
+          padding: variant === "cta" ? "7px 12px" : "4px 10px",
           cursor: "pointer",
           fontSize: 12,
-          fontWeight: 900,
+          fontWeight: 800,
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 6,
+          lineHeight: 1,
         }}
       >
-        Open {props.title || props.toolId}
+        {variant === "cta" ? `Open ${label}` : label}
       </button>
     );
   }
@@ -250,7 +263,7 @@ export default function ChatPage() {
                               : p.toolId;
           return (
             <span key={i} style={{ display: "inline-flex", margin: "0 6px", verticalAlign: "middle" }}>
-              <ToolButton toolId={p.toolId} title={title} />
+              <ToolButton toolId={p.toolId} title={title} variant="inline" />
             </span>
           );
         })}
@@ -271,22 +284,7 @@ export default function ChatPage() {
     return (
       <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap" }}>
         {tools.map((t) => (
-          <button
-            key={t.toolId}
-            onClick={() => setActiveUiToolId(t.toolId)}
-            style={{
-              border: "1px solid #0f172a",
-              background: "#0f172a",
-              color: "white",
-              borderRadius: 10,
-              padding: "6px 10px",
-              cursor: "pointer",
-              fontSize: 12,
-              fontWeight: 900,
-            }}
-          >
-            Open {t.title || t.toolId}
-          </button>
+          <ToolButton key={t.toolId} toolId={t.toolId} title={t.title || t.toolId} variant="cta" />
         ))}
       </div>
     );
@@ -593,6 +591,8 @@ export default function ChatPage() {
                       gap: 8,
                     }}
                     onClick={() => {
+                      setActiveUiToolId(null);
+                      setIsToolsOpenMobile(false);
                       setActiveThreadId(t.id);
                       if (isMobile) setIsThreadsOpenMobile(false);
                     }}
@@ -785,157 +785,157 @@ export default function ChatPage() {
 
       {activeUiToolId ? (
         <div className={`${styles.toolPane} ${isMobile && isToolsOpenMobile ? styles.toolPaneOpen : ""}`}>
-          {activeUiToolId === "household_manager" ? (
-            <HouseholdManagerPanel
-              identity={{
-                tenant_id: identity.tenant_id,
-                user_id: identity.user_id,
-                role: identity.role,
-                campus_id: identity.campus_id ?? null,
-                timezone: identity.timezone ?? null,
-                persona_id: null,
-              }}
-              onClose={closeTool}
-            />
-          ) : activeUiToolId === "kids_checkin" ? (
-            <KidsCheckinPanel
-              identity={{
-                tenant_id: identity.tenant_id,
-                user_id: identity.user_id,
-                role: identity.role,
-                campus_id: identity.campus_id ?? null,
-                timezone: identity.timezone ?? null,
-              }}
-              onClose={closeTool}
-            />
-          ) : activeUiToolId === "memory_manager" ? (
-            <MemoryManagerPanel
-              identity={{
-                tenant_id: identity.tenant_id,
-                user_id: identity.user_id,
-                role: identity.role,
-                campus_id: identity.campus_id ?? null,
-                timezone: identity.timezone ?? null,
-                persona_id: null,
-              }}
-              onClose={closeTool}
-              onOpenTool={(toolId) => setActiveUiToolId(toolId)}
-            />
-          ) : activeUiToolId === "faith_journey" ? (
-            <FaithJourneyPanel
-              identity={{
-                tenant_id: identity.tenant_id,
-                user_id: identity.user_id,
-                role: identity.role,
-                campus_id: identity.campus_id ?? null,
-                timezone: identity.timezone ?? null,
-                persona_id: null,
-              }}
-              onClose={closeTool}
-            />
-          ) : activeUiToolId === "identity_contact" ? (
-            <IdentityContactPanel
-              identity={{
-                tenant_id: identity.tenant_id,
-                user_id: identity.user_id,
-                role: identity.role,
-                campus_id: identity.campus_id ?? null,
-                timezone: identity.timezone ?? null,
-                persona_id: null,
-              }}
-              onClose={closeTool}
-            />
-          ) : activeUiToolId === "comm_prefs" ? (
-            <CommPrefsPanel
-              identity={{
-                tenant_id: identity.tenant_id,
-                user_id: identity.user_id,
-                role: identity.role,
-                campus_id: identity.campus_id ?? null,
-                timezone: identity.timezone ?? null,
-                persona_id: null,
-              }}
-              onClose={closeTool}
-            />
-          ) : activeUiToolId === "care_pastoral" ? (
-            <CarePastoralPanel
-              identity={{
-                tenant_id: identity.tenant_id,
-                user_id: identity.user_id,
-                role: identity.role,
-                campus_id: identity.campus_id ?? null,
-                timezone: identity.timezone ?? null,
-                persona_id: null,
-              }}
-              onClose={closeTool}
-            />
-          ) : activeUiToolId === "teams_skills" ? (
-            <TeamsSkillsPanel
-              identity={{
-                tenant_id: identity.tenant_id,
-                user_id: identity.user_id,
-                role: identity.role,
-                campus_id: identity.campus_id ?? null,
-                timezone: identity.timezone ?? null,
-                persona_id: null,
-              }}
-              onClose={closeTool}
-            />
-          ) : activeUiToolId === "kids_safety" ? (
-            <KidsSafetyPanel
-              identity={{
-                tenant_id: identity.tenant_id,
-                user_id: identity.user_id,
-                role: identity.role,
-                campus_id: identity.campus_id ?? null,
-                timezone: identity.timezone ?? null,
-                persona_id: null,
-              }}
-              onClose={closeTool}
-            />
-          ) : activeUiToolId === "guide" ? (
-            <GuidePanel
-              identity={{
-                tenant_id: identity.tenant_id,
-                user_id: identity.user_id,
-                role: identity.role,
-                campus_id: identity.campus_id ?? null,
-                timezone: identity.timezone ?? null,
-                persona_id: null,
-              }}
-              onClose={closeTool}
-              onOpenTool={(toolId: string) => setActiveUiToolId(toolId)}
-            />
-          ) : activeUiToolId === "church_overview" ? (
-            <ChurchOverviewPanel
-              identity={{
-                tenant_id: identity.tenant_id,
-                user_id: identity.user_id,
-                role: identity.role,
-                campus_id: identity.campus_id ?? null,
-                timezone: identity.timezone ?? null,
-                persona_id: null,
-              }}
-              onClose={closeTool}
-              onOpenTool={(toolId: string) => setActiveUiToolId(toolId)}
-            />
-          ) : activeUiToolId === "strategic_intent" ? (
-            <StrategicIntentPanel
-              identity={{
-                tenant_id: identity.tenant_id,
-                user_id: identity.user_id,
-                role: identity.role,
-                campus_id: identity.campus_id ?? null,
-                timezone: identity.timezone ?? null,
-                persona_id: null,
-              }}
-              onClose={closeTool}
-            />
-          ) : (
-            <div style={{ padding: 14, color: "#64748b", background: "white", height: "100%" }}>
-              Unknown tool: {activeUiToolId}
-            </div>
-          )}
+          <div style={{ height: "100%", minHeight: 0 }}>
+            {activeUiToolId === "household_manager" ? (
+              <HouseholdManagerPanel
+                identity={{
+                  tenant_id: identity.tenant_id,
+                  user_id: identity.user_id,
+                  role: identity.role,
+                  campus_id: identity.campus_id ?? null,
+                  timezone: identity.timezone ?? null,
+                  persona_id: null,
+                }}
+                onClose={closeTool}
+              />
+            ) : activeUiToolId === "kids_checkin" ? (
+              <KidsCheckinPanel
+                identity={{
+                  tenant_id: identity.tenant_id,
+                  user_id: identity.user_id,
+                  role: identity.role,
+                  campus_id: identity.campus_id ?? null,
+                  timezone: identity.timezone ?? null,
+                }}
+                onClose={closeTool}
+              />
+            ) : activeUiToolId === "memory_manager" ? (
+              <MemoryManagerPanel
+                identity={{
+                  tenant_id: identity.tenant_id,
+                  user_id: identity.user_id,
+                  role: identity.role,
+                  campus_id: identity.campus_id ?? null,
+                  timezone: identity.timezone ?? null,
+                  persona_id: null,
+                }}
+                onClose={closeTool}
+                onOpenTool={(toolId) => setActiveUiToolId(toolId)}
+              />
+            ) : activeUiToolId === "faith_journey" ? (
+              <FaithJourneyPanel
+                identity={{
+                  tenant_id: identity.tenant_id,
+                  user_id: identity.user_id,
+                  role: identity.role,
+                  campus_id: identity.campus_id ?? null,
+                  timezone: identity.timezone ?? null,
+                  persona_id: null,
+                }}
+                onClose={closeTool}
+              />
+            ) : activeUiToolId === "identity_contact" ? (
+              <IdentityContactPanel
+                identity={{
+                  tenant_id: identity.tenant_id,
+                  user_id: identity.user_id,
+                  role: identity.role,
+                  campus_id: identity.campus_id ?? null,
+                  timezone: identity.timezone ?? null,
+                  persona_id: null,
+                }}
+                onClose={closeTool}
+              />
+            ) : activeUiToolId === "comm_prefs" ? (
+              <CommPrefsPanel
+                identity={{
+                  tenant_id: identity.tenant_id,
+                  user_id: identity.user_id,
+                  role: identity.role,
+                  campus_id: identity.campus_id ?? null,
+                  timezone: identity.timezone ?? null,
+                  persona_id: null,
+                }}
+                onClose={closeTool}
+              />
+            ) : activeUiToolId === "care_pastoral" ? (
+              <CarePastoralPanel
+                identity={{
+                  tenant_id: identity.tenant_id,
+                  user_id: identity.user_id,
+                  role: identity.role,
+                  campus_id: identity.campus_id ?? null,
+                  timezone: identity.timezone ?? null,
+                  persona_id: null,
+                }}
+                onClose={closeTool}
+              />
+            ) : activeUiToolId === "teams_skills" ? (
+              <TeamsSkillsPanel
+                identity={{
+                  tenant_id: identity.tenant_id,
+                  user_id: identity.user_id,
+                  role: identity.role,
+                  campus_id: identity.campus_id ?? null,
+                  timezone: identity.timezone ?? null,
+                  persona_id: null,
+                }}
+                onClose={closeTool}
+              />
+            ) : activeUiToolId === "kids_safety" ? (
+              <KidsSafetyPanel
+                identity={{
+                  tenant_id: identity.tenant_id,
+                  user_id: identity.user_id,
+                  role: identity.role,
+                  campus_id: identity.campus_id ?? null,
+                  timezone: identity.timezone ?? null,
+                  persona_id: null,
+                }}
+                onClose={closeTool}
+              />
+            ) : activeUiToolId === "guide" ? (
+              <GuidePanel
+                identity={{
+                  tenant_id: identity.tenant_id,
+                  user_id: identity.user_id,
+                  role: identity.role,
+                  campus_id: identity.campus_id ?? null,
+                  timezone: identity.timezone ?? null,
+                  persona_id: null,
+                }}
+                onClose={closeTool}
+                onOpenTool={(toolId: string) => setActiveUiToolId(toolId)}
+              />
+            ) : activeUiToolId === "church_overview" ? (
+              <ChurchOverviewPanel
+                identity={{
+                  tenant_id: identity.tenant_id,
+                  user_id: identity.user_id,
+                  role: identity.role,
+                  campus_id: identity.campus_id ?? null,
+                  timezone: identity.timezone ?? null,
+                  persona_id: null,
+                }}
+                onClose={closeTool}
+                onOpenTool={(toolId: string) => setActiveUiToolId(toolId)}
+              />
+            ) : activeUiToolId === "strategic_intent" ? (
+              <StrategicIntentPanel
+                identity={{
+                  tenant_id: identity.tenant_id,
+                  user_id: identity.user_id,
+                  role: identity.role,
+                  campus_id: identity.campus_id ?? null,
+                  timezone: identity.timezone ?? null,
+                  persona_id: null,
+                }}
+                onClose={closeTool}
+              />
+            ) : (
+              <div style={{ padding: 14, color: "#64748b", background: "white", height: "100%" }}>Unknown tool: {activeUiToolId}</div>
+            )}
+          </div>
         </div>
       ) : null}
     </div>
