@@ -34,8 +34,13 @@ export default function CheckinPage() {
   );
 
   // demo service/area (seed.sql)
-  const servicePlanId = "plan1";
-  const areaId = "area_kids_main";
+  const campusId = identity.campus_id ?? "campus_boulder";
+  const defaultsByCampus: Record<string, { servicePlanId: string; areaId: string }> = {
+    campus_boulder: { servicePlanId: "plan_boulder_1030", areaId: "area_kids_boulder" },
+    campus_erie: { servicePlanId: "plan_erie_0930", areaId: "area_kids_erie" },
+    campus_thornton: { servicePlanId: "plan_thornton_1030", areaId: "area_kids_thornton" },
+  };
+  const { servicePlanId, areaId } = defaultsByCampus[campusId] ?? defaultsByCampus.campus_boulder;
 
   const [phone, setPhone] = useState("+15550000002");
   const [otp, setOtp] = useState("");
@@ -77,7 +82,7 @@ export default function CheckinPage() {
     postJson("/api/a2a/checkin/start", { identity, service_plan_id: servicePlanId, area_id: areaId })
       .then((out: any) => setRooms(Array.isArray(out?.rooms) ? out.rooms : []))
       .catch(() => {});
-  }, [identity]);
+  }, [identity, servicePlanId, areaId]);
 
   async function identifyHousehold() {
     setError(null);

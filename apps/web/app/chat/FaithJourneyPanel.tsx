@@ -60,9 +60,11 @@ export function FaithJourneyPanel(props: { identity: Identity; onClose: () => vo
     setError(null);
     try {
       const s = await postJson<JourneyGetStateResponse>("/api/a2a/journey/get_state", { identity });
+      if ((s as any)?.ok === false) throw new Error(String((s as any)?.error ?? "Failed to load"));
       setState(s);
       setStageId(String((s?.current_stage as any)?.id ?? ""));
       const n = await postJson<JourneyNextStepsResponse>("/api/a2a/journey/next_steps", { identity, limit: 3 });
+      if ((n as any)?.ok === false) throw new Error(String((n as any)?.error ?? "Failed to load"));
       setNext(n);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Failed to load memory");
@@ -77,7 +79,7 @@ export function FaithJourneyPanel(props: { identity: Identity; onClose: () => vo
     setError(null);
     void refresh();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [identity.tenant_id, identity.user_id]);
+  }, [identity.tenant_id, identity.user_id, identity.persona_id, identity.role, identity.campus_id]);
 
   async function saveStage() {
     setSaving(true);

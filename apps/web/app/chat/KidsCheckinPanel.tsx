@@ -8,6 +8,7 @@ type Identity = {
   role: "seeker" | "guide";
   campus_id?: string | null;
   timezone?: string | null;
+  persona_id?: string | null;
 };
 
 async function postJson<T>(url: string, body: unknown): Promise<T> {
@@ -21,8 +22,13 @@ export function KidsCheckinPanel(props: { identity: Identity; onClose: () => voi
   const identity = props.identity;
 
   // demo service/area (seed.sql)
-  const servicePlanId = "plan1";
-  const areaId = "area_kids_main";
+  const campusId = identity.campus_id ?? "campus_boulder";
+  const defaultsByCampus: Record<string, { servicePlanId: string; areaId: string }> = {
+    campus_boulder: { servicePlanId: "plan_boulder_1030", areaId: "area_kids_boulder" },
+    campus_erie: { servicePlanId: "plan_erie_0930", areaId: "area_kids_erie" },
+    campus_thornton: { servicePlanId: "plan_thornton_1030", areaId: "area_kids_thornton" },
+  };
+  const { servicePlanId, areaId } = defaultsByCampus[campusId] ?? defaultsByCampus.campus_boulder;
 
   const [phone, setPhone] = useState("+15550000002");
   const [otp, setOtp] = useState("");
@@ -80,7 +86,7 @@ export function KidsCheckinPanel(props: { identity: Identity; onClose: () => voi
     postJson("/api/a2a/checkin/start", { identity, service_plan_id: servicePlanId, area_id: areaId })
       .then((out: any) => setRooms(Array.isArray(out?.rooms) ? out.rooms : []))
       .catch(() => {});
-  }, [identity]);
+  }, [identity, servicePlanId, areaId]);
 
   async function identifyHousehold() {
     setError(null);
@@ -410,7 +416,6 @@ export function KidsCheckinPanel(props: { identity: Identity; onClose: () => voi
             {placements.map((p: any) => (
               <div key={String(p.person_id)} style={{ border: "1px solid #e2e8f0", borderRadius: 12, padding: 10, display: "grid", gap: 8 }}>
                 <div style={{ fontWeight: 900 }}>{kidLabel(String(p.person_id ?? ""))}</div>
-                <div style={{ fontSize: 12, color: "#64748b" }}>{String(p.person_id ?? "")}</div>
                 <select
                   value={selections[String(p.person_id)] ?? ""}
                   onChange={(e) => setSelections((s) => ({ ...s, [String(p.person_id)]: e.target.value }))}

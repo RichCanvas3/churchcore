@@ -120,38 +120,51 @@ INSERT OR REPLACE INTO services (
 -- Service plan (example run-of-show)
 INSERT OR REPLACE INTO service_plans (id, church_id, campus_id, service_id, title, starts_at, ends_at, created_at, updated_at) VALUES
 ('plan_boulder_0900','calvarybible','campus_boulder','svc_boulder_0900','Sunday Gathering Plan (Boulder 9:00)',datetime('now','+2 days'),datetime('now','+2 days','+90 minutes'),datetime('now'),datetime('now')),
+('plan_boulder_1030','calvarybible','campus_boulder','svc_boulder_1030','Sunday Gathering Plan (Boulder 10:30)',datetime('now','+2 days'),datetime('now','+2 days','+90 minutes'),datetime('now'),datetime('now')),
+('plan_erie_0800','calvarybible','campus_erie','svc_erie_0800','Sunday Gathering Plan (Erie 8:00)',datetime('now','+2 days'),datetime('now','+2 days','+90 minutes'),datetime('now'),datetime('now')),
 ('plan_erie_0930','calvarybible','campus_erie','svc_erie_0930','Sunday Gathering Plan (Erie 9:30)',datetime('now','+2 days'),datetime('now','+2 days','+90 minutes'),datetime('now'),datetime('now')),
-('plan_thornton_0900','calvarybible','campus_thornton','svc_thornton_0900','Sunday Gathering Plan (Thornton 9:00)',datetime('now','+2 days'),datetime('now','+2 days','+90 minutes'),datetime('now'),datetime('now'));
+('plan_erie_1100','calvarybible','campus_erie','svc_erie_1100','Sunday Gathering Plan (Erie 11:00)',datetime('now','+2 days'),datetime('now','+2 days','+90 minutes'),datetime('now'),datetime('now')),
+('plan_thornton_0900','calvarybible','campus_thornton','svc_thornton_0900','Sunday Gathering Plan (Thornton 9:00)',datetime('now','+2 days'),datetime('now','+2 days','+90 minutes'),datetime('now'),datetime('now')),
+('plan_thornton_1030','calvarybible','campus_thornton','svc_thornton_1030','Sunday Gathering Plan (Thornton 10:30)',datetime('now','+2 days'),datetime('now','+2 days','+90 minutes'),datetime('now'),datetime('now'));
 
 -- Kids check-in config
 INSERT OR REPLACE INTO checkin_areas (id, church_id, campus_id, name, kind, created_at, updated_at) VALUES
 ('area_kids_boulder','calvarybible','campus_boulder','Calvary Kids Check-in','kids',datetime('now'),datetime('now')),
+('area_kids_boulder_early','calvarybible','campus_boulder','Calvary Kids Check-in (Birth–Age 3)','kids',datetime('now'),datetime('now')),
 ('area_kids_erie','calvarybible','campus_erie','Calvary Kids Check-in','kids',datetime('now'),datetime('now')),
 ('area_kids_thornton','calvarybible','campus_thornton','Calvary Kids Check-in','kids',datetime('now'),datetime('now'));
 
 INSERT OR REPLACE INTO checkin_rooms (id, church_id, campus_id, area_id, name, min_age_months, max_age_months, min_grade, max_grade, capacity, notes, created_at, updated_at) VALUES
-('room_boulder_nursery','calvarybible','campus_boulder','area_kids_boulder','Nursery (0-1)',0,23,NULL,NULL,20,'Allergies must be shown on label',datetime('now'),datetime('now')),
-('room_boulder_toddlers','calvarybible','campus_boulder','area_kids_boulder','Toddlers (1-2)',24,35,NULL,NULL,20,'Allergies must be shown on label',datetime('now'),datetime('now')),
-('room_boulder_preschool','calvarybible','campus_boulder','area_kids_boulder','Preschool (3-5)',36,71,NULL,NULL,24,'Allergies must be shown on label',datetime('now'),datetime('now')),
-('room_boulder_elem_early','calvarybible','campus_boulder','area_kids_boulder','Elementary (K-2)',72,119,'K','2',30,NULL,datetime('now'),datetime('now')),
-('room_boulder_elem_late','calvarybible','campus_boulder','area_kids_boulder','Elementary (3-5)',72,119,'3','5',30,NULL,datetime('now'),datetime('now')),
+('room_boulder_nursery','calvarybible','campus_boulder','area_kids_boulder','Owls (Nursery 0–1) — Room 110',0,23,NULL,NULL,20,'Allergies must be shown on label',datetime('now'),datetime('now')),
+('room_boulder_toddlers','calvarybible','campus_boulder','area_kids_boulder','Foxes (Toddlers 1–2) — Room 111',24,35,NULL,NULL,20,'Allergies must be shown on label',datetime('now'),datetime('now')),
+('room_boulder_preschool','calvarybible','campus_boulder','area_kids_boulder','Bears (Preschool 3–5) — Room 112',36,71,NULL,NULL,24,'Allergies must be shown on label',datetime('now'),datetime('now')),
+('room_boulder_elem_early','calvarybible','campus_boulder','area_kids_boulder','Lions (K–2) — Room 210',72,119,'K','2',30,NULL,datetime('now'),datetime('now')),
+('room_boulder_elem_late','calvarybible','campus_boulder','area_kids_boulder','Eagles (3–5) — Room 211',72,119,'3','5',30,NULL,datetime('now'),datetime('now')),
 
-('room_erie_nursery','calvarybible','campus_erie','area_kids_erie','Nursery (0-1)',0,23,NULL,NULL,20,'Allergies must be shown on label',datetime('now'),datetime('now')),
-('room_erie_toddlers','calvarybible','campus_erie','area_kids_erie','Toddlers (1-2)',24,35,NULL,NULL,20,'Allergies must be shown on label',datetime('now'),datetime('now')),
-('room_erie_preschool','calvarybible','campus_erie','area_kids_erie','Preschool (3-5)',36,71,NULL,NULL,24,'Allergies must be shown on label',datetime('now'),datetime('now')),
-('room_erie_elem_early','calvarybible','campus_erie','area_kids_erie','Elementary (K-2)',72,119,'K','2',30,NULL,datetime('now'),datetime('now')),
-('room_erie_elem_late','calvarybible','campus_erie','area_kids_erie','Elementary (3-5)',72,119,'3','5',30,NULL,datetime('now'),datetime('now')),
+('room_boulder_early_nursery','calvarybible','campus_boulder','area_kids_boulder_early','Owls (Nursery 0–1) — Room 101',0,23,NULL,NULL,20,'9am: Birth through Age Three',datetime('now'),datetime('now')),
+('room_boulder_early_toddlers','calvarybible','campus_boulder','area_kids_boulder_early','Foxes (Toddlers 1–2) — Room 102',24,35,NULL,NULL,20,'9am: Birth through Age Three',datetime('now'),datetime('now')),
+('room_boulder_early_preschool','calvarybible','campus_boulder','area_kids_boulder_early','Bears (Age 3) — Room 103',36,47,NULL,NULL,20,'9am: Birth through Age Three',datetime('now'),datetime('now')),
 
-('room_thornton_nursery','calvarybible','campus_thornton','area_kids_thornton','Nursery (0-1)',0,23,NULL,NULL,20,'Allergies must be shown on label',datetime('now'),datetime('now')),
-('room_thornton_toddlers','calvarybible','campus_thornton','area_kids_thornton','Toddlers (1-2)',24,35,NULL,NULL,20,'Allergies must be shown on label',datetime('now'),datetime('now')),
-('room_thornton_preschool','calvarybible','campus_thornton','area_kids_thornton','Preschool (3-5)',36,71,NULL,NULL,24,'Allergies must be shown on label',datetime('now'),datetime('now')),
-('room_thornton_elem_early','calvarybible','campus_thornton','area_kids_thornton','Elementary (K-2)',72,119,'K','2',30,NULL,datetime('now'),datetime('now')),
-('room_thornton_elem_late','calvarybible','campus_thornton','area_kids_thornton','Elementary (3-5)',72,119,'3','5',30,NULL,datetime('now'),datetime('now'));
+('room_erie_nursery','calvarybible','campus_erie','area_kids_erie','Owls (Nursery 0–1) — Room 120',0,23,NULL,NULL,20,'Allergies must be shown on label',datetime('now'),datetime('now')),
+('room_erie_toddlers','calvarybible','campus_erie','area_kids_erie','Foxes (Toddlers 1–2) — Room 121',24,35,NULL,NULL,20,'Allergies must be shown on label',datetime('now'),datetime('now')),
+('room_erie_preschool','calvarybible','campus_erie','area_kids_erie','Bears (Preschool 3–5) — Room 122',36,71,NULL,NULL,24,'Allergies must be shown on label',datetime('now'),datetime('now')),
+('room_erie_elem_early','calvarybible','campus_erie','area_kids_erie','Lions (K–2) — Room 220',72,119,'K','2',30,NULL,datetime('now'),datetime('now')),
+('room_erie_elem_late','calvarybible','campus_erie','area_kids_erie','Eagles (3–5) — Room 221',72,119,'3','5',30,NULL,datetime('now'),datetime('now')),
+
+('room_thornton_nursery','calvarybible','campus_thornton','area_kids_thornton','Owls (Nursery 0–1) — Room 130',0,23,NULL,NULL,20,'Allergies must be shown on label',datetime('now'),datetime('now')),
+('room_thornton_toddlers','calvarybible','campus_thornton','area_kids_thornton','Foxes (Toddlers 1–2) — Room 131',24,35,NULL,NULL,20,'Allergies must be shown on label',datetime('now'),datetime('now')),
+('room_thornton_preschool','calvarybible','campus_thornton','area_kids_thornton','Bears (Preschool 3–5) — Room 132',36,71,NULL,NULL,24,'Allergies must be shown on label',datetime('now'),datetime('now')),
+('room_thornton_elem_early','calvarybible','campus_thornton','area_kids_thornton','Lions (K–2) — Room 230',72,119,'K','2',30,NULL,datetime('now'),datetime('now')),
+('room_thornton_elem_late','calvarybible','campus_thornton','area_kids_thornton','Eagles (3–5) — Room 231',72,119,'3','5',30,NULL,datetime('now'),datetime('now'));
 
 INSERT OR REPLACE INTO checkin_schedules (id, church_id, campus_id, service_plan_id, area_id, opens_at, closes_at, created_at, updated_at) VALUES
-('sched_boulder_0900_kids','calvarybible','campus_boulder','plan_boulder_0900','area_kids_boulder',datetime('now','+2 days','-30 minutes'),datetime('now','+2 days','+30 minutes'),datetime('now'),datetime('now')),
+('sched_boulder_0900_kids','calvarybible','campus_boulder','plan_boulder_0900','area_kids_boulder_early',datetime('now','+2 days','-30 minutes'),datetime('now','+2 days','+30 minutes'),datetime('now'),datetime('now')),
+('sched_boulder_1030_kids','calvarybible','campus_boulder','plan_boulder_1030','area_kids_boulder',datetime('now','+2 days','-30 minutes'),datetime('now','+2 days','+30 minutes'),datetime('now'),datetime('now')),
+('sched_erie_0800_kids','calvarybible','campus_erie','plan_erie_0800','area_kids_erie',datetime('now','+2 days','-30 minutes'),datetime('now','+2 days','+30 minutes'),datetime('now'),datetime('now')),
 ('sched_erie_0930_kids','calvarybible','campus_erie','plan_erie_0930','area_kids_erie',datetime('now','+2 days','-30 minutes'),datetime('now','+2 days','+30 minutes'),datetime('now'),datetime('now')),
-('sched_thornton_0900_kids','calvarybible','campus_thornton','plan_thornton_0900','area_kids_thornton',datetime('now','+2 days','-30 minutes'),datetime('now','+2 days','+30 minutes'),datetime('now'),datetime('now'));
+('sched_erie_1100_kids','calvarybible','campus_erie','plan_erie_1100','area_kids_erie',datetime('now','+2 days','-30 minutes'),datetime('now','+2 days','+30 minutes'),datetime('now'),datetime('now')),
+('sched_thornton_0900_kids','calvarybible','campus_thornton','plan_thornton_0900','area_kids_thornton',datetime('now','+2 days','-30 minutes'),datetime('now','+2 days','+30 minutes'),datetime('now'),datetime('now')),
+('sched_thornton_1030_kids','calvarybible','campus_thornton','plan_thornton_1030','area_kids_thornton',datetime('now','+2 days','-30 minutes'),datetime('now','+2 days','+30 minutes'),datetime('now'),datetime('now'));
 
 INSERT OR REPLACE INTO service_plan_items (id, church_id, plan_id, sort_order, item_type, title, notes, duration_minutes, created_at, updated_at) VALUES
 ('item_b1','calvarybible','plan_boulder_0900',10,'welcome','Welcome','',3,datetime('now'),datetime('now')),
@@ -159,15 +172,35 @@ INSERT OR REPLACE INTO service_plan_items (id, church_id, plan_id, sort_order, i
 ('item_b3','calvarybible','plan_boulder_0900',30,'prayer','Prayer','',3,datetime('now'),datetime('now')),
 ('item_b4','calvarybible','plan_boulder_0900',40,'sermon','Message','Weekly messages: https://calvarybible.com/message-archive/',35,datetime('now'),datetime('now')),
 
+('item_b1030_1','calvarybible','plan_boulder_1030',10,'welcome','Welcome','',3,datetime('now'),datetime('now')),
+('item_b1030_2','calvarybible','plan_boulder_1030',20,'song','Worship','',18,datetime('now'),datetime('now')),
+('item_b1030_3','calvarybible','plan_boulder_1030',30,'prayer','Prayer','',3,datetime('now'),datetime('now')),
+('item_b1030_4','calvarybible','plan_boulder_1030',40,'sermon','Message','Weekly messages: https://calvarybible.com/message-archive/',35,datetime('now'),datetime('now')),
+
+('item_e0800_1','calvarybible','plan_erie_0800',10,'welcome','Welcome','',3,datetime('now'),datetime('now')),
+('item_e0800_2','calvarybible','plan_erie_0800',20,'song','Worship','',18,datetime('now'),datetime('now')),
+('item_e0800_3','calvarybible','plan_erie_0800',30,'prayer','Prayer','',3,datetime('now'),datetime('now')),
+('item_e0800_4','calvarybible','plan_erie_0800',40,'sermon','Message','Weekly messages: https://calvarybible.com/message-archive/',35,datetime('now'),datetime('now')),
+
 ('item_e1','calvarybible','plan_erie_0930',10,'welcome','Welcome','',3,datetime('now'),datetime('now')),
 ('item_e2','calvarybible','plan_erie_0930',20,'song','Worship','',18,datetime('now'),datetime('now')),
 ('item_e3','calvarybible','plan_erie_0930',30,'prayer','Prayer','',3,datetime('now'),datetime('now')),
 ('item_e4','calvarybible','plan_erie_0930',40,'sermon','Message','Weekly messages: https://calvarybible.com/message-archive/',35,datetime('now'),datetime('now')),
 
+('item_e1100_1','calvarybible','plan_erie_1100',10,'welcome','Welcome','',3,datetime('now'),datetime('now')),
+('item_e1100_2','calvarybible','plan_erie_1100',20,'song','Worship','',18,datetime('now'),datetime('now')),
+('item_e1100_3','calvarybible','plan_erie_1100',30,'prayer','Prayer','',3,datetime('now'),datetime('now')),
+('item_e1100_4','calvarybible','plan_erie_1100',40,'sermon','Message','Weekly messages: https://calvarybible.com/message-archive/',35,datetime('now'),datetime('now')),
+
 ('item_t1','calvarybible','plan_thornton_0900',10,'welcome','Welcome','',3,datetime('now'),datetime('now')),
 ('item_t2','calvarybible','plan_thornton_0900',20,'song','Worship','',18,datetime('now'),datetime('now')),
 ('item_t3','calvarybible','plan_thornton_0900',30,'prayer','Prayer','',3,datetime('now'),datetime('now')),
-('item_t4','calvarybible','plan_thornton_0900',40,'sermon','Message','Weekly messages: https://calvarybible.com/message-archive/',35,datetime('now'),datetime('now'));
+('item_t4','calvarybible','plan_thornton_0900',40,'sermon','Message','Weekly messages: https://calvarybible.com/message-archive/',35,datetime('now'),datetime('now')),
+
+('item_t1030_1','calvarybible','plan_thornton_1030',10,'welcome','Welcome','',3,datetime('now'),datetime('now')),
+('item_t1030_2','calvarybible','plan_thornton_1030',20,'song','Worship','',18,datetime('now'),datetime('now')),
+('item_t1030_3','calvarybible','plan_thornton_1030',30,'prayer','Prayer','',3,datetime('now'),datetime('now')),
+('item_t1030_4','calvarybible','plan_thornton_1030',40,'sermon','Message','Weekly messages: https://calvarybible.com/message-archive/',35,datetime('now'),datetime('now'));
 
 -- Events
 INSERT OR REPLACE INTO events (
@@ -175,7 +208,87 @@ INSERT OR REPLACE INTO events (
   location_name, location_address, created_at, updated_at
 ) VALUES
 ('ev1','calvarybible','campus_boulder','Starting Point','New to Calvary? A simple next step to learn more.',datetime('now','+7 days'),datetime('now','+7 days','+90 minutes'),'Boulder Campus','3245 Kalmia Ave. Boulder, CO 80301',datetime('now'),datetime('now')),
-('ev2','calvarybible','campus_boulder','Welcome Lunch','Meet pastors and new friends.',datetime('now','+14 days'),datetime('now','+14 days','+2 hours'),'Boulder Campus','3245 Kalmia Ave. Boulder, CO 80301',datetime('now'),datetime('now'));
+('ev2','calvarybible','campus_boulder','Welcome Lunch','Meet pastors and new friends.',datetime('now','+14 days'),datetime('now','+14 days','+2 hours'),'Boulder Campus','3245 Kalmia Ave. Boulder, CO 80301',datetime('now'),datetime('now')),
+
+-- Erie campus "Coming up" (from https://calvarybible.com/erie/)
+('ev_erie_candy_needed','calvarybible','campus_erie','Candy Needed!',
+ 'Please help fill treasure chests for the Easter Egg Hunt. Bring individually wrapped, NUT-FREE candy through March 8. Learn more: https://calvarybible.com/egghunt/',
+ datetime('now','start of day','+1 day'),datetime('now','start of day','+8 day','+23 hours','+59 minutes'),
+ 'Erie Campus','615 Evans St. Erie, CO 80516',datetime('now'),datetime('now')),
+('ev_erie_easter_weekend','calvarybible','campus_erie','Easter Weekend',
+ 'Celebrate Easter with us! Good Friday (Apr 3), Egg Hunt (Apr 4), Easter Services (Apr 4-5). Learn more: https://calvarybible.com/easter',
+ datetime('now','start of day','+30 day'),datetime('now','start of day','+32 day','+23 hours','+59 minutes'),
+ 'Erie Campus','615 Evans St. Erie, CO 80516',datetime('now'),datetime('now')),
+('ev_erie_womens_away_retreat','calvarybible','campus_erie','Women''s Away Retreat',
+ 'Women of Calvary: “Called to Hope” retreat at YMCA of the Rockies (Estes Park). Learn more: https://calvarybible.com/women/retreat/',
+ datetime('now','start of day','-1 day'),datetime('now','start of day','+1 day','+23 hours','+59 minutes'),
+ 'YMCA of the Rockies','Estes Park, CO',datetime('now'),datetime('now')),
+
+-- Boulder campus "Coming up" (from https://calvarybible.com/boulder/)
+('ev_boulder_candy_needed','calvarybible','campus_boulder','Candy Needed!',
+ 'Please help fill treasure chests for the Easter Egg Hunt. Bring individually wrapped candy through March 15.',
+ '2026-03-01T00:00:00','2026-03-15T23:59:00',
+ 'Boulder Campus','3245 Kalmia Ave. Boulder, CO 80301',datetime('now'),datetime('now')),
+('ev_boulder_ironman_hs_trip','calvarybible','campus_boulder','Ironman High School Trip',
+ 'High school spring break trip (community, worship, teaching). Learn more + register: https://calvarybiblechurch.churchcenter.com/registrations/events/3387389',
+ '2026-03-13T00:00:00','2026-03-19T23:59:00',
+ 'Boulder Campus','3245 Kalmia Ave. Boulder, CO 80301',datetime('now'),datetime('now')),
+('ev_boulder_easter_weekend','calvarybible','campus_boulder','Easter Weekend',
+ 'Celebrate Easter with us! Good Friday (Apr 3), Egg Hunt (Apr 4), Easter Sunday (Apr 5). Learn more: https://calvarybible.com/easter',
+ '2026-04-03T00:00:00','2026-04-05T23:59:00',
+ 'Boulder Campus','3245 Kalmia Ave. Boulder, CO 80301',datetime('now'),datetime('now')),
+
+-- Thornton campus "Coming up" (from https://calvarybible.com/thornton/)
+('ev_thornton_candy_needed','calvarybible','campus_thornton','Candy Needed!',
+ 'Please help fill treasure chests for the Easter Egg Hunt. Bring individually wrapped candy through March 15.',
+ '2026-03-01T00:00:00','2026-03-15T23:59:00',
+ 'Thornton Campus','11989 St Paul St. Thornton, CO 80233',datetime('now'),datetime('now')),
+('ev_thornton_easter_weekend','calvarybible','campus_thornton','Easter Weekend',
+ 'Celebrate Easter with us! Good Friday (Apr 3), Egg Hunt (Apr 4), Easter Sunday (Apr 5). Learn more: https://calvarybible.com/easter',
+ '2026-04-03T00:00:00','2026-04-05T23:59:00',
+ 'Thornton Campus','11989 St Paul St. Thornton, CO 80233',datetime('now'),datetime('now')),
+('ev_thornton_family_worship_night','calvarybible','campus_thornton','Family Worship Night',
+ 'March 1, 6–7pm. Songs of worship + time to respond and reflect. Questions: dvaughan@calvarybible.com',
+ '2026-03-01T18:00:00','2026-03-01T19:00:00',
+ 'Thornton Campus','11989 St Paul St. Thornton, CO 80233',datetime('now'),datetime('now')),
+
+-- Thornton campus "Events" page (from https://calvarybible.com/thornton/events/)
+('ev_thornton_mens_spring_study','calvarybible','campus_thornton','Men''s Spring Study (Habakkuk)',
+ 'Monday evenings, 6:30–8pm. A study through Habakkuk. Learn more: https://calvarybible.com/thornton/events/',
+ datetime('now'),datetime('now','+90 days'),
+ 'Thornton Campus','11989 St Paul St. Thornton, CO 80233',datetime('now'),datetime('now')),
+('ev_thornton_womens_spring_study','calvarybible','campus_thornton','Women''s Spring Study (Ephesians)',
+ 'Monday evenings 6:30–8pm and Thursday mornings 9:30–11:30am (8 sessions). Learn more: https://calvarybible.com/thornton/events/',
+ datetime('now'),datetime('now','+90 days'),
+ 'Thornton Campus','11989 St Paul St. Thornton, CO 80233',datetime('now'),datetime('now')),
+('ev_thornton_8th_grade_dessert_crawl','calvarybible','campus_thornton','8th Grade Dessert Crawl',
+ 'February 28, 6:50–9pm. Celebrate 8th graders and welcome them toward high school community. Learn more: https://calvarybible.com/thornton/events/',
+ '2026-02-28T18:50:00','2026-02-28T21:00:00',
+ 'Thornton Campus','11989 St Paul St. Thornton, CO 80233',datetime('now'),datetime('now')),
+('ev_thornton_young_adults','calvarybible','campus_thornton','Young Adults',
+ 'Monday evenings, 6:30–8pm weekly gathering. Learn more: https://calvarybible.com/thornton/events/',
+ datetime('now'),datetime('now','+180 days'),
+ 'Thornton Campus','11989 St Paul St. Thornton, CO 80233',datetime('now'),datetime('now')),
+('ev_thornton_meal_train','calvarybible','campus_thornton','Meal Train Ministry',
+ 'A ministry to love one another by easing the burden of providing meals for those in need. Learn more: https://calvarybible.com/thornton/events/',
+ datetime('now'),datetime('now','+365 days'),
+ 'Thornton Campus','11989 St Paul St. Thornton, CO 80233',datetime('now'),datetime('now')),
+('ev_thornton_momco_at_night','calvarybible','campus_thornton','MOMCo at NIGHT',
+ '2nd & 4th Tuesdays, 6:30–8pm. A community of moms. Learn more: https://calvarybible.com/thornton/events/',
+ datetime('now'),datetime('now','+180 days'),
+ 'Thornton Campus','11989 St Paul St. Thornton, CO 80233',datetime('now'),datetime('now')),
+('ev_thornton_discipleship_course','calvarybible','campus_thornton','Discipleship: Following Jesus in All of Life',
+ 'Tuesdays, 6:30–8pm. Register on the Thornton events page. Learn more: https://calvarybible.com/thornton/events/',
+ datetime('now'),datetime('now','+90 days'),
+ 'Thornton Campus','11989 St Paul St. Thornton, CO 80233',datetime('now'),datetime('now')),
+('ev_thornton_membership_class','calvarybible','campus_thornton','Membership Class',
+ 'April 19, after 2nd service. Learn Calvary history, beliefs, and vision. Learn more: https://calvarybible.com/thornton/events/',
+ '2026-04-19T11:45:00','2026-04-19T13:00:00',
+ 'Thornton Campus','11989 St Paul St. Thornton, CO 80233',datetime('now'),datetime('now')),
+('ev_thornton_kids_week_2026','calvarybible','campus_thornton','Kids Week 2026 (Save the Date)',
+ 'July 13–17, 2026. More info on the Thornton events page. Learn more: https://calvarybible.com/thornton/events/',
+ '2026-07-13T09:00:00','2026-07-17T12:00:00',
+ 'Thornton Campus','11989 St Paul St. Thornton, CO 80233',datetime('now'),datetime('now'));
 
 -- Outreach campaign
 INSERT OR REPLACE INTO outreach_campaigns (id, church_id, campus_id, title, description, start_at, end_at, status, created_at, updated_at) VALUES
@@ -204,14 +317,28 @@ INSERT OR REPLACE INTO opportunities (
 INSERT OR REPLACE INTO resources (id, church_id, campus_id, title, body_markdown, visibility, created_at, updated_at) VALUES
 ('res1','calvarybible','campus_boulder','What to expect on Sunday', 'Calvary Bible Church has multiple campuses. Service times and campus info:\\n\\n- Locations: https://calvarybible.com/locations/\\n\\nDress is casual. You are welcome even if you are unsure what you believe.', 'public', datetime('now'), datetime('now')),
 ('res2','calvarybible','campus_boulder','Next steps', 'Common next steps:\\n\\n- Fill out a Connect Card: https://calvarybible.com/ (see Connect Card)\\n- Starting Point\\n- Join a group\\n- Serve on a team', 'public', datetime('now'), datetime('now')),
-('res_message_archive','calvarybible','campus_boulder','Weekly Messages', 'Watch weekly messages here:\\n\\n- Message archive: https://calvarybible.com/message-archive/\\n- Watch online: https://calvarybible.com/', 'public', datetime('now'), datetime('now'));
+('res_message_archive','calvarybible','campus_boulder','Weekly Messages', 'Watch weekly messages here:\\n\\n- Message archive: https://calvarybible.com/message-archive/\\n- Watch online: https://calvarybible.com/', 'public', datetime('now'), datetime('now')),
+('res_thornton_events','calvarybible','campus_thornton','Thornton campus events', 'Thornton events + signups:\\n\\n- Events: https://calvarybible.com/thornton/events/\\n- Campus page: https://calvarybible.com/thornton/', 'public', datetime('now'), datetime('now')),
+('res_thornton_messages','calvarybible','campus_thornton','Thornton message archive', 'Thornton message archive (watch/listen):\\n\\n- https://calvarybible.com/messages/thornton/', 'public', datetime('now'), datetime('now')),
+('res_classes','calvarybible',NULL,'Classes', 'Find classes and class-style resources (adult classes, foundations, and more):\\n\\n- Search: https://calvarybible.com/?s=classes', 'public', datetime('now'), datetime('now'));
 
 -- Content docs stored in D1 (instead of local markdown files)
 INSERT OR REPLACE INTO content_docs (id, church_id, entity_type, entity_id, locale, title, body_markdown, created_at, updated_at) VALUES
 ('doc_faq','calvarybible','faq','general','en','FAQ','## Is it okay to come if I''m not sure what I believe?\\n\\nYes. You are welcome to ask honest questions and take next steps at your own pace.\\n\\n## What are the service times and campuses?\\n\\nSee: https://calvarybible.com/locations/\\n\\n## How do I get connected?\\n\\n- Starting Point\\n- Adults & Groups\\n- Serve on a Team', datetime('now'), datetime('now')),
 ('doc_calvary_mission_vision','calvarybible','church','mission_vision','en','Mission & Vision',
  '## Mission\\n\\nBuilding Christ centered communities of people fully devoted to loving God and loving others.\\n\\n## Vision\\n\\n- Make disciples\\n- Empower leaders\\n- Multiply churches\\n\\n## Shaping values\\n\\n- Biblical Authority\\n- Prayer in Faith\\n- Loving Relationships\\n- Moral Excellence\\n- Confident Witness\\n- Faithful Stewardship\\n\\nSource: https://calvarybible.com/mission-vision/',
- datetime('now'), datetime('now'));
+ datetime('now'), datetime('now')),
+
+-- Sermons / message archive (Thornton campus examples, from https://calvarybible.com/messages/thornton/)
+('doc_sermon_thornton_2026_03_01','calvarybible','sermon','thornton:2026-03-01','en','The Gospel of John: The Helper',
+ 'Speaker: Zack Thompson\\n\\nDate: 2026-03-01\\n\\nScripture: John 14:15-31\\n\\nWatch: https://calvarybible.com/messages/thornton/\\n\\nFrom series: The Gospel of John',
+ datetime('now'),datetime('now')),
+('doc_sermon_thornton_2026_02_22','calvarybible','sermon','thornton:2026-02-22','en','The Gospel of John: Let Not Your Heart Be Troubled',
+ 'Speaker: Tom Shirk\\n\\nDate: 2026-02-22\\n\\nScripture: John 14:1-14\\n\\nWatch/Listen: https://calvarybible.com/messages/thornton/\\n\\nFrom series: The Gospel of John',
+ datetime('now'),datetime('now')),
+('doc_sermon_thornton_2026_02_15','calvarybible','sermon','thornton:2026-02-15','en','The Gospel of John: Love One Another',
+ 'Speaker: Zack Thompson\\n\\nDate: 2026-02-15\\n\\nScripture: John 13:21-38\\n\\nWatch/Listen: https://calvarybible.com/messages/thornton/\\n\\nFrom series: The Gospel of John',
+ datetime('now'),datetime('now'));
 
 -- Strategic intent (ChurchCore ontology-aligned)
 INSERT OR REPLACE INTO strategic_intents (id, church_id, intent_type, title, body_markdown, sort_order, source_url, created_at, updated_at) VALUES

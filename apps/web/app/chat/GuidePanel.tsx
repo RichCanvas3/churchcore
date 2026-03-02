@@ -118,8 +118,10 @@ export function GuidePanel(props: { identity: Identity; onClose: () => void; onO
     setError(null);
     try {
       const s = await postJson<JourneyGetStateResponse>("/api/a2a/journey/get_state", { identity });
+      if ((s as any)?.ok === false) throw new Error(String((s as any)?.error ?? "Failed to load"));
       setState(s);
       const n = await postJson<JourneyNextStepsResponse>("/api/a2a/journey/next_steps", { identity, limit: 5 });
+      if ((n as any)?.ok === false) throw new Error(String((n as any)?.error ?? "Failed to load"));
       setNext(n);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Failed to load");
