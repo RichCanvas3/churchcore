@@ -134,7 +134,7 @@ export function GuidePanel(props: { identity: Identity; onClose: () => void; onO
     setError(null);
     void refresh();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [identity.tenant_id, identity.user_id]);
+  }, [identity.tenant_id, identity.user_id, identity.persona_id, identity.role, identity.campus_id]);
 
   async function markComplete(nodeId: string) {
     setSaving(true);
