@@ -37,6 +37,10 @@ def _score_doc_for_query(doc: dict[str, Any], q: str) -> int:
         score += 10
     if any(k in q for k in ["group", "groups", "small group"]) and "groups" in sid:
         score += 10
+    if any(k in q for k in ["purpose", "vision", "mission", "strategy", "values", "beliefs", "intent"]) and (
+        "strategy" in sid or "church.json" in sid
+    ):
+        score += 8
     if any(k in q for k in ["serve", "volunteer", "opportunit"]) and ("groups" in sid or "resources" in sid):
         score += 4
     return score
@@ -48,7 +52,7 @@ def _pick_relevant_docs(exported_docs: list[dict[str, Any]], query: str, k: int 
     if top:
         return top
     # Fallback to the most generally useful docs
-    preferred = {"church/church.json", "church/services.json", "church/events.json", "church/groups.json"}
+    preferred = {"church/church.json", "church/services.json", "church/events.json", "church/groups.json", "church/strategy.json"}
     out: list[dict[str, Any]] = []
     for d in exported_docs:
         if str(d.get("sourceId")) in preferred:
@@ -83,6 +87,59 @@ def _ui_handoff_for_user_text(user_text: str) -> list[dict[str, Any]]:
                 "tool_id": "kids_checkin",
                 "title": "Kids check-in",
                 "instructions": "Open the kids check-in panel.",
+            }
+        ]
+
+    intentish = any(
+        k in u
+        for k in [
+            "strategic intent",
+            "purpose",
+            "vision",
+            "mission",
+            "strategy",
+            "values",
+            "beliefs",
+            "why we exist",
+            "what is the mission",
+            "what's the mission",
+            "mission of this church",
+        ]
+    )
+    if intentish:
+        return [
+            {
+                "type": "ui_tool",
+                "tool_id": "strategic_intent",
+                "title": "Strategic intent",
+                "instructions": "Open the church strategic intent panel (purpose/vision/mission/strategy).",
+            }
+        ]
+
+    churchish = any(
+        k in u
+        for k in [
+            "tell me about the church",
+            "about the church",
+            "tell me about calvary",
+            "about calvary",
+            "campus",
+            "campuses",
+            "locations",
+            "location",
+            "service times",
+            "service time",
+            "address",
+            "where are you located",
+        ]
+    )
+    if churchish:
+        return [
+            {
+                "type": "ui_tool",
+                "tool_id": "church_overview",
+                "title": "Church",
+                "instructions": "Open the church overview panel (logo, campuses, service times).",
             }
         ]
 
@@ -514,6 +571,8 @@ async def handle_seeker_skill(
             "Do not invent service times, events, groups, or volunteer opportunities. Use ONLY the provided church data excerpt.\n"
             "Always be warm, concise, and propose 1-3 next actions.\n\n"
             "Client UI tools available (use handoff items when helpful):\n"
+            "- church_overview: show church overview (logo, campuses, service times).\n"
+            "- strategic_intent: show purpose/vision/mission/strategy (church strategic intent).\n"
             "- household_manager: manage household members (add/edit/remove kids, allergies, special needs).\n"
             "- kids_checkin: run kids check-in flow (find family, preview rooms, commit check-in).\n"
             "- guide: show journey position + next steps + resources.\n"
