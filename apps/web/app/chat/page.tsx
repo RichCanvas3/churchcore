@@ -465,7 +465,7 @@ export default function ChatPage() {
                   title: typeof (h as any).title === "string" ? String((h as any).title) : String((h as any).tool_id),
                 }))
                 .filter((t) => t.toolId);
-              return tools.length ? [{ type: "text", text }, { type: "uiToolButtons", tools }] : [{ type: "text", text }];
+              return tools.length ? [{ type: "text", text }, { type: "UiToolButtons", tools }] : [{ type: "text", text }];
             })(),
             status: { type: "complete", reason: "stop" },
             metadata: {

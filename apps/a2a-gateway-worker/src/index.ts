@@ -1257,6 +1257,25 @@ async function runAgent(env: Env, args: { threadId: string; inputPayload: Record
   return maybeEnvelope && typeof maybeEnvelope === "object" ? maybeEnvelope : data;
 }
 
+async function ensureLangGraphThread(env: Env, threadId: string) {
+  const deploymentUrl = (env.LANGGRAPH_DEPLOYMENT_URL ?? "").trim();
+  const apiKey = (env.LANGSMITH_API_KEY ?? "").trim();
+  if (!deploymentUrl || !apiKey) {
+    throw new Error("Hosted agent not configured (missing LANGGRAPH_DEPLOYMENT_URL / LANGSMITH_API_KEY).");
+  }
+
+  const res = await fetch(`${deploymentUrl.replace(/\/$/, "")}/threads`, {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-api-key": apiKey },
+    body: JSON.stringify({ thread_id: threadId, if_exists: "do_nothing" }),
+  });
+
+  if (!res.ok) {
+    const raw = await res.text().catch(() => "");
+    throw new Error(`LangGraph create thread error (${res.status}): ${raw || "no body"}`);
+  }
+}
+
 async function runAgentStream(env: Env, args: { threadId: string; inputPayload: Record<string, unknown> }) {
   const deploymentUrl = (env.LANGGRAPH_DEPLOYMENT_URL ?? "").trim();
   const apiKey = (env.LANGSMITH_API_KEY ?? "").trim();
@@ -1264,6 +1283,9 @@ async function runAgentStream(env: Env, args: { threadId: string; inputPayload: 
   if (!deploymentUrl || !apiKey) {
     throw new Error("Hosted agent not configured (missing LANGGRAPH_DEPLOYMENT_URL / LANGSMITH_API_KEY).");
   }
+
+  // The thread-runs streaming endpoint requires the thread to exist.
+  await ensureLangGraphThread(env, args.threadId);
 
   const url = `${deploymentUrl.replace(/\/$/, "")}/threads/${encodeURIComponent(args.threadId)}/runs/stream`;
   const res = await fetch(url, {
@@ -1578,10 +1600,7 @@ async function handleChatStream(req: Request, env: Env) {
           const maybeEnvelope = (lastValues as any)?.output ?? lastValues;
           envelope = maybeEnvelope && typeof maybeEnvelope === "object" ? maybeEnvelope : null;
         }
-        if (!envelope) {
-          // fallback: fetch final via wait endpoint
-          envelope = await runAgent(env, { threadId, inputPayload });
-        }
+        if (!envelope) throw new Error("LangGraph stream did not produce final state (values).");
 
         // Apply MemoryOps proposed by the agent (gateway enforces policy).
         if (personId) {

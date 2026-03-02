@@ -109,7 +109,7 @@ export function makeA2AChatModelAdapter(args: {
               title: typeof (h as any).title === "string" ? String((h as any).title) : String((h as any).tool_id),
             }));
           yield ({
-            content: tools.length ? [{ type: "text", text: fullText }, { type: "uiToolButtons", tools }] : [{ type: "text", text: fullText }],
+            content: tools.length ? [{ type: "text", text: fullText }, { type: "UiToolButtons", tools }] : [{ type: "text", text: fullText }],
           } as any);
         } else if (ev.event === "error") {
           throw new Error(ev.data || "A2A stream error");
