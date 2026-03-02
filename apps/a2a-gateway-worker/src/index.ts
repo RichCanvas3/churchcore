@@ -1257,6 +1257,32 @@ async function runAgent(env: Env, args: { threadId: string; inputPayload: Record
   return maybeEnvelope && typeof maybeEnvelope === "object" ? maybeEnvelope : data;
 }
 
+async function runAgentStream(env: Env, args: { threadId: string; inputPayload: Record<string, unknown> }) {
+  const deploymentUrl = (env.LANGGRAPH_DEPLOYMENT_URL ?? "").trim();
+  const apiKey = (env.LANGSMITH_API_KEY ?? "").trim();
+  const assistantId = (env.LANGGRAPH_ASSISTANT_ID ?? "church_agent").trim() || "church_agent";
+  if (!deploymentUrl || !apiKey) {
+    throw new Error("Hosted agent not configured (missing LANGGRAPH_DEPLOYMENT_URL / LANGSMITH_API_KEY).");
+  }
+
+  const url = `${deploymentUrl.replace(/\/$/, "")}/threads/${encodeURIComponent(args.threadId)}/runs/stream`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "content-type": "application/json", accept: "text/event-stream", "x-api-key": apiKey },
+    body: JSON.stringify({
+      assistant_id: assistantId,
+      input: args.inputPayload,
+      // Stream tokens + final state
+      stream_mode: ["messages-tuple", "values"],
+    }),
+  });
+  if (!res.ok || !res.body) {
+    const raw = await res.text().catch(() => "");
+    throw new Error(`LangGraph stream error (${res.status}): ${raw || "no body"}`);
+  }
+  return res;
+}
+
 async function handleChat(req: Request, env: Env) {
   const parsed = ChatSchema.safeParse(await parseJson(req));
   if (!parsed.success) return json({ error: "Invalid body", issues: parsed.error.issues }, { status: 400 });
@@ -1274,13 +1300,24 @@ async function handleChat(req: Request, env: Env) {
   if ((m1 as any)?.error) return json(m1, { status: 404 });
 
   const { personId } = await resolvePerson(env, identity);
-  const personMemory = personId ? await getPersonMemory(env, { churchId, personId }) : { memory: null, updatedAt: null };
-  const redactedMemory = redactMemoryForRole(role, personMemory.memory);
-  const hh = personId ? await getHouseholdSummary(env, { churchId, personId }) : { householdId: null, summary: "" };
-  const journeyState = personId ? await ensurePersonJourneyState(env, { churchId, personId, personMemory: personMemory.memory ?? {} }) : { currentStageId: null, confidence: 0.5, updatedAt: null };
+
+  // Heuristic: only compute "next steps" when the user is asking for it (saves DB work).
+  const msgLower = String(message ?? "").toLowerCase();
+  const wantsNextSteps =
+    skill !== "chat" ||
+    /next\s+step|next\s+steps|what\s+should\s+i\s+do|journey|stage|faith|baptis|membership|join\s+(a\s+)?group|serve|volunteer|guide/i.test(msgLower);
+
+  const [personMemory, hh] = personId
+    ? await Promise.all([getPersonMemory(env, { churchId, personId }), getHouseholdSummary(env, { churchId, personId })])
+    : [{ memory: null, updatedAt: null }, { householdId: null, summary: "" }];
+
+  const redactedMemory = redactMemoryForRole(role, (personMemory as any).memory);
+  const journeyState = personId
+    ? await ensurePersonJourneyState(env, { churchId, personId, personMemory: (personMemory as any).memory ?? {} })
+    : { currentStageId: null, confidence: 0.5, updatedAt: null };
   const currentStageId = journeyState.currentStageId ?? "stage_seeker";
   const journeyCurrentStage = personId ? await getJourneyNode(env, { churchId, nodeId: currentStageId }) : null;
-  const journeyNextSteps = personId ? await computeJourneyNextSteps(env, { churchId, personId, currentStageId, limit: 3 }) : [];
+  const journeyNextSteps = wantsNextSteps && personId ? await computeJourneyNextSteps(env, { churchId, personId, currentStageId, limit: 3 }) : [];
   const inputArgs = parsed.data.args && typeof parsed.data.args === "object" ? (parsed.data.args as Record<string, unknown>) : {};
   const session = {
     churchId,
@@ -1418,14 +1455,151 @@ async function handleChatStream(req: Request, env: Env) {
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
       try {
-        const out = await handleChat(new Request(req.url, { method: "POST", body: JSON.stringify(parsed.data) }), env);
-        const body = (await out.json().catch(() => ({}))) as any;
-        const msg = typeof body?.output?.message === "string" ? String(body.output.message) : "";
-        for (let i = 0; i < msg.length; i += 24) {
-          const chunk = msg.slice(i, i + 24);
-          controller.enqueue(encoder.encode(`event: token\ndata: ${chunk}\n\n`));
+        const { identity } = parsed.data;
+        const churchId = identity.tenant_id;
+        const userId = identity.user_id;
+        const threadId = parsed.data.thread_id;
+        const message = parsed.data.message;
+        const role = (identity.role ?? "seeker") as string;
+        const skill = (parsed.data.skill ?? "chat").trim() || "chat";
+
+        // Persist user message now (so refresh shows it immediately)
+        const m1 = await appendMessage(env, { churchId, userId, threadId, senderType: "user", content: message });
+        if ((m1 as any)?.error) throw new Error(String((m1 as any)?.error ?? "append failed"));
+
+        const { personId } = await resolvePerson(env, identity);
+        const msgLower = String(message ?? "").toLowerCase();
+        const wantsNextSteps =
+          skill !== "chat" ||
+          /next\s+step|next\s+steps|what\s+should\s+i\s+do|journey|stage|faith|baptis|membership|join\s+(a\s+)?group|serve|volunteer|guide/i.test(msgLower);
+
+        const [personMemory, hh] = personId
+          ? await Promise.all([getPersonMemory(env, { churchId, personId }), getHouseholdSummary(env, { churchId, personId })])
+          : [{ memory: null, updatedAt: null }, { householdId: null, summary: "" }];
+
+        const redactedMemory = redactMemoryForRole(role, (personMemory as any).memory);
+        const journeyState = personId
+          ? await ensurePersonJourneyState(env, { churchId, personId, personMemory: (personMemory as any).memory ?? {} })
+          : { currentStageId: null, confidence: 0.5, updatedAt: null };
+        const currentStageId = journeyState.currentStageId ?? "stage_seeker";
+        const journeyCurrentStage = personId ? await getJourneyNode(env, { churchId, nodeId: currentStageId }) : null;
+        const journeyNextSteps = wantsNextSteps && personId ? await computeJourneyNextSteps(env, { churchId, personId, currentStageId, limit: 3 }) : [];
+        const inputArgs = parsed.data.args && typeof parsed.data.args === "object" ? (parsed.data.args as Record<string, unknown>) : {};
+
+        const session = {
+          churchId,
+          campusId: identity.campus_id ?? "campus_boulder",
+          timezone: identity.timezone ?? "UTC",
+          userId,
+          personId,
+          role,
+          auth: { isAuthenticated: false, roles: [] },
+          threadId,
+        };
+
+        const inputPayload = {
+          skill,
+          message,
+          args: {
+            ...inputArgs,
+            __context: {
+              person_memory: redactedMemory,
+              person_memory_updated_at: (personMemory as any).updatedAt,
+              household: { household_id: (hh as any).householdId, summary: (hh as any).summary },
+              journey: { current_stage: journeyCurrentStage, next_steps: journeyNextSteps },
+              policy: { role },
+            },
+          },
+          session,
+        } as Record<string, unknown>;
+
+        const lgRes = await runAgentStream(env, { threadId, inputPayload });
+        const reader = lgRes.body!.getReader();
+        const decoder = new TextDecoder();
+        let buf = "";
+        let lastValues: any = null;
+        let assistantText = "";
+
+        function emitToken(t: string) {
+          if (!t) return;
+          assistantText += t;
+          // data lines must not contain raw newlines
+          const safe = t.replace(/\r/g, "").replace(/\n/g, "\\n");
+          controller.enqueue(encoder.encode(`event: token\ndata: ${safe}\n\n`));
         }
-        controller.enqueue(encoder.encode(`event: final\ndata: ${JSON.stringify(body.output ?? {})}\n\n`));
+
+        function processEventBlock(block: string) {
+          const lines = block.split("\n").map((l) => l.trimEnd());
+          let eventName = "";
+          const dataLines: string[] = [];
+          for (const ln of lines) {
+            if (ln.startsWith("event:")) eventName = ln.slice(6).trim();
+            if (ln.startsWith("data:")) dataLines.push(ln.slice(5).trimStart());
+          }
+          const dataRaw = dataLines.join("\n").trim();
+          if (!dataRaw) return;
+
+          // Prefer JSON payloads (LangGraph sends {event,data} in many cases)
+          const j = safeJsonParse(dataRaw);
+          const ev = (eventName || (j && typeof j.event === "string" ? j.event : "")) as string;
+          const data = j && "data" in j ? (j as any).data : j;
+
+          if (ev === "messages") {
+            // messages-tuple: [message_chunk, metadata]
+            const tup = Array.isArray(data) ? data : [];
+            const messageChunk = tup[0] as any;
+            const token = typeof messageChunk?.content === "string" ? String(messageChunk.content) : "";
+            emitToken(token);
+            return;
+          }
+          if (ev === "values") {
+            lastValues = data;
+            return;
+          }
+        }
+
+        for (;;) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buf += decoder.decode(value, { stream: true });
+          let idx = buf.indexOf("\n\n");
+          while (idx !== -1) {
+            const block = buf.slice(0, idx).trim();
+            buf = buf.slice(idx + 2);
+            if (block) processEventBlock(block);
+            idx = buf.indexOf("\n\n");
+          }
+        }
+
+        // Resolve final envelope
+        let envelope: any = null;
+        if (lastValues && typeof lastValues === "object") {
+          // state may be the full state, or {output: {...}} depending on graph
+          const maybeEnvelope = (lastValues as any)?.output ?? lastValues;
+          envelope = maybeEnvelope && typeof maybeEnvelope === "object" ? maybeEnvelope : null;
+        }
+        if (!envelope) {
+          // fallback: fetch final via wait endpoint
+          envelope = await runAgent(env, { threadId, inputPayload });
+        }
+
+        // Apply MemoryOps proposed by the agent (gateway enforces policy).
+        if (personId) {
+          const ops = (envelope as any)?.data?.memory_ops;
+          if (Array.isArray(ops) && ops.length) {
+            const { memory: nextMemory, applied } = applyMemoryOps((personMemory as any).memory ?? {}, ops as any, role);
+            if (applied.length) {
+              await upsertPersonMemory(env, { churchId, personId, memory: nextMemory });
+              await auditMemoryOps(env, { churchId, personId, threadId, actorUserId: userId, actorRole: role, ops: applied, turnId: null });
+            }
+          }
+        }
+
+        // Persist assistant message (+ envelope json). Use streamed text if envelope lacks message.
+        const finalText = typeof (envelope as any)?.message === "string" ? String((envelope as any).message) : assistantText;
+        await appendMessage(env, { churchId, userId, threadId, senderType: "assistant", content: finalText || "", envelope });
+
+        controller.enqueue(encoder.encode(`event: final\ndata: ${JSON.stringify(envelope ?? {})}\n\n`));
         controller.enqueue(encoder.encode(`event: done\ndata: {\"ok\":true}\n\n`));
       } catch (e: any) {
         controller.enqueue(encoder.encode(`event: error\ndata: ${JSON.stringify({ error: String(e?.message ?? e ?? "error") })}\n\n`));

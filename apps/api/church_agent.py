@@ -262,6 +262,82 @@ def _ui_handoff_for_user_text(user_text: str) -> list[dict[str, Any]]:
     return []
 
 
+def _should_fetch_church_export(user_text: str) -> bool:
+    u = (user_text or "").strip().lower()
+    if not u:
+        return False
+    # Only pull authoritative church data when the user is actually asking about the church.
+    return any(
+        k in u
+        for k in [
+            "service time",
+            "service times",
+            "sunday",
+            "gathering",
+            "campus",
+            "campuses",
+            "location",
+            "locations",
+            "address",
+            "events",
+            "event",
+            "groups",
+            "small group",
+            "serve",
+            "volunteer",
+            "mission",
+            "vision",
+            "purpose",
+            "strategy",
+            "values",
+            "beliefs",
+            "tell me about the church",
+            "about the church",
+            "calvary",
+        ]
+    )
+
+
+def _should_search_kb(user_text: str) -> bool:
+    u = (user_text or "").strip().lower()
+    if not u:
+        return False
+    # KB search can be expensive. Only do it for Scripture/resources style queries.
+    return any(k in u for k in ["bible", "scripture", "verse", "passage", "john", "romans", "ephesians", "psalm", "proverbs", "matthew"])
+
+
+def _should_propose_memory_ops(user_text: str) -> bool:
+    u = (user_text or "").strip().lower()
+    if not u:
+        return False
+    # This is a SECOND model call. Keep it for turns that likely contain durable profile updates.
+    return any(
+        k in u
+        for k in [
+            "my name is",
+            "call me",
+            "preferred name",
+            "my email",
+            "email is",
+            "my phone",
+            "phone is",
+            "text me",
+            "sms",
+            "allergy",
+            "allergies",
+            "custody",
+            "authorized pickup",
+            "i want to join",
+            "i want to serve",
+            "i want to volunteer",
+            "pray for",
+            "prayer request",
+            "i live",
+            "my address",
+        ]
+    )
+
+
 def _cards_from_export_docs(docs: list[dict[str, Any]]) -> list[dict[str, Any]]:
     cards: list[dict[str, Any]] = []
     for d in docs:
@@ -548,23 +624,26 @@ async def handle_seeker_skill(
         hh_summary = _household_context_from_args(args)
         journey, journey_summary = _journey_context_from_args(args)
 
-        # Always ground church-specific questions in authoritative ChurchCore D1 data.
-        # (No hallucinated service times/events/groups/resources.)
-        exported = await _call_tool_json(tools, "churchcore_kb_export_docs", {"churchId": session.churchId, "limitPerTable": 200})
-        exported_docs = exported.get("docs") if isinstance(exported, dict) else None
-        exported_docs_list = exported_docs if isinstance(exported_docs, list) else []
-        relevant_docs = _pick_relevant_docs([d for d in exported_docs_list if isinstance(d, dict)], user, k=3) if user else []
-        church_context = "\n\n".join([f"SOURCE {d.get('sourceId')}:\n{_as_text(d.get('text'), 6000)}" for d in relevant_docs])
+        # Only ground with authoritative church data when the user is asking church questions.
+        relevant_docs: list[dict[str, Any]] = []
+        church_context = ""
+        if user and _should_fetch_church_export(user):
+            exported = await _call_tool_json(tools, "churchcore_kb_export_docs", {"churchId": session.churchId, "limitPerTable": 200})
+            exported_docs = exported.get("docs") if isinstance(exported, dict) else None
+            exported_docs_list = exported_docs if isinstance(exported_docs, list) else []
+            relevant_docs = _pick_relevant_docs([d for d in exported_docs_list if isinstance(d, dict)], user, k=3)
+            church_context = "\n\n".join([f"SOURCE {d.get('sourceId')}:\n{_as_text(d.get('text'), 6000)}" for d in relevant_docs])
 
         # If embeddings are configured, also do semantic KB search (for better grounding).
         kb_text = ""
         kb_hits: list[Any] = []
-        try:
-            kb_ttl = int(float(os.environ.get("KB_INDEX_TTL_SECONDS", "300") or "300"))
-            kb_index = await ensure_index_with_mcp(church_id=session.churchId, ttl_seconds=max(30, kb_ttl))
-            kb_text, kb_hits = search_kb(kb_index, user, k=4) if user and kb_index else ("", [])
-        except Exception:
-            kb_text, kb_hits = ("", [])
+        if user and _should_search_kb(user):
+            try:
+                kb_ttl = int(float(os.environ.get("KB_INDEX_TTL_SECONDS", "300") or "300"))
+                kb_index = await ensure_index_with_mcp(church_id=session.churchId, ttl_seconds=max(30, kb_ttl))
+                kb_text, kb_hits = search_kb(kb_index, user, k=4) if user and kb_index else ("", [])
+            except Exception:
+                kb_text, kb_hits = ("", [])
 
         sys = (
             "You are Church Agent in seeker role. Help the person explore faith and take next steps.\n"
@@ -604,16 +683,17 @@ async def handle_seeker_skill(
         out_text = str(txt or "").strip() or "How can I help?"
         ui_handoff = _ui_handoff_for_user_text(user)
         memory_ops: list[dict[str, Any]] = []
-        try:
-            memory_ops = await _propose_memory_ops(
-                model=model,
-                role=str(session.role or "seeker"),
-                existing_memory=mem,
-                user_text=user,
-                assistant_text=out_text,
-            )
-        except Exception:
-            memory_ops = []
+        if _should_propose_memory_ops(user):
+            try:
+                memory_ops = await _propose_memory_ops(
+                    model=model,
+                    role=str(session.role or "seeker"),
+                    existing_memory=mem,
+                    user_text=user,
+                    assistant_text=out_text,
+                )
+            except Exception:
+                memory_ops = []
 
         return OutputEnvelope(
             message=out_text,
