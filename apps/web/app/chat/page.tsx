@@ -279,6 +279,8 @@ export default function ChatPage() {
     );
   }
 
+  // Defensive: older persisted messages (or cached clients) may still contain UiToolButtons parts.
+  // We don't emit this part anymore, but rendering it prevents noisy console warnings.
   function UiToolButtonsPart(props: any) {
     const toolsLike = Array.isArray(props?.tools) ? props.tools : Array.isArray(props?.part?.tools) ? props.part.tools : [];
     const tools = (toolsLike as any[])
@@ -315,7 +317,7 @@ export default function ChatPage() {
       <MessagePrimitive.Root>
         <div style={{ display: "flex", justifyContent: "flex-start" }}>
           <div style={{ maxWidth: 760, background: "white", color: "#0f172a", border: "1px solid #e2e8f0", borderRadius: 14, padding: "10px 12px" }}>
-            <MessagePrimitive.Parts components={{ Text: TextPart, UiToolButtons: UiToolButtonsPart } as any} />
+            <MessagePrimitive.Parts components={{ Text: TextPart, UiToolButtons: UiToolButtonsPart, uiToolButtons: UiToolButtonsPart } as any} />
           </div>
         </div>
       </MessagePrimitive.Root>
@@ -465,7 +467,9 @@ export default function ChatPage() {
                   title: typeof (h as any).title === "string" ? String((h as any).title) : String((h as any).tool_id),
                 }))
                 .filter((t) => t.toolId);
-              return tools.length ? [{ type: "text", text }, { type: "UiToolButtons", tools }] : [{ type: "text", text }];
+              const snippets = tools.map((t) => `{"type":"ui_tool","tool_id":"${String(t.toolId).replace(/"/g, "")}"}`).join("\n");
+              const withTools = snippets ? `${text}\n\n${snippets}` : text;
+              return [{ type: "text", text: withTools }];
             })(),
             status: { type: "complete", reason: "stop" },
             metadata: {

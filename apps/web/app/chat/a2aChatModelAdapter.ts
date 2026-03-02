@@ -54,6 +54,13 @@ export function makeA2AChatModelAdapter(args: {
 }): ChatModelAdapter {
   const { session, threadId, onFinalEnvelope } = args;
 
+  function appendUiToolSnippets(text: string, tools: Array<{ toolId: string; title?: string }>) {
+    const ids = tools.map((t) => String(t.toolId || "").trim()).filter(Boolean);
+    if (!ids.length) return text;
+    const snippets = ids.map((id) => `{"type":"ui_tool","tool_id":"${id.replace(/"/g, "")}"}`).join("\n");
+    return `${text}\n\n${snippets}`;
+  }
+
   const adapter: ChatModelAdapter = {
     async *run({ messages, abortSignal }: any) {
       const last = Array.isArray(messages) && messages.length ? messages[messages.length - 1] : null;
@@ -108,8 +115,9 @@ export function makeA2AChatModelAdapter(args: {
               toolId: String((h as any).tool_id),
               title: typeof (h as any).title === "string" ? String((h as any).title) : String((h as any).tool_id),
             }));
+          const textWithTools = appendUiToolSnippets(fullText, tools);
           yield ({
-            content: tools.length ? [{ type: "text", text: fullText }, { type: "UiToolButtons", tools }] : [{ type: "text", text: fullText }],
+            content: [{ type: "text", text: textWithTools }],
           } as any);
         } else if (ev.event === "error") {
           throw new Error(ev.data || "A2A stream error");

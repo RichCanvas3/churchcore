@@ -1257,25 +1257,6 @@ async function runAgent(env: Env, args: { threadId: string; inputPayload: Record
   return maybeEnvelope && typeof maybeEnvelope === "object" ? maybeEnvelope : data;
 }
 
-async function ensureLangGraphThread(env: Env, threadId: string) {
-  const deploymentUrl = (env.LANGGRAPH_DEPLOYMENT_URL ?? "").trim();
-  const apiKey = (env.LANGSMITH_API_KEY ?? "").trim();
-  if (!deploymentUrl || !apiKey) {
-    throw new Error("Hosted agent not configured (missing LANGGRAPH_DEPLOYMENT_URL / LANGSMITH_API_KEY).");
-  }
-
-  const res = await fetch(`${deploymentUrl.replace(/\/$/, "")}/threads`, {
-    method: "POST",
-    headers: { "content-type": "application/json", "x-api-key": apiKey },
-    body: JSON.stringify({ thread_id: threadId, if_exists: "do_nothing" }),
-  });
-
-  if (!res.ok) {
-    const raw = await res.text().catch(() => "");
-    throw new Error(`LangGraph create thread error (${res.status}): ${raw || "no body"}`);
-  }
-}
-
 async function runAgentStream(env: Env, args: { threadId: string; inputPayload: Record<string, unknown> }) {
   const deploymentUrl = (env.LANGGRAPH_DEPLOYMENT_URL ?? "").trim();
   const apiKey = (env.LANGSMITH_API_KEY ?? "").trim();
@@ -1284,9 +1265,6 @@ async function runAgentStream(env: Env, args: { threadId: string; inputPayload: 
     throw new Error("Hosted agent not configured (missing LANGGRAPH_DEPLOYMENT_URL / LANGSMITH_API_KEY).");
   }
 
-  // The thread-runs streaming endpoint requires the thread to exist.
-  await ensureLangGraphThread(env, args.threadId);
-
   const url = `${deploymentUrl.replace(/\/$/, "")}/threads/${encodeURIComponent(args.threadId)}/runs/stream`;
   const res = await fetch(url, {
     method: "POST",
@@ -1294,8 +1272,9 @@ async function runAgentStream(env: Env, args: { threadId: string; inputPayload: 
     body: JSON.stringify({
       assistant_id: assistantId,
       input: args.inputPayload,
+      if_not_exists: "create",
       // Stream tokens + final state
-      stream_mode: ["messages-tuple", "values"],
+      stream_mode: ["messages-tuple", "values", "updates"],
     }),
   });
   if (!res.ok || !res.body) {
@@ -1563,8 +1542,32 @@ async function handleChatStream(req: Request, env: Env) {
 
           // Prefer JSON payloads (LangGraph sends {event,data} in many cases)
           const j = safeJsonParse(dataRaw);
-          const ev = (eventName || (j && typeof j.event === "string" ? j.event : "")) as string;
+          // LangGraph Agent Server often uses `event: message` for all chunks.
+          // In that case, prefer the JSON `event` field.
+          const ev = ((j && typeof (j as any).event === "string" ? (j as any).event : "") || eventName || "") as string;
           const data = j && "data" in j ? (j as any).data : j;
+
+          // When stream_mode is a list, many APIs return (mode, chunk) tuples.
+          if (Array.isArray(data) && data.length === 2 && typeof data[0] === "string") {
+            const mode = String(data[0]);
+            const chunk = data[1];
+            if (mode === "messages-tuple") {
+              const tup = Array.isArray(chunk) ? chunk : [];
+              const messageChunk = tup[0] as any;
+              const token = typeof messageChunk?.content === "string" ? String(messageChunk.content) : "";
+              emitToken(token);
+              return;
+            }
+            if (mode === "values") {
+              lastValues = chunk;
+              return;
+            }
+            if (mode === "updates") {
+              // Not guaranteed to be full state, but keep the latest in case "values" isn't emitted.
+              lastValues = chunk;
+              return;
+            }
+          }
 
           if (ev === "messages") {
             // messages-tuple: [message_chunk, metadata]
@@ -1574,7 +1577,7 @@ async function handleChatStream(req: Request, env: Env) {
             emitToken(token);
             return;
           }
-          if (ev === "values") {
+          if (ev === "values" || ev === "updates") {
             lastValues = data;
             return;
           }
@@ -1584,18 +1587,31 @@ async function handleChatStream(req: Request, env: Env) {
           const { done, value } = await reader.read();
           if (done) break;
           buf += decoder.decode(value, { stream: true });
-          let idx = buf.indexOf("\n\n");
-          while (idx !== -1) {
+          for (;;) {
+            const idxN = buf.indexOf("\n\n");
+            const idxR = buf.indexOf("\r\n\r\n");
+            let idx = -1;
+            let delimLen = 0;
+            if (idxN !== -1 && (idxR === -1 || idxN < idxR)) {
+              idx = idxN;
+              delimLen = 2;
+            } else if (idxR !== -1) {
+              idx = idxR;
+              delimLen = 4;
+            }
+            if (idx === -1) break;
             const block = buf.slice(0, idx).trim();
-            buf = buf.slice(idx + 2);
+            buf = buf.slice(idx + delimLen);
             if (block) processEventBlock(block);
-            idx = buf.indexOf("\n\n");
           }
         }
+        // Flush trailing SSE block (some servers don't end with a blank line).
+        const tail = buf.trim();
+        if (tail) processEventBlock(tail);
 
         // Resolve final envelope
         let envelope: any = null;
-        if (lastValues && typeof lastValues === "object") {
+        if (lastValues !== null && typeof lastValues === "object") {
           // state may be the full state, or {output: {...}} depending on graph
           const maybeEnvelope = (lastValues as any)?.output ?? lastValues;
           envelope = maybeEnvelope && typeof maybeEnvelope === "object" ? maybeEnvelope : null;
