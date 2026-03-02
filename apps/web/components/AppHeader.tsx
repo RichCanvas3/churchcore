@@ -70,11 +70,17 @@ export function AppHeader(props: { height?: number }) {
           <a href="/chat" style={{ fontSize: 14 }}>
             Chat
           </a>
+          <a href="/calendar" style={{ fontSize: 14 }}>
+            Calendar
+          </a>
           <a href="/checkin" style={{ fontSize: 14 }}>
             Kids check-in
           </a>
           <a href="/guide" style={{ fontSize: 14 }}>
             Guide
+          </a>
+          <a href="/agent-card" style={{ fontSize: 14 }}>
+            Agent card
           </a>
           <div style={{ display: "grid", gap: 6 }}>
             <div style={{ fontSize: 12, color: "#64748b" }}>Switch account</div>

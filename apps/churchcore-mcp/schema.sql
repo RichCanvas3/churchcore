@@ -413,6 +413,9 @@ CREATE TABLE IF NOT EXISTS events (
   end_at TEXT,
   location_name TEXT,
   location_address TEXT,
+  is_outdoor INTEGER NOT NULL DEFAULT 0,
+  lat REAL,
+  lon REAL,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );

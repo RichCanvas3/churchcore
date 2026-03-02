@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
 from langchain_openai import ChatOpenAI
@@ -402,6 +403,31 @@ def _tool_raw_to_json(raw: Any) -> Optional[dict[str, Any]]:
         return None
 
 
+def _tool_raw_to_text(raw: Any) -> str:
+    """
+    Normalize MCP tool outputs to a single text string.
+    Useful for tools that return non-JSON confirmations (e.g., email sent).
+    """
+    try:
+        if isinstance(raw, dict):
+            content = raw.get("content")
+            if isinstance(content, list):
+                raw = content
+            else:
+                return _as_text(raw, 4000)
+
+        if isinstance(raw, list):
+            texts: list[str] = []
+            for item in raw:
+                if isinstance(item, dict) and isinstance(item.get("text"), str):
+                    texts.append(str(item.get("text")))
+            return "\n".join([t for t in texts if t.strip()]).strip()
+
+        return str(raw or "").strip()
+    except Exception:
+        return str(raw or "").strip()
+
+
 def _find_tool_by_suffix(tools: list[Any], suffix: str) -> Any | None:
     suffix = (suffix or "").strip()
     if not suffix:
@@ -421,6 +447,15 @@ async def _call_tool_json(tools: list[Any], tool_suffix: str, payload: dict[str,
         return None
     raw = await tool.ainvoke(payload if isinstance(payload, dict) else {})
     return _tool_raw_to_json(raw)
+
+
+async def _call_tool_text(tools: list[Any], tool_suffix: str, payload: dict[str, Any]) -> Optional[str]:
+    tool = _find_tool_by_suffix(tools, tool_suffix)
+    if not tool:
+        return None
+    raw = await tool.ainvoke(payload if isinstance(payload, dict) else {})
+    txt = _tool_raw_to_text(raw)
+    return txt if txt else ""
 
 
 def _permission_denied() -> OutputEnvelope:
@@ -539,6 +574,74 @@ def _journey_context_from_args(args: dict[str, Any]) -> tuple[dict[str, Any] | N
     return j, ("; ".join(summary_bits)).strip()
 
 
+def _now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _parse_iso_to_unix(iso: str) -> Optional[int]:
+    try:
+        dt = datetime.fromisoformat(str(iso).replace("Z", "+00:00"))
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return int(dt.timestamp())
+    except Exception:
+        return None
+
+
+def _pick_hour(hourly: list[dict[str, Any]], target_unix: int) -> Optional[dict[str, Any]]:
+    best = None
+    best_delta = None
+    for h in hourly:
+        if not isinstance(h, dict):
+            continue
+        dt = h.get("dt")
+        if not isinstance(dt, int):
+            continue
+        d = abs(dt - target_unix)
+        if best_delta is None or d < best_delta:
+            best = h
+            best_delta = d
+    return best
+
+
+def _week_window_iso(start_date: str) -> tuple[str, str, str]:
+    """
+    Returns (weekStartISODate, fromIsoZ, toIsoZ) where start_date is YYYY-MM-DD.
+    """
+    s = (start_date or "").strip()
+    try:
+        d = datetime.fromisoformat(s).date()
+    except Exception:
+        d = datetime.now(timezone.utc).date()
+    week_start = d.isoformat()
+    week_end = (d + timedelta(days=6)).isoformat()
+    from_iso = f"{week_start}T00:00:00.000Z"
+    to_iso = f"{week_end}T23:59:59.999Z"
+    return week_start, from_iso, to_iso
+
+
+async def _weather_hourly(tools: list[Any], *, lat: float, lon: float, hours: int = 48) -> Optional[dict[str, Any]]:
+    try:
+        return await _call_tool_json(
+            tools,
+            "weather_forecast_hourly",
+            {"lat": float(lat), "lon": float(lon), "hours": int(hours), "units": "imperial"},
+        )
+    except Exception:
+        return None
+
+
+async def _weather_daily(tools: list[Any], *, lat: float, lon: float, days: int = 8) -> Optional[dict[str, Any]]:
+    try:
+        return await _call_tool_json(
+            tools,
+            "weather_forecast_daily",
+            {"lat": float(lat), "lon": float(lon), "days": int(days), "units": "imperial"},
+        )
+    except Exception:
+        return None
+
+
 def _safe_json_loads(text: str) -> Any:
     try:
         return json.loads(text)
@@ -616,6 +719,122 @@ async def handle_seeker_skill(
 ) -> OutputEnvelope:
     skill = (skill or "chat").strip()
     args = args if isinstance(args, dict) else {}
+
+    if skill == "calendar.week":
+        start = str(args.get("start") or args.get("weekStartISO") or "").strip()
+        week_start, from_iso, to_iso = _week_window_iso(start)
+        week_end = (datetime.fromisoformat(week_start).date() + timedelta(days=6)).isoformat()
+
+        res = await _call_tool_json(
+            tools,
+            "churchcore_list_events",
+            {
+                "churchId": session.churchId,
+                "campusId": session.campusId,
+                "timezone": session.timezone,
+                "fromIso": from_iso,
+                "toIso": to_iso,
+            },
+        )
+        if not res:
+            return _missing_mcp("churchcore_list_events")
+
+        events = res.get("events") if isinstance(res, dict) else None
+        items = [e for e in events if isinstance(e, dict)] if isinstance(events, list) else []
+
+        # Weather: group calls by location and attach a small snapshot for outdoor events.
+        by_loc: dict[str, dict[str, float]] = {}
+        for e in items:
+            is_outdoor = bool(e.get("is_outdoor") or e.get("isOutdoor"))
+            lat = e.get("lat")
+            lon = e.get("lon")
+            if not is_outdoor or not isinstance(lat, (int, float)) or not isinstance(lon, (int, float)):
+                continue
+            key = f"{float(lat):.5f},{float(lon):.5f}"
+            by_loc[key] = {"lat": float(lat), "lon": float(lon)}
+
+        forecasts: dict[str, dict[str, list[dict[str, Any]]]] = {}
+        for key, loc in by_loc.items():
+            hourly = await _weather_hourly(tools, lat=loc["lat"], lon=loc["lon"], hours=48) or {}
+            daily = await _weather_daily(tools, lat=loc["lat"], lon=loc["lon"], days=8) or {}
+            hourly_list = hourly.get("hourly") if isinstance(hourly, dict) else None
+            daily_list = daily.get("daily") if isinstance(daily, dict) else None
+            forecasts[key] = {
+                "hourly": [x for x in hourly_list if isinstance(x, dict)] if isinstance(hourly_list, list) else [],
+                "daily": [x for x in daily_list if isinstance(x, dict)] if isinstance(daily_list, list) else [],
+            }
+
+        out_items: list[dict[str, Any]] = []
+        for e in items:
+            out = dict(e)
+            is_outdoor = bool(e.get("is_outdoor") or e.get("isOutdoor"))
+            lat = e.get("lat")
+            lon = e.get("lon")
+            start_at = str(e.get("start_at") or "")
+            t = _parse_iso_to_unix(start_at) if start_at else None
+
+            weather = None
+            if is_outdoor and isinstance(lat, (int, float)) and isinstance(lon, (int, float)) and isinstance(t, int):
+                key = f"{float(lat):.5f},{float(lon):.5f}"
+                f = forecasts.get(key) or {"hourly": [], "daily": []}
+                hourly_list = f.get("hourly") or []
+                daily_list = f.get("daily") or []
+
+                if hourly_list:
+                    h = _pick_hour(hourly_list, t)
+                    if h:
+                        desc = None
+                        w = h.get("weather")
+                        if isinstance(w, list) and w and isinstance(w[0], dict):
+                            desc = w[0].get("description")
+                        weather = {
+                            "summary": str(desc or "Hourly forecast"),
+                            "temp": h.get("temp"),
+                            "wind_speed": h.get("wind_speed"),
+                            "wind_gust": h.get("wind_gust"),
+                            "pop": h.get("pop"),
+                        }
+
+                if weather is None and daily_list:
+                    best = None
+                    best_delta = None
+                    for d in daily_list:
+                        dt = d.get("dt")
+                        if not isinstance(dt, int):
+                            continue
+                        delta = abs(dt - t)
+                        if best_delta is None or delta < best_delta:
+                            best = d
+                            best_delta = delta
+                    if best:
+                        desc = None
+                        w = best.get("weather")
+                        if isinstance(w, list) and w and isinstance(w[0], dict):
+                            desc = w[0].get("description")
+                        temp_max = None
+                        temp = best.get("temp")
+                        if isinstance(temp, dict):
+                            temp_max = temp.get("max")
+                        weather = {
+                            "summary": str(desc or "Daily forecast"),
+                            "temp": temp_max,
+                            "wind_speed": best.get("wind_speed"),
+                            "wind_gust": best.get("wind_gust"),
+                            "pop": best.get("pop"),
+                        }
+
+            out["weatherForecast"] = weather
+            out_items.append(out)
+
+        schedule = {"asOfISO": _now_iso(), "weekStartISO": week_start, "weekEndISO": week_end, "events": out_items}
+        return OutputEnvelope(message="", data={"schedule": schedule})
+
+    if skill == "notify.send_email":
+        return OutputEnvelope(
+            message="Email sending is only available in guide role.",
+            suggested_next_actions=[NextAction(title="Open Guide", skill="chat")],
+            data={"skill": skill},
+        )
 
     if skill in {"chat", "chat.stream"}:
         model = ChatOpenAI(model=os.environ.get("OPENAI_MODEL", "gpt-5.2"))
@@ -929,6 +1148,27 @@ async def handle_guide_skill(
 ) -> OutputEnvelope:
     skill = (skill or "chat").strip()
     args = args if isinstance(args, dict) else {}
+
+    if skill == "calendar.week":
+        # Not sensitive; allow even if guide permission isn't configured.
+        return await handle_seeker_skill(skill=skill, message=message, args=args, session=session, tools=tools)
+
+    if skill == "notify.send_email":
+        to = str(args.get("to") or "").strip()
+        subject = str(args.get("subject") or "").strip() or "Message from your church"
+        text = str(args.get("text") or "").strip()
+        html = args.get("html")
+        payload: dict[str, Any] = {"to": to, "subject": subject}
+        if text:
+            payload["text"] = text
+        if isinstance(html, str) and html.strip():
+            payload["html"] = html.strip()
+        if not to:
+            return OutputEnvelope(message="Missing required arg: to", data={"skill": skill})
+        tool_txt = await _call_tool_text(tools, "sendEmail", payload)
+        if tool_txt is None:
+            return _missing_mcp("sendgrid_sendEmail")
+        return OutputEnvelope(message=tool_txt or "Email sent.", data={"to": to, "subject": subject})
 
     if not await _require_guide_permission(session, tools):
         return _permission_denied()

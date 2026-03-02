@@ -36,6 +36,10 @@ pnpm dev
 ## Deploy (high level)
 
 - **LangSmith Deployments**: uses `langgraph.json` and `apps/api`
-- **Cloudflare Workers**: deploy `apps/churchcore-mcp` and configure `MCP_SERVERS_JSON` in the LangSmith Deployment
-- **Vercel**: deploy `apps/web` and set `LANGGRAPH_DEPLOYMENT_URL`, `LANGSMITH_API_KEY`, `LANGGRAPH_ASSISTANT_ID`
+- **Cloudflare Workers**:
+  - Deploy `apps/churchcore-mcp` (D1-backed ChurchCore MCP)
+  - Deploy `apps/a2a-gateway-worker` (A2A gateway)
+  - Run D1 migrations/seeds as needed
+- **LangSmith Deployment env**: configure `MCP_SERVERS_JSON` (+ allowlist) to include `churchcore`, `weather-mcp`, and `sendgrid-mcp`
+- **Vercel**: deploy `apps/web` and set `A2A_GATEWAY_URL` (+ optional `A2A_GATEWAY_API_KEY`)
 

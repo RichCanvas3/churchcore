@@ -137,7 +137,7 @@ function createServer(env: Env) {
       const fromIso = typeof (args as any).fromIso === "string" ? (args as any).fromIso : nowIso();
       const toIso = typeof (args as any).toIso === "string" ? (args as any).toIso : null;
 
-      let sql = `SELECT id,title,description,start_at,end_at,location_name,location_address
+      let sql = `SELECT id,campus_id,title,description,start_at,end_at,location_name,location_address,is_outdoor,lat,lon
                  FROM events
                  WHERE church_id=?1 AND start_at >= ?2`;
       const binds: any[] = [churchId, fromIso];

@@ -6,6 +6,8 @@ type Env = {
   LANGSMITH_API_KEY?: string;
   LANGGRAPH_ASSISTANT_ID?: string;
   A2A_API_KEY?: string;
+  SENDGRID_MCP_URL?: string;
+  SENDGRID_MCP_API_KEY?: string;
 };
 
 function nowIso() {
@@ -47,6 +49,91 @@ function requireApiKey(req: Request, env: Env) {
   return null;
 }
 
+function guessPublicBaseUrl(req: Request) {
+  const url = new URL(req.url);
+  // Cloudflare Workers default to correct origin; keep it simple.
+  return `${url.protocol}//${url.host}/`;
+}
+
+function agentCard(req: Request, env: Env) {
+  const baseUrl = guessPublicBaseUrl(req);
+  const url = new URL(req.url);
+  const assistantId = url.searchParams.get("assistant_id") || (env.LANGGRAPH_ASSISTANT_ID ?? "church_agent");
+  const authRequired = Boolean((env.A2A_API_KEY ?? "").trim());
+
+  // A2A Agent Card (public discovery) shape based on a2a.types AgentCard:
+  // https://a2a-protocol.org/latest/tutorials/python/3-agent-skills-and-card/
+  return json(
+    {
+      name: "Church Agent Gateway",
+      description: "A2A gateway for Church Agent (threads, chat, memory, household, check-in, journey).",
+      url: baseUrl,
+      version: "0.1.0",
+      defaultInputModes: ["text"],
+      defaultOutputModes: ["text"],
+      capabilities: { streaming: true },
+      skills: [
+        {
+          id: "chat",
+          name: "Chat",
+          description: "General conversation (seeker/guide) with optional UI tool handoffs.",
+          tags: ["chat"],
+          examples: ["Tell me about the church", "What are the service times?", "What is the mission?"],
+        },
+        {
+          id: "threads",
+          name: "Threads",
+          description: "Create/list/get/rename/archive chat threads (topics).",
+          tags: ["threads"],
+          examples: ["Create a new topic", "Rename this topic to Planning a visit"],
+        },
+        {
+          id: "households_checkin",
+          name: "Households & kids check-in",
+          description: "Household lookup, member management, room preview, and check-in commit (demo OTP supported).",
+          tags: ["household", "checkin", "kids"],
+          examples: ["Find my family by phone", "Preview rooms for Mia", "Check in now"],
+        },
+        {
+          id: "calendar",
+          name: "Calendar",
+          description: "Week-view calendar of church events; outdoor events include a weather snapshot (48h/8d forecast).",
+          tags: ["calendar", "events", "weather"],
+          examples: ["Show this week's calendar", "Outdoor events this week"],
+        },
+        {
+          id: "journey",
+          name: "Faith journey",
+          description: "Get journey state and compute next steps; mark steps complete.",
+          tags: ["journey", "discipleship"],
+          examples: ["What stage am I in?", "What are my next steps?"],
+        },
+      ],
+      // Non-standard but helpful for clients integrating *this* gateway (not LangSmith A2A JSON-RPC).
+      endpoints: {
+        a2a_base: `${baseUrl}a2a/`,
+        chat: `${baseUrl}a2a/chat`,
+        chat_stream: `${baseUrl}a2a/chat.stream`,
+        thread_list: `${baseUrl}a2a/thread.list`,
+        thread_get: `${baseUrl}a2a/thread.get`,
+        thread_create: `${baseUrl}a2a/thread.create`,
+        thread_rename: `${baseUrl}a2a/thread.rename`,
+        thread_archive: `${baseUrl}a2a/thread.archive`,
+        household_identify: `${baseUrl}a2a/household.identify`,
+        checkin_start: `${baseUrl}a2a/checkin.start`,
+        checkin_preview: `${baseUrl}a2a/checkin.preview`,
+        checkin_commit: `${baseUrl}a2a/checkin.commit`,
+        calendar_week: `${baseUrl}a2a/calendar.week`,
+        journey_get_state: `${baseUrl}a2a/journey.get_state`,
+        journey_next_steps: `${baseUrl}a2a/journey.next_steps`,
+      },
+      authentication: authRequired ? { type: "api_key", header: "x-api-key", instructions: "Send x-api-key with the gateway API key." } : { type: "none" },
+      langgraph: { assistant_id: assistantId },
+    },
+    { headers: { "cache-control": "public, max-age=300" } },
+  );
+}
+
 const IdentitySchema = z.object({
   tenant_id: z.string().min(1),
   user_id: z.string().min(1),
@@ -67,6 +154,11 @@ const StrategicIntentsListSchema = z.object({
   intent_type: z.string().min(1).optional().nullable(),
 });
 
+const CalendarWeekSchema = z.object({
+  identity: IdentitySchema,
+  start: z.string().min(1).optional().nullable(), // YYYY-MM-DD
+});
+
 async function parseJson(req: Request) {
   const raw = await req.json().catch(() => null);
   return raw;
@@ -78,6 +170,70 @@ function safeJsonParse(text: string) {
   } catch {
     return null;
   }
+}
+
+function firstSseJson(text: string) {
+  const raw = String(text ?? "");
+  // Most MCP Streamable HTTP responses are single SSE events:
+  // event: message
+  // data: {...jsonrpc...}
+  const lines = raw.split("\n");
+  const dataLines: string[] = [];
+  for (const ln of lines) {
+    if (ln.startsWith("data:")) dataLines.push(ln.slice(5).trimStart());
+  }
+  const joined = dataLines.join("\n").trim();
+  return joined ? safeJsonParse(joined) : null;
+}
+
+async function mcpCallTool(env: Env, args: { baseUrl: string; apiKey?: string; toolName: string; toolArgs: Record<string, unknown> }) {
+  const baseUrl = String(args.baseUrl ?? "").trim().replace(/\/$/, "");
+  if (!baseUrl) return { ok: false, error: "Missing MCP baseUrl" as const };
+  const url = `${baseUrl}/mcp`;
+  const headers: Record<string, string> = {
+    "content-type": "application/json",
+    accept: "application/json, text/event-stream",
+  };
+  const apiKey = String(args.apiKey ?? "").trim();
+  if (apiKey) headers["x-api-key"] = apiKey;
+
+  // Initialize (required by MCP).
+  const initRes = await fetch(url, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({
+      jsonrpc: "2.0",
+      id: 1,
+      method: "initialize",
+      params: { protocolVersion: "2024-11-05", capabilities: {}, clientInfo: { name: "churchcore-a2a-gateway", version: "0.1.0" } },
+    }),
+  });
+  const initTxt = await initRes.text().catch(() => "");
+  if (!initRes.ok) return { ok: false, error: `MCP initialize failed (${initRes.status}): ${initTxt || "no body"}` as const };
+
+  // notifications/initialized (server commonly expects it)
+  await fetch(url, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized", params: {} }),
+  }).catch(() => {});
+
+  const callRes = await fetch(url, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({
+      jsonrpc: "2.0",
+      id: 2,
+      method: "tools/call",
+      params: { name: args.toolName, arguments: args.toolArgs ?? {} },
+    }),
+  });
+  const callTxt = await callRes.text().catch(() => "");
+  if (!callRes.ok) return { ok: false, error: `MCP tools/call failed (${callRes.status}): ${callTxt || "no body"}` as const };
+
+  const msg = firstSseJson(callTxt);
+  const result = msg && typeof msg === "object" ? (msg as any).result : null;
+  return { ok: true, result, raw: msg } as const;
 }
 
 function isUuid(s: string) {
@@ -1409,6 +1565,40 @@ async function handleChat(req: Request, env: Env) {
   return json({ thread_id: threadId, output: envelope });
 }
 
+async function handleCalendarWeek(req: Request, env: Env) {
+  const parsed = CalendarWeekSchema.safeParse(await parseJson(req));
+  if (!parsed.success) return json({ error: "Invalid body", issues: parsed.error.issues }, { status: 400 });
+  const { identity } = parsed.data;
+  const churchId = identity.tenant_id;
+  const userId = identity.user_id;
+  const role = (identity.role ?? "seeker") as string;
+
+  const start = String(parsed.data.start ?? "").trim();
+  const startIso = /^\d{4}-\d{2}-\d{2}$/.test(start) ? start : new Date().toISOString().slice(0, 10);
+
+  const envelope = await runAgent(env, {
+    threadId: crypto.randomUUID(),
+    inputPayload: {
+      skill: "calendar.week",
+      args: { start: startIso },
+      session: {
+        churchId,
+        campusId: identity.campus_id ?? null,
+        timezone: identity.timezone ?? "UTC",
+        userId,
+        personId: identity.persona_id ?? null,
+        role,
+        auth: { isAuthenticated: false, roles: [] },
+        threadId: null,
+      },
+    },
+  });
+
+  const schedule = (envelope as any)?.data?.schedule ?? null;
+  if (!schedule || typeof schedule !== "object") return json({ ok: false, error: "calendar.week did not return schedule", envelope });
+  return json(schedule);
+}
+
 async function handleChurchGetOverview(req: Request, env: Env) {
   const parsed = ChurchOverviewSchema.safeParse(await parseJson(req));
   if (!parsed.success) return json({ error: "Invalid body", issues: parsed.error.issues }, { status: 400 });
@@ -2191,16 +2381,72 @@ async function handleCheckinCommit(req: Request, env: Env) {
     items.push({ id, person_id: s.person_id, room_id: s.room_id, checked_in_at: now });
   }
 
-  return json({ ok: true, checkin_id: checkinId, security_code: securityCode, items });
+  // Best-effort: email the check-in id to the user/household email.
+  let emailSent: boolean | null = null;
+  let emailTo: string | null = null;
+  let emailError: string | null = null;
+  try {
+    const pid = identity.persona_id ? String(identity.persona_id) : "";
+    if (pid) {
+      const row = (await env.churchcore
+        .prepare(`SELECT email FROM people WHERE church_id=?1 AND id=?2 LIMIT 1`)
+        .bind(churchId, pid)
+        .first()) as any;
+      const em = typeof row?.email === "string" ? String(row.email).trim() : "";
+      if (em) emailTo = em;
+    }
+    if (!emailTo) {
+      const row = (await env.churchcore
+        .prepare(
+          `SELECT contact_value AS email
+           FROM household_contacts
+           WHERE church_id=?1 AND household_id=?2 AND contact_type='email'
+           ORDER BY is_primary DESC, updated_at DESC
+           LIMIT 1`,
+        )
+        .bind(churchId, parsed.data.household_id)
+        .first()) as any;
+      const em = typeof row?.email === "string" ? String(row.email).trim() : "";
+      if (em) emailTo = em;
+    }
+
+    const mcpUrl = String(env.SENDGRID_MCP_URL ?? "").trim();
+    const mcpKey = String(env.SENDGRID_MCP_API_KEY ?? "").trim();
+    if (emailTo && mcpUrl) {
+      const subject = "Kids check-in confirmation";
+      const text =
+        `Your kids check-in is complete.\n\n` +
+        `Check-in ID: ${checkinId}\n` +
+        `Pickup code: ${securityCode}\n` +
+        `Campus: ${String(identity.campus_id ?? "")}\n` +
+        `Created at: ${now}\n`;
+
+      const out = await mcpCallTool(env, { baseUrl: mcpUrl, apiKey: mcpKey, toolName: "sendEmail", toolArgs: { to: emailTo, subject, text } });
+      if (!out.ok) {
+        emailSent = false;
+        emailError = out.error;
+      } else {
+        emailSent = true;
+      }
+    }
+  } catch (e: any) {
+    emailSent = false;
+    emailError = String(e?.message ?? e ?? "email failed");
+  }
+
+  return json({ ok: true, checkin_id: checkinId, security_code: securityCode, items, email_to: emailTo, email_sent: emailSent, email_error: emailError });
 }
 
 export default {
   async fetch(req: Request, env: Env) {
+    const url = new URL(req.url);
+    // Public discovery endpoints (no auth)
+    if (req.method === "GET" && url.pathname === "/.well-known/agent-card.json") return agentCard(req, env);
+    if (req.method === "GET" && url.pathname === "/healthz") return json({ ok: true });
+
     const auth = requireApiKey(req, env);
     if (auth) return auth;
 
-    const url = new URL(req.url);
-    if (req.method === "GET" && url.pathname === "/healthz") return json({ ok: true });
     if (req.method !== "POST") return json({ error: "Method not allowed" }, { status: 405 });
 
     switch (url.pathname) {
@@ -2236,6 +2482,8 @@ export default {
         return handleCheckinPreview(req, env);
       case "/a2a/checkin.commit":
         return handleCheckinCommit(req, env);
+      case "/a2a/calendar.week":
+        return handleCalendarWeek(req, env);
       case "/a2a/memory.get":
         return handleMemoryGet(req, env);
       case "/a2a/memory.apply_ops":
