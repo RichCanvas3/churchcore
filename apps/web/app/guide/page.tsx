@@ -76,7 +76,7 @@ export default function GuidePage() {
   }
 
   return (
-    <div style={{ minHeight: "100vh", background: "#f8fafc" }}>
+    <div style={{ height: "100%", minHeight: 0, overflow: "auto", background: "#f8fafc" }}>
       <div style={{ maxWidth: 980, margin: "0 auto", padding: 16, display: "grid", gap: 14 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
           <div>

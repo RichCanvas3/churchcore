@@ -24,7 +24,13 @@ async function postJson<T = unknown>(url: string, body: unknown): Promise<T> {
 }
 
 function mdToText(md: string) {
-  return String(md || "")
+  // D1 seed content often contains double-escaped newlines ("\\n").
+  const normalized = String(md || "")
+    .replace(/\r/g, "")
+    .replace(/\\n/g, "\n")
+    .replace(/\\t/g, "\t");
+
+  return normalized
     .replace(/\r/g, "")
     .replace(/^> /gm, "")
     .replace(/```[\s\S]*?```/g, "")
@@ -133,25 +139,33 @@ export function StrategicIntentPanel(props: { identity: Identity; onClose: () =>
         {grouped.keys.map((k) => {
           const items = grouped.g.get(k) ?? [];
           const title = k.charAt(0).toUpperCase() + k.slice(1);
+          const itemsSorted = [...items].sort((a, b) => {
+            const ao = Number.isFinite(a.sortOrder) ? a.sortOrder : 0;
+            const bo = Number.isFinite(b.sortOrder) ? b.sortOrder : 0;
+            return ao - bo || String(a.title || "").localeCompare(String(b.title || ""));
+          });
           return (
             <div key={k} style={{ border: "1px solid #e2e8f0", borderRadius: 12, overflow: "hidden" }}>
               <div style={{ padding: "10px 12px", background: "#f8fafc", borderBottom: "1px solid #e2e8f0", fontWeight: 900, fontSize: 12 }}>{title}</div>
               <div style={{ padding: 12, display: "grid", gap: 10 }}>
-                {items.map((it) => (
+                {itemsSorted.map((it) => {
+                  const showItemTitle = String(it.title || "").trim().toLowerCase() !== title.trim().toLowerCase();
+                  return (
                   <div key={it.id} style={{ border: "1px solid #e2e8f0", borderRadius: 12, padding: 12 }}>
                     <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "baseline" }}>
-                      <div style={{ fontWeight: 900 }}>{it.title}</div>
+                      <div style={{ fontWeight: 900 }}>{showItemTitle ? it.title : null}</div>
                       {it.sourceUrl ? (
                         <a href={String(it.sourceUrl)} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: "#2563eb", textDecoration: "underline" }}>
                           Source
                         </a>
                       ) : null}
                     </div>
-                    <div style={{ marginTop: 8, fontSize: 13, color: "#0f172a" }}>
+                    <div style={{ marginTop: showItemTitle ? 8 : 0, fontSize: 13, lineHeight: 1.45, color: "#0f172a" }}>
                       <Linkified text={mdToText(it.bodyMarkdown)} />
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           );

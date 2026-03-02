@@ -216,30 +216,40 @@ INSERT OR REPLACE INTO content_docs (id, church_id, entity_type, entity_id, loca
 -- Strategic intent (ChurchCore ontology-aligned)
 INSERT OR REPLACE INTO strategic_intents (id, church_id, intent_type, title, body_markdown, sort_order, source_url, created_at, updated_at) VALUES
 ('si_mission','calvarybible','mission','Mission (Calvary)','Building Christ centered communities of people fully devoted to loving God and loving others.',10,'https://calvarybible.com/mission-vision/',datetime('now'),datetime('now')),
+('si_purpose','calvarybible','purpose','Purpose','Loving God and loving others.',5,'https://calvarybible.com/mission-vision/',datetime('now'),datetime('now')),
+('si_strategy','calvarybible','strategy','Strategy (interpreted)','Interpreted from Calvary’s published vision headings:\\n\\n- Make disciples\\n- Empower leaders\\n- Multiply churches',15,'https://calvarybible.com/mission-vision/',datetime('now'),datetime('now')),
 ('si_vision','calvarybible','vision','Vision (Calvary)','- Make disciples\\n- Empower leaders\\n- Multiply churches',20,'https://calvarybible.com/mission-vision/',datetime('now'),datetime('now')),
+('si_vision_make_disciples','calvarybible','vision','Make disciples','A disciple is a follower of Jesus who is growing in love for God and love for others.',21,'https://calvarybible.com/mission-vision/',datetime('now'),datetime('now')),
+('si_vision_empower_leaders','calvarybible','vision','Empower leaders','We train and equip leaders in our church, community, and world to make disciples of Jesus.',22,'https://calvarybible.com/mission-vision/',datetime('now'),datetime('now')),
+('si_vision_multiply_churches','calvarybible','vision','Multiply churches','The church is not a building, but people who love Jesus and love each other. We want to help the church grow around the world.',23,'https://calvarybible.com/mission-vision/',datetime('now'),datetime('now')),
 ('si_value_biblical_authority','calvarybible','value','Biblical Authority','We submit our lives to the teaching of God’s Word.',30,'https://calvarybible.com/mission-vision/',datetime('now'),datetime('now')),
 ('si_value_prayer_in_faith','calvarybible','value','Prayer in Faith','We believe that God accomplishes His will through our prayers.',31,'https://calvarybible.com/mission-vision/',datetime('now'),datetime('now')),
 ('si_value_loving_relationships','calvarybible','value','Loving Relationships','We commit ourselves to pursue authentic community.',32,'https://calvarybible.com/mission-vision/',datetime('now'),datetime('now')),
 ('si_value_moral_excellence','calvarybible','value','Moral Excellence','We pursue deeper holiness in everyday living.',33,'https://calvarybible.com/mission-vision/',datetime('now'),datetime('now')),
 ('si_value_confident_witness','calvarybible','value','Confident Witness','We communicate in word and deed that salvation is found in Christ alone.',34,'https://calvarybible.com/mission-vision/',datetime('now'),datetime('now')),
-('si_value_faithful_stewardship','calvarybible','value','Faithful Stewardship','We give generously and faithfully of our financial resources.',35,'https://calvarybible.com/mission-vision/',datetime('now'),datetime('now')),
-
--- ChurchCore ontology initiative (stored under this church for demo)
-('si_purpose_churchcore','calvarybible','purpose','Purpose (ChurchCore)','To clarify and align ministry intent so the Church can more faithfully live out its calling.\\n\\nThis expresses existential cause — not tactics.',5,NULL,datetime('now'),datetime('now')),
-('si_vision_churchcore','calvarybible','vision','Vision (ChurchCore)','Thriving, integrated local, regional, and global ministries collaborating around shared mission and meaning.',6,NULL,datetime('now'),datetime('now')),
-('si_mission_churchcore','calvarybible','mission','Mission (ChurchCore)','We design and steward a foundational ChurchCore ontology that enables ministries to structure, coordinate, and measure evangelism and discipleship.',7,NULL,datetime('now'),datetime('now')),
-('si_strategy_churchcore','calvarybible','strategy','Strategy (ChurchCore)',
- '### Establish a Shared Semantic Foundation\\n(Connect theology to data through ontology.)\\n\\n### Enable Ecosystem Collaboration\\n(Unite churches, technologists, and solution providers.)\\n\\n### Prototype and Iterate Rapidly\\n(Experiment openly and refine through real-world ministry use.)',
- 8,NULL,datetime('now'),datetime('now'));
+('si_value_faithful_stewardship','calvarybible','value','Faithful Stewardship','We give generously and faithfully of our financial resources.',35,'https://calvarybible.com/mission-vision/',datetime('now'),datetime('now'));
 
 INSERT OR REPLACE INTO strategic_intent_links (church_id, from_intent_id, to_intent_id, link_type, weight, metadata_json, created_at) VALUES
+('calvarybible','si_purpose','si_mission','drives',1.0,'{}',datetime('now')),
 ('calvarybible','si_mission','si_vision','drives',1.0,'{}',datetime('now')),
-('calvarybible','si_vision','si_value_biblical_authority','supports',1.0,'{}',datetime('now')),
-('calvarybible','si_vision','si_value_prayer_in_faith','supports',1.0,'{}',datetime('now')),
-('calvarybible','si_vision','si_value_loving_relationships','supports',1.0,'{}',datetime('now')),
-('calvarybible','si_vision','si_value_moral_excellence','supports',1.0,'{}',datetime('now')),
-('calvarybible','si_vision','si_value_confident_witness','supports',1.0,'{}',datetime('now')),
-('calvarybible','si_vision','si_value_faithful_stewardship','supports',1.0,'{}',datetime('now'));
+('calvarybible','si_strategy','si_vision','implements',1.0,'{}',datetime('now')),
+('calvarybible','si_vision','si_vision_make_disciples','implements',1.0,'{}',datetime('now')),
+('calvarybible','si_vision','si_vision_empower_leaders','implements',1.0,'{}',datetime('now')),
+('calvarybible','si_vision','si_vision_multiply_churches','implements',1.0,'{}',datetime('now')),
+
+('calvarybible','si_mission','si_value_biblical_authority','supports',1.0,'{}',datetime('now')),
+('calvarybible','si_mission','si_value_prayer_in_faith','supports',1.0,'{}',datetime('now')),
+('calvarybible','si_mission','si_value_loving_relationships','supports',1.0,'{}',datetime('now')),
+('calvarybible','si_mission','si_value_moral_excellence','supports',1.0,'{}',datetime('now')),
+('calvarybible','si_mission','si_value_confident_witness','supports',1.0,'{}',datetime('now')),
+('calvarybible','si_mission','si_value_faithful_stewardship','supports',1.0,'{}',datetime('now')),
+
+('calvarybible','si_vision_make_disciples','si_value_biblical_authority','supported_by',1.0,'{}',datetime('now')),
+('calvarybible','si_vision_make_disciples','si_value_prayer_in_faith','supported_by',1.0,'{}',datetime('now')),
+('calvarybible','si_vision_make_disciples','si_value_loving_relationships','supported_by',1.0,'{}',datetime('now')),
+('calvarybible','si_vision_make_disciples','si_value_moral_excellence','supported_by',1.0,'{}',datetime('now')),
+('calvarybible','si_vision_make_disciples','si_value_confident_witness','supported_by',1.0,'{}',datetime('now')),
+('calvarybible','si_vision_make_disciples','si_value_faithful_stewardship','supported_by',1.0,'{}',datetime('now'));
 
 -- Assignments (guide local-guide shepherds 2 seekers)
 INSERT OR REPLACE INTO assignments (id, church_id, seeker_id, guide_user_id, assigned_at) VALUES

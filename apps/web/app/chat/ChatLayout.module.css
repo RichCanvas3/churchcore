@@ -1,5 +1,5 @@
 .root {
-  height: 100dvh;
+  height: 100%;
   background: #f8fafc;
   display: grid;
   grid-template-columns: var(--left-width) 1fr var(--right-width);
