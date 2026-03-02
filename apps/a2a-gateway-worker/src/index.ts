@@ -80,6 +80,43 @@ function safeJsonParse(text: string) {
   }
 }
 
+function isUuid(s: string) {
+  const v = String(s || "").trim();
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v);
+}
+
+async function getOrCreateLangGraphThreadId(env: Env, args: { churchId: string; threadId: string }) {
+  const threadId = String(args.threadId || "").trim();
+  if (!threadId) throw new Error("Missing thread_id");
+  if (isUuid(threadId)) return threadId;
+
+  const row = (await env.churchcore
+    .prepare(
+      `SELECT langgraph_thread_id AS langgraphThreadId
+       FROM chat_thread_langgraph_map
+       WHERE church_id=?1 AND thread_id=?2
+       LIMIT 1`,
+    )
+    .bind(args.churchId, threadId)
+    .first()) as any;
+
+  const existing = typeof row?.langgraphThreadId === "string" ? String(row.langgraphThreadId).trim() : "";
+  if (existing && isUuid(existing)) return existing;
+
+  const lg = crypto.randomUUID();
+  const ts = nowIso();
+  await env.churchcore
+    .prepare(
+      `INSERT INTO chat_thread_langgraph_map (church_id, thread_id, langgraph_thread_id, created_at, updated_at)
+       VALUES (?1, ?2, ?3, ?4, ?5)
+       ON CONFLICT(church_id, thread_id) DO UPDATE SET langgraph_thread_id=excluded.langgraph_thread_id, updated_at=excluded.updated_at`,
+    )
+    .bind(args.churchId, threadId, lg, ts, ts)
+    .run();
+
+  return lg;
+}
+
 async function getUserRoles(env: Env, args: { churchId: string; userId: string }) {
   const rows =
     (
@@ -1300,6 +1337,9 @@ async function handleChat(req: Request, env: Env) {
   const m1 = await appendMessage(env, { churchId, userId, threadId, senderType: "user", content: message });
   if ((m1 as any)?.error) return json(m1, { status: 404 });
 
+  // LangGraph /threads/<id>/runs/stream requires UUID thread ids; map chat thread ids to UUIDs.
+  const langgraphThreadId = await getOrCreateLangGraphThreadId(env, { churchId, threadId });
+
   const { personId } = await resolvePerson(env, identity);
 
   // Heuristic: only compute "next steps" when the user is asking for it (saves DB work).
@@ -1332,7 +1372,7 @@ async function handleChat(req: Request, env: Env) {
   };
 
   const envelope = await runAgent(env, {
-    threadId,
+    threadId: langgraphThreadId,
     inputPayload: {
       skill,
       message,
@@ -1468,6 +1508,9 @@ async function handleChatStream(req: Request, env: Env) {
         const m1 = await appendMessage(env, { churchId, userId, threadId, senderType: "user", content: message });
         if ((m1 as any)?.error) throw new Error(String((m1 as any)?.error ?? "append failed"));
 
+        // LangGraph /threads/<id>/runs/stream requires UUID thread ids; map chat thread ids to UUIDs.
+        const langgraphThreadId = await getOrCreateLangGraphThreadId(env, { churchId, threadId });
+
         const { personId } = await resolvePerson(env, identity);
         const msgLower = String(message ?? "").toLowerCase();
         const wantsNextSteps =
@@ -1514,7 +1557,7 @@ async function handleChatStream(req: Request, env: Env) {
           session,
         } as Record<string, unknown>;
 
-        const lgRes = await runAgentStream(env, { threadId, inputPayload });
+        const lgRes = await runAgentStream(env, { threadId: langgraphThreadId, inputPayload });
         const reader = lgRes.body!.getReader();
         const decoder = new TextDecoder();
         let buf = "";

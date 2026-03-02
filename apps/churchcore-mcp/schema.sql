@@ -344,6 +344,18 @@ CREATE TABLE IF NOT EXISTS chat_messages (
 );
 CREATE INDEX IF NOT EXISTS idx_chat_messages ON chat_messages(church_id, thread_id, created_at);
 
+-- Map chat thread ids (TEXT) -> LangGraph thread ids (UUID required by /threads/<id>/runs/stream)
+CREATE TABLE IF NOT EXISTS chat_thread_langgraph_map (
+  church_id TEXT NOT NULL,
+  thread_id TEXT NOT NULL,
+  langgraph_thread_id TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (church_id, thread_id),
+  FOREIGN KEY (thread_id) REFERENCES chat_threads(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_chat_thread_langgraph_map ON chat_thread_langgraph_map(church_id, langgraph_thread_id);
+
 -- Public-facing discoverables
 CREATE TABLE IF NOT EXISTS services (
   id TEXT PRIMARY KEY,
