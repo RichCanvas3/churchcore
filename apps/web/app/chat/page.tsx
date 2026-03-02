@@ -17,6 +17,7 @@ import { MemoryManagerPanel } from "./MemoryManagerPanel";
 import { GuidePanel } from "./GuidePanel";
 import { ChurchOverviewPanel } from "./ChurchOverviewPanel";
 import { StrategicIntentPanel } from "./StrategicIntentPanel";
+import { CalendarPanel } from "./CalendarPanel";
 import styles from "./ChatLayout.module.css";
 
 type ThreadMeta = { id: string; title: string; status: string; updatedAt?: string; createdAt?: string };
@@ -224,6 +225,49 @@ export default function ChatPage() {
     const text = typeof props?.text === "string" ? props.text : "";
     if (!text) return null;
 
+    function renderTextWithLinks(raw: string) {
+      const s = String(raw ?? "");
+      if (!s) return null;
+      const urlRe = /(https?:\/\/[^\s<>"']+)/g;
+      const out: React.ReactNode[] = [];
+      let lastIdx = 0;
+      for (;;) {
+        const m = urlRe.exec(s);
+        if (!m) break;
+        const idx = m.index;
+        if (idx > lastIdx) out.push(<span key={`t-${lastIdx}`}>{s.slice(lastIdx, idx)}</span>);
+
+        let url = String(m[1] ?? "");
+        // Trim common trailing punctuation that isn't part of URLs.
+        const trailing: string[] = [];
+        while (url && /[)\],.!?:;]$/.test(url)) {
+          trailing.unshift(url.slice(-1));
+          url = url.slice(0, -1);
+        }
+
+        if (url) {
+          out.push(
+            <a
+              key={`a-${idx}`}
+              href={url}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ color: "#2563eb", textDecoration: "underline", fontWeight: 700 }}
+            >
+              {url}
+            </a>,
+          );
+        } else {
+          out.push(<span key={`a-${idx}`}>{String(m[1] ?? "")}</span>);
+        }
+
+        if (trailing.length) out.push(<span key={`p-${idx}`}>{trailing.join("")}</span>);
+        lastIdx = idx + String(m[1] ?? "").length;
+      }
+      if (lastIdx < s.length) out.push(<span key={`t-${lastIdx}`}>{s.slice(lastIdx)}</span>);
+      return out.length ? out : s;
+    }
+
     // Replace inline {"type":"ui_tool","tool_id":"kids_checkin"} snippets with buttons.
     const re = /\{\s*"type"\s*:\s*"ui_tool"\s*,\s*"tool_id"\s*:\s*"([^"]+)"\s*\}/g;
     const parts: Array<{ kind: "text"; value: string } | { kind: "tool"; toolId: string }> = [];
@@ -238,17 +282,19 @@ export default function ChatPage() {
     }
     if (last < text.length) parts.push({ kind: "text", value: text.slice(last) });
     const textStyle: React.CSSProperties = { whiteSpace: "pre-wrap", overflowWrap: "anywhere", wordBreak: "break-word" };
-    if (parts.length <= 1) return <span style={textStyle}>{text}</span>;
+    if (parts.length <= 1) return <span style={textStyle}>{renderTextWithLinks(text)}</span>;
 
     return (
       <span style={textStyle}>
         {parts.map((p, i) => {
-          if (p.kind === "text") return <span key={i}>{p.value}</span>;
+          if (p.kind === "text") return <span key={i}>{renderTextWithLinks(p.value)}</span>;
           const title =
             p.toolId === "kids_checkin"
               ? "Kids check-in"
               : p.toolId === "household_manager"
                 ? "Household"
+                : p.toolId === "calendar"
+                  ? "Calendar"
                 : p.toolId === "faith_journey"
                   ? "Faith journey"
                   : p.toolId === "identity_contact"
@@ -935,6 +981,18 @@ export default function ChatPage() {
               />
             ) : activeUiToolId === "strategic_intent" ? (
               <StrategicIntentPanel
+                identity={{
+                  tenant_id: identity.tenant_id,
+                  user_id: identity.user_id,
+                  role: identity.role,
+                  campus_id: identity.campus_id ?? null,
+                  timezone: identity.timezone ?? null,
+                  persona_id: (identity as any).persona_id ?? null,
+                }}
+                onClose={closeTool}
+              />
+            ) : activeUiToolId === "calendar" ? (
+              <CalendarPanel
                 identity={{
                   tenant_id: identity.tenant_id,
                   user_id: identity.user_id,

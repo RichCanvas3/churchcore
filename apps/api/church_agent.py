@@ -91,6 +91,29 @@ def _ui_handoff_for_user_text(user_text: str) -> list[dict[str, Any]]:
             }
         ]
 
+    calendarish = any(
+        k in u
+        for k in [
+            "events calendar",
+            "event calendar",
+            "calendar of events",
+            "show calendar",
+            "show me the calendar",
+            "calendar view",
+            "weekly calendar",
+            "week calendar",
+        ]
+    ) or ("calendar" in u and "event" in u)
+    if calendarish:
+        return [
+            {
+                "type": "ui_tool",
+                "tool_id": "calendar",
+                "title": "Calendar",
+                "instructions": "Open the events calendar panel.",
+            }
+        ]
+
     intentish = any(
         k in u
         for k in [
@@ -871,6 +894,7 @@ async def handle_seeker_skill(
             "Client UI tools available (use handoff items when helpful):\n"
             "- church_overview: show church overview (logo, campuses, service times).\n"
             "- strategic_intent: show purpose/vision/mission/strategy (church strategic intent).\n"
+            "- calendar: show events calendar (week view, with outdoor weather).\n"
             "- household_manager: manage household members (add/edit/remove kids, allergies, special needs).\n"
             "- kids_checkin: run kids check-in flow (find family, preview rooms, commit check-in).\n"
             "- guide: show journey position + next steps + resources.\n"
