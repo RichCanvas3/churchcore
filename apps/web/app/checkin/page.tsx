@@ -28,6 +28,7 @@ export default function CheckinPage() {
       role: demo.role,
       campus_id: demo.campus_id,
       timezone: demo.timezone,
+      persona_id: (demo as any).persona_id,
     }),
     [demo],
   );

@@ -158,7 +158,7 @@ export default function ChatPage() {
         role: identity.role,
         campus_id: identity.campus_id ?? undefined,
         timezone: identity.timezone ?? undefined,
-        persona_id: null,
+        persona_id: (identity as any).persona_id ?? null,
       },
       include_archived: false,
     });
@@ -329,7 +329,7 @@ export default function ChatPage() {
         role: identity.role,
         campus_id: identity.campus_id ?? undefined,
         timezone: identity.timezone ?? undefined,
-        persona_id: null,
+        persona_id: (identity as any).persona_id ?? null,
       },
       title: "New topic",
     });
@@ -345,7 +345,7 @@ export default function ChatPage() {
         role: identity.role,
         campus_id: identity.campus_id ?? undefined,
         timezone: identity.timezone ?? undefined,
-        persona_id: null,
+        persona_id: (identity as any).persona_id ?? null,
       },
       thread_id: threadId,
     });
@@ -366,7 +366,7 @@ export default function ChatPage() {
           role: identity.role,
           campus_id: identity.campus_id ?? undefined,
           timezone: identity.timezone ?? undefined,
-          persona_id: null,
+          persona_id: (identity as any).persona_id ?? null,
         },
         thread_id: threadId,
         title,
@@ -396,7 +396,7 @@ export default function ChatPage() {
               role: identity.role,
               campus_id: identity.campus_id ?? undefined,
               timezone: identity.timezone ?? undefined,
-              persona_id: null,
+              persona_id: (identity as any).persona_id ?? null,
             },
             thread_id: threadId,
             limit: 200,
@@ -802,7 +802,7 @@ export default function ChatPage() {
                   role: identity.role,
                   campus_id: identity.campus_id ?? null,
                   timezone: identity.timezone ?? null,
-                  persona_id: null,
+                  persona_id: (identity as any).persona_id ?? null,
                 }}
                 onClose={closeTool}
               />
@@ -825,7 +825,7 @@ export default function ChatPage() {
                   role: identity.role,
                   campus_id: identity.campus_id ?? null,
                   timezone: identity.timezone ?? null,
-                  persona_id: null,
+                  persona_id: (identity as any).persona_id ?? null,
                 }}
                 onClose={closeTool}
                 onOpenTool={(toolId) => setActiveUiToolId(toolId)}
@@ -838,7 +838,7 @@ export default function ChatPage() {
                   role: identity.role,
                   campus_id: identity.campus_id ?? null,
                   timezone: identity.timezone ?? null,
-                  persona_id: null,
+                  persona_id: (identity as any).persona_id ?? null,
                 }}
                 onClose={closeTool}
               />
@@ -850,7 +850,7 @@ export default function ChatPage() {
                   role: identity.role,
                   campus_id: identity.campus_id ?? null,
                   timezone: identity.timezone ?? null,
-                  persona_id: null,
+                  persona_id: (identity as any).persona_id ?? null,
                 }}
                 onClose={closeTool}
               />
@@ -862,7 +862,7 @@ export default function ChatPage() {
                   role: identity.role,
                   campus_id: identity.campus_id ?? null,
                   timezone: identity.timezone ?? null,
-                  persona_id: null,
+                  persona_id: (identity as any).persona_id ?? null,
                 }}
                 onClose={closeTool}
               />
@@ -874,7 +874,7 @@ export default function ChatPage() {
                   role: identity.role,
                   campus_id: identity.campus_id ?? null,
                   timezone: identity.timezone ?? null,
-                  persona_id: null,
+                  persona_id: (identity as any).persona_id ?? null,
                 }}
                 onClose={closeTool}
               />
@@ -886,7 +886,7 @@ export default function ChatPage() {
                   role: identity.role,
                   campus_id: identity.campus_id ?? null,
                   timezone: identity.timezone ?? null,
-                  persona_id: null,
+                  persona_id: (identity as any).persona_id ?? null,
                 }}
                 onClose={closeTool}
               />
@@ -898,7 +898,7 @@ export default function ChatPage() {
                   role: identity.role,
                   campus_id: identity.campus_id ?? null,
                   timezone: identity.timezone ?? null,
-                  persona_id: null,
+                  persona_id: (identity as any).persona_id ?? null,
                 }}
                 onClose={closeTool}
               />
@@ -910,7 +910,7 @@ export default function ChatPage() {
                   role: identity.role,
                   campus_id: identity.campus_id ?? null,
                   timezone: identity.timezone ?? null,
-                  persona_id: null,
+                  persona_id: (identity as any).persona_id ?? null,
                 }}
                 onClose={closeTool}
                 onOpenTool={(toolId: string) => setActiveUiToolId(toolId)}
@@ -923,7 +923,7 @@ export default function ChatPage() {
                   role: identity.role,
                   campus_id: identity.campus_id ?? null,
                   timezone: identity.timezone ?? null,
-                  persona_id: null,
+                  persona_id: (identity as any).persona_id ?? null,
                 }}
                 onClose={closeTool}
                 onOpenTool={(toolId: string) => setActiveUiToolId(toolId)}
@@ -936,7 +936,7 @@ export default function ChatPage() {
                   role: identity.role,
                   campus_id: identity.campus_id ?? null,
                   timezone: identity.timezone ?? null,
-                  persona_id: null,
+                  persona_id: (identity as any).persona_id ?? null,
                 }}
                 onClose={closeTool}
               />
