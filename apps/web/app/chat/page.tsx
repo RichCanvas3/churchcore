@@ -18,6 +18,7 @@ import { GuidePanel } from "./GuidePanel";
 import { ChurchOverviewPanel } from "./ChurchOverviewPanel";
 import { StrategicIntentPanel } from "./StrategicIntentPanel";
 import { CalendarPanel } from "./CalendarPanel";
+import { BibleReaderPanel } from "./BibleReaderPanel";
 import styles from "./ChatLayout.module.css";
 
 type ThreadMeta = { id: string; title: string; status: string; updatedAt?: string; createdAt?: string };
@@ -79,6 +80,7 @@ export default function ChatPage() {
   const [renaming, setRenaming] = useState(false);
   const [uiError, setUiError] = useState<string | null>(null);
   const [activeUiToolId, setActiveUiToolId] = useState<string | null>(null);
+  const [activeUiToolArgs, setActiveUiToolArgs] = useState<Record<string, unknown> | null>(null);
   const [leftCollapsed, setLeftCollapsed] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [isThreadsOpenMobile, setIsThreadsOpenMobile] = useState(false);
@@ -86,8 +88,14 @@ export default function ChatPage() {
 
   const closeTool = () => {
     setActiveUiToolId(null);
+    setActiveUiToolArgs(null);
     setIsToolsOpenMobile(false);
   };
+
+  function openTool(toolId: string, args?: Record<string, unknown> | null) {
+    setActiveUiToolId(toolId);
+    setActiveUiToolArgs(args ?? null);
+  }
 
   useEffect(() => {
     const mq = window.matchMedia("(max-width: 768px)");
@@ -200,7 +208,7 @@ export default function ChatPage() {
     const label = props.title || props.toolId;
     return (
       <button
-        onClick={() => setActiveUiToolId(props.toolId)}
+        onClick={() => openTool(props.toolId)}
         style={{
           border: variant === "cta" ? "1px solid #0f172a" : "1px solid #cbd5e1",
           background: variant === "cta" ? "#0f172a" : "#f8fafc",
@@ -229,42 +237,85 @@ export default function ChatPage() {
       const s = String(raw ?? "");
       if (!s) return null;
       const urlRe = /(https?:\/\/[^\s<>"']+)/g;
+      const scriptureRe =
+        /\b(?:[1-3]\s*)?[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\s+\d{1,3}:\d{1,3}(?:[-–—]\d{1,3})?(?:,\s*\d{1,3}(?:[-–—]\d{1,3})?)*\b/g;
+
       const out: React.ReactNode[] = [];
-      let lastIdx = 0;
+
+      const reset = () => {
+        urlRe.lastIndex = 0;
+        scriptureRe.lastIndex = 0;
+      };
+      reset();
+
+      let i = 0;
       for (;;) {
-        const m = urlRe.exec(s);
-        if (!m) break;
-        const idx = m.index;
-        if (idx > lastIdx) out.push(<span key={`t-${lastIdx}`}>{s.slice(lastIdx, idx)}</span>);
+        urlRe.lastIndex = i;
+        scriptureRe.lastIndex = i;
+        const mu = urlRe.exec(s);
+        const ms = scriptureRe.exec(s);
+        const nu = mu ? mu.index : -1;
+        const ns = ms ? ms.index : -1;
+        if (nu === -1 && ns === -1) break;
 
-        let url = String(m[1] ?? "");
-        // Trim common trailing punctuation that isn't part of URLs.
-        const trailing: string[] = [];
-        while (url && /[)\],.!?:;]$/.test(url)) {
-          trailing.unshift(url.slice(-1));
-          url = url.slice(0, -1);
-        }
+        const pick = nu !== -1 && (ns === -1 || nu < ns) ? ("url" as const) : ("scripture" as const);
+        const idx = pick === "url" ? nu : ns;
+        const m = pick === "url" ? mu! : ms!;
+        if (idx > i) out.push(<span key={`t-${i}`}>{s.slice(i, idx)}</span>);
 
-        if (url) {
-          out.push(
-            <a
-              key={`a-${idx}`}
-              href={url}
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{ color: "#2563eb", textDecoration: "underline", fontWeight: 700 }}
-            >
-              {url}
-            </a>,
-          );
+        if (pick === "url") {
+          let url = String(m[1] ?? "");
+          // Trim common trailing punctuation that isn't part of URLs.
+          const trailing: string[] = [];
+          while (url && /[)\],.!?:;]$/.test(url)) {
+            trailing.unshift(url.slice(-1));
+            url = url.slice(0, -1);
+          }
+          if (url) {
+            out.push(
+              <a
+                key={`a-${idx}`}
+                href={url}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ color: "#2563eb", textDecoration: "underline", fontWeight: 700 }}
+              >
+                {url}
+              </a>,
+            );
+          } else {
+            out.push(<span key={`a-${idx}`}>{String(m[1] ?? "")}</span>);
+          }
+          if (trailing.length) out.push(<span key={`p-${idx}`}>{trailing.join("")}</span>);
         } else {
-          out.push(<span key={`a-${idx}`}>{String(m[1] ?? "")}</span>);
+          const ref = String(m[0] ?? "").trim();
+          out.push(
+            <button
+              key={`s-${idx}`}
+              type="button"
+              onClick={() => openTool("bible_reader", { ref })}
+              style={{
+                border: "1px solid #cbd5e1",
+                background: "#eef2ff",
+                color: "#1e3a8a",
+                borderRadius: 999,
+                padding: "2px 8px",
+                cursor: "pointer",
+                fontSize: 12,
+                fontWeight: 900,
+                lineHeight: 1.4,
+              }}
+              title={`Read ${ref}`}
+            >
+              {ref}
+            </button>,
+          );
         }
 
-        if (trailing.length) out.push(<span key={`p-${idx}`}>{trailing.join("")}</span>);
-        lastIdx = idx + String(m[1] ?? "").length;
+        i = idx + String(m[0] ?? "").length;
       }
-      if (lastIdx < s.length) out.push(<span key={`t-${lastIdx}`}>{s.slice(lastIdx)}</span>);
+
+      if (i < s.length) out.push(<span key={`t-${i}`}>{s.slice(i)}</span>);
       return out.length ? out : s;
     }
 
@@ -295,6 +346,8 @@ export default function ChatPage() {
                 ? "Household"
                 : p.toolId === "calendar"
                   ? "Calendar"
+                  : p.toolId === "bible_reader"
+                    ? "Bible"
                 : p.toolId === "faith_journey"
                   ? "Faith journey"
                   : p.toolId === "identity_contact"
@@ -879,7 +932,7 @@ export default function ChatPage() {
                   persona_id: (identity as any).persona_id ?? null,
                 }}
                 onClose={closeTool}
-                onOpenTool={(toolId) => setActiveUiToolId(toolId)}
+                onOpenTool={(toolId) => openTool(toolId)}
               />
             ) : activeUiToolId === "faith_journey" ? (
               <FaithJourneyPanel
@@ -964,7 +1017,7 @@ export default function ChatPage() {
                   persona_id: (identity as any).persona_id ?? null,
                 }}
                 onClose={closeTool}
-                onOpenTool={(toolId: string) => setActiveUiToolId(toolId)}
+                onOpenTool={(toolId: string) => openTool(toolId)}
               />
             ) : activeUiToolId === "church_overview" ? (
               <ChurchOverviewPanel
@@ -977,7 +1030,7 @@ export default function ChatPage() {
                   persona_id: (identity as any).persona_id ?? null,
                 }}
                 onClose={closeTool}
-                onOpenTool={(toolId: string) => setActiveUiToolId(toolId)}
+                onOpenTool={(toolId: string) => openTool(toolId)}
               />
             ) : activeUiToolId === "strategic_intent" ? (
               <StrategicIntentPanel
@@ -1001,6 +1054,19 @@ export default function ChatPage() {
                   timezone: identity.timezone ?? null,
                   persona_id: (identity as any).persona_id ?? null,
                 }}
+                onClose={closeTool}
+              />
+            ) : activeUiToolId === "bible_reader" ? (
+              <BibleReaderPanel
+                identity={{
+                  tenant_id: identity.tenant_id,
+                  user_id: identity.user_id,
+                  role: identity.role,
+                  campus_id: identity.campus_id ?? null,
+                  timezone: identity.timezone ?? null,
+                  persona_id: (identity as any).persona_id ?? null,
+                }}
+                initialRef={typeof (activeUiToolArgs as any)?.ref === "string" ? String((activeUiToolArgs as any).ref) : null}
                 onClose={closeTool}
               />
             ) : (

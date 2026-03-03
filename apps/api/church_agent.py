@@ -974,6 +974,7 @@ async def handle_seeker_skill(
             "- church_overview: show church overview (logo, campuses, service times).\n"
             "- strategic_intent: show purpose/vision/mission/strategy (church strategic intent).\n"
             "- calendar: show events calendar (week view, with outdoor weather).\n"
+            "- bible_reader: read Bible passages (WEB text in-panel, NIV link).\n"
             "- household_manager: manage household members (add/edit/remove kids, allergies, special needs).\n"
             "- kids_checkin: run kids check-in flow (find family, preview rooms, commit check-in).\n"
             "- guide: show journey position + next steps + resources.\n"
@@ -1004,6 +1005,24 @@ async def handle_seeker_skill(
         txt = getattr(r, "content", "") if r else ""
         out_text = str(txt or "").strip() or "How can I help?"
         ui_handoff = _ui_handoff_for_user_text(user)
+
+        # If the assistant recommends scripture references, offer the Bible reader tool.
+        # (UI also auto-links refs, but this makes the right panel discoverable.)
+        try:
+            scripture_re = r"\b(?:[1-3]\s*)?[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\s+\d{1,3}:\d{1,3}(?:[-–—]\d{1,3})?(?:,\s*\d{1,3}(?:[-–—]\d{1,3})?)*\b"
+            has_scripture = bool(__import__("re").search(scripture_re, out_text or ""))
+        except Exception:
+            has_scripture = False
+        if has_scripture and not any(isinstance(h, dict) and h.get("type") == "ui_tool" and h.get("tool_id") == "bible_reader" for h in ui_handoff):
+            ui_handoff = [
+                *ui_handoff,
+                {
+                    "type": "ui_tool",
+                    "tool_id": "bible_reader",
+                    "title": "Bible",
+                    "instructions": "Open the Bible reader for recommended passages.",
+                },
+            ]
         memory_ops: list[dict[str, Any]] = []
         if _should_propose_memory_ops(user):
             try:

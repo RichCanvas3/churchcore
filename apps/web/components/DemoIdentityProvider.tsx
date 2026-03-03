@@ -12,6 +12,7 @@ export type DemoIdentity = {
 };
 
 const STORAGE_KEY = "churchcore.demo_identity.v1";
+const CAMPUSES = new Set(["campus_boulder", "campus_erie", "campus_thornton"]);
 
 const Noah: DemoIdentity = {
   tenant_id: "calvarybible",
@@ -50,11 +51,13 @@ function readStored(): DemoIdentity | null {
     if (!j || typeof j !== "object") return null;
     if (j.user_id !== Noah.user_id && j.user_id !== Ava.user_id) return null;
     const uid = String(j.user_id);
+    const campusRaw = typeof (j as any).campus_id === "string" ? String((j as any).campus_id) : "";
+    const campus_id = CAMPUSES.has(campusRaw) ? campusRaw : "campus_boulder";
     return {
       tenant_id: "calvarybible",
       user_id: uid,
       role: "seeker",
-      campus_id: "campus_boulder",
+      campus_id,
       persona_id: PERSONA_BY_USER[uid] ?? undefined,
       timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
     };
@@ -76,17 +79,19 @@ export function DemoIdentityProvider(props: { children: React.ReactNode }) {
 
   function setIdentity(next: DemoIdentity) {
     const uid = String(next.user_id);
+    const campusRaw = typeof next.campus_id === "string" ? String(next.campus_id) : "";
+    const campus_id = CAMPUSES.has(campusRaw) ? campusRaw : "campus_boulder";
     const normalized: DemoIdentity = {
       tenant_id: "calvarybible",
       user_id: uid,
       role: "seeker",
-      campus_id: "campus_boulder",
+      campus_id,
       persona_id: PERSONA_BY_USER[uid] ?? undefined,
       timezone: next.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
     };
     setIdentityState(normalized);
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ user_id: normalized.user_id }));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ user_id: normalized.user_id, campus_id: normalized.campus_id }));
       window.dispatchEvent(new Event("churchcore-demo-identity-changed"));
     } catch {
       // ignore

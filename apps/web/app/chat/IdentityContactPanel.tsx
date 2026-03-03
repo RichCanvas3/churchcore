@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useDemoIdentity } from "../../components/DemoIdentityProvider";
 
 type Identity = {
   tenant_id: string;
@@ -33,6 +34,7 @@ function asStr(v: unknown) {
 
 export function IdentityContactPanel(props: { identity: Identity; onClose: () => void }) {
   const { identity, onClose } = props;
+  const { identity: demoIdentity, setIdentity } = useDemoIdentity();
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -46,6 +48,7 @@ export function IdentityContactPanel(props: { identity: Identity; onClose: () =>
   const [preferredName, setPreferredName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
+  const [campusId, setCampusId] = useState<string>("campus_boulder");
 
   const btn = useMemo(
     () => ({
@@ -72,6 +75,8 @@ export function IdentityContactPanel(props: { identity: Identity; onClose: () =>
       setPreferredName(asStr(i?.preferredName));
       setEmail(asStr(c?.email));
       setPhone(asStr(c?.phone));
+      const memCampus = asStr(i?.campusId);
+      setCampusId(memCampus || (demoIdentity.campus_id ?? identity.campus_id ?? "campus_boulder"));
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Failed to load memory");
     } finally {
@@ -93,6 +98,7 @@ export function IdentityContactPanel(props: { identity: Identity; onClose: () =>
     try {
       const ops = [
         { op: "set", path: "identity.preferredName", value: preferredName.trim() || null, visibility: "self" },
+        { op: "set", path: "identity.campusId", value: campusId.trim() || null, visibility: "self" },
         { op: "set", path: "contact.email", value: email.trim() || null, visibility: "self" },
         { op: "set", path: "contact.phone", value: phone.trim() || null, visibility: "self" },
       ];
@@ -134,6 +140,39 @@ export function IdentityContactPanel(props: { identity: Identity; onClose: () =>
           <div style={{ color: "#64748b" }}>Loading…</div>
         ) : (
           <>
+            <section style={{ background: "white", border: "1px solid #e2e8f0", borderRadius: 14, padding: 12, display: "grid", gap: 10 }}>
+              <div style={{ fontSize: 12, fontWeight: 900, color: "#0f172a" }}>Current campus</div>
+              <select
+                value={campusId}
+                onChange={async (e) => {
+                  const next = String(e.target.value || "campus_boulder");
+                  setCampusId(next);
+                  setIdentity({ ...demoIdentity, campus_id: next } as any);
+                  if (!canEdit) return;
+                  try {
+                    setSaving(true);
+                    await postJson("/api/a2a/memory/apply_ops", {
+                      identity,
+                      ops: [{ op: "set", path: "identity.campusId", value: next, visibility: "self" }],
+                    });
+                    await refresh();
+                  } catch (err) {
+                    setError(err instanceof Error ? err.message : "Failed to save campus");
+                  } finally {
+                    setSaving(false);
+                  }
+                }}
+                style={{ padding: "8px 10px", borderRadius: 10, border: "1px solid #e2e8f0", background: "white", fontWeight: 700 }}
+              >
+                <option value="campus_boulder">Boulder</option>
+                <option value="campus_erie">Erie</option>
+                <option value="campus_thornton">Thornton</option>
+              </select>
+              <div style={{ fontSize: 12, color: "#64748b" }}>
+                This affects service times, events, and check-in defaults for your current session.
+              </div>
+            </section>
+
             <section style={{ background: "white", border: "1px solid #e2e8f0", borderRadius: 14, padding: 12, display: "grid", gap: 10 }}>
               <div style={{ fontSize: 12, fontWeight: 900, color: "#0f172a" }}>Preferred name</div>
               <input

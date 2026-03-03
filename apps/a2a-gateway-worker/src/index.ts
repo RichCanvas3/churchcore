@@ -108,6 +108,13 @@ function agentCard(req: Request, env: Env) {
           tags: ["journey", "discipleship"],
           examples: ["What stage am I in?", "What are my next steps?"],
         },
+        {
+          id: "bible",
+          name: "Bible passages",
+          description: "Fetch public-domain Bible passage text (WEB/KJV) and provide outbound links to NIV.",
+          tags: ["bible", "scripture"],
+          examples: ["Ephesians 2:8-9", "John 3:16"],
+        },
       ],
       // Non-standard but helpful for clients integrating *this* gateway (not LangSmith A2A JSON-RPC).
       endpoints: {
@@ -124,6 +131,7 @@ function agentCard(req: Request, env: Env) {
         checkin_preview: `${baseUrl}a2a/checkin.preview`,
         checkin_commit: `${baseUrl}a2a/checkin.commit`,
         calendar_week: `${baseUrl}a2a/calendar.week`,
+        bible_passage: `${baseUrl}a2a/bible.passage`,
         journey_get_state: `${baseUrl}a2a/journey.get_state`,
         journey_next_steps: `${baseUrl}a2a/journey.next_steps`,
       },
@@ -157,6 +165,12 @@ const StrategicIntentsListSchema = z.object({
 const CalendarWeekSchema = z.object({
   identity: IdentitySchema,
   start: z.string().min(1).optional().nullable(), // YYYY-MM-DD
+});
+
+const BiblePassageSchema = z.object({
+  identity: IdentitySchema,
+  ref: z.string().min(1),
+  translation: z.enum(["web", "kjv"]).optional().nullable(),
 });
 
 async function parseJson(req: Request) {
@@ -1599,6 +1613,43 @@ async function handleCalendarWeek(req: Request, env: Env) {
   return json(schedule);
 }
 
+async function handleBiblePassage(req: Request, env: Env) {
+  const parsed = BiblePassageSchema.safeParse(await parseJson(req));
+  if (!parsed.success) return json({ error: "Invalid body", issues: parsed.error.issues }, { status: 400 });
+  // Auth is already enforced for POST routes by the worker.
+  const ref = String(parsed.data.ref ?? "").trim();
+  const translation = (parsed.data.translation ?? "web") as "web" | "kjv";
+  // bible-api.com expects refs like "Ephesians 2:8-9" URL-encoded.
+  const url = `https://bible-api.com/${encodeURIComponent(ref)}?translation=${encodeURIComponent(translation)}`;
+  const res = await fetch(url, { method: "GET", headers: { accept: "application/json" } });
+  const raw = await res.text().catch(() => "");
+  if (!res.ok) return json({ ok: false, error: `Bible API error (${res.status})`, detail: raw || "no body" }, { status: 502 });
+  const j = safeJsonParse(raw) as any;
+  const verses = Array.isArray(j?.verses) ? j.verses : [];
+  const normalizedVerses = verses
+    .filter((v: any) => v && typeof v === "object")
+    .map((v: any) => ({
+      book: typeof v.book_name === "string" ? v.book_name : null,
+      chapter: typeof v.chapter === "number" ? v.chapter : null,
+      verse: typeof v.verse === "number" ? v.verse : null,
+      text: typeof v.text === "string" ? v.text : "",
+    }))
+    .filter((v: any) => v.text);
+
+  const text =
+    typeof j?.text === "string"
+      ? String(j.text)
+      : normalizedVerses.map((v: any) => (v.verse != null ? `${v.verse} ${String(v.text).trim()}` : String(v.text).trim())).join("\n");
+
+  return json({
+    ok: true,
+    ref: typeof j?.reference === "string" ? String(j.reference) : ref,
+    translation,
+    text: String(text || "").trim(),
+    verses: normalizedVerses,
+  });
+}
+
 async function handleChurchGetOverview(req: Request, env: Env) {
   const parsed = ChurchOverviewSchema.safeParse(await parseJson(req));
   if (!parsed.success) return json({ error: "Invalid body", issues: parsed.error.issues }, { status: 400 });
@@ -2484,6 +2535,8 @@ export default {
         return handleCheckinCommit(req, env);
       case "/a2a/calendar.week":
         return handleCalendarWeek(req, env);
+      case "/a2a/bible.passage":
+        return handleBiblePassage(req, env);
       case "/a2a/memory.get":
         return handleMemoryGet(req, env);
       case "/a2a/memory.apply_ops":
