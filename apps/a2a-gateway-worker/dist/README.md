@@ -1,0 +1,1 @@
+This folder contains the built output assets for the worker "a2a-gateway-worker" generated at 2026-03-03T11:09:43.732Z.

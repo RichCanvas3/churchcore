@@ -19,6 +19,9 @@ type JourneyGetStateResponse = {
   person_id?: string;
   current_stage?: JourneyNode | null;
   stages?: Stage[];
+  stage_path?: Stage[];
+  next_stage_id?: string | null;
+  next_stage_requirements?: Array<{ node: JourneyNode; edgeType?: string; weight?: number }>;
   completed_node_ids?: string[];
   confidence?: number;
   error?: string;
@@ -27,6 +30,12 @@ type JourneyGetStateResponse = {
 type JourneyNextStepsResponse = {
   ok?: boolean;
   next_steps?: Array<{ node: JourneyNode; edgeType: string; score: number; why: string }>;
+  error?: string;
+};
+
+type MemoryGetResponse = {
+  ok?: boolean;
+  memory?: any;
   error?: string;
 };
 
@@ -49,23 +58,41 @@ export function FaithJourneyPanel(props: { identity: Identity; onClose: () => vo
   const [state, setState] = useState<JourneyGetStateResponse | null>(null);
   const [next, setNext] = useState<JourneyNextStepsResponse | null>(null);
   const [stageId, setStageId] = useState<string>("");
+  const [bdiSaving, setBdiSaving] = useState(false);
+  const [belief, setBelief] = useState<string[]>([]);
+  const [desire, setDesire] = useState<string[]>([]);
+  const [intent, setIntent] = useState<string[]>([]);
 
-  const stages = Array.isArray(state?.stages) ? state.stages : [];
+  const stages = Array.isArray(state?.stage_path) ? state.stage_path : Array.isArray(state?.stages) ? state.stages : [];
   const currentStage = state?.current_stage?.id ? String(state.current_stage.id) : "";
   const completedNodeIds = Array.isArray(state?.completed_node_ids) ? state.completed_node_ids : [];
   const completed = new Set<string>(completedNodeIds.map(String));
+  const nextStageId = state?.next_stage_id ? String(state.next_stage_id) : "";
+  const nextStageTitle = stages.find((s) => String(s.id) === nextStageId)?.title ?? "";
+  const nextReqs = Array.isArray(state?.next_stage_requirements) ? state!.next_stage_requirements! : [];
 
   async function refresh() {
     setLoading(true);
     setError(null);
     try {
-      const s = await postJson<JourneyGetStateResponse>("/api/a2a/journey/get_state", { identity });
+      const [s, n, m] = await Promise.all([
+        postJson<JourneyGetStateResponse>("/api/a2a/journey/get_state", { identity }),
+        postJson<JourneyNextStepsResponse>("/api/a2a/journey/next_steps", { identity, limit: 3 }),
+        postJson<MemoryGetResponse>("/api/a2a/memory/get", { identity }),
+      ]);
       if ((s as any)?.ok === false) throw new Error(String((s as any)?.error ?? "Failed to load"));
+      if ((n as any)?.ok === false) throw new Error(String((n as any)?.error ?? "Failed to load"));
+      if ((m as any)?.ok === false) throw new Error(String((m as any)?.error ?? "Failed to load"));
+
       setState(s);
       setStageId(String((s?.current_stage as any)?.id ?? ""));
-      const n = await postJson<JourneyNextStepsResponse>("/api/a2a/journey/next_steps", { identity, limit: 3 });
-      if ((n as any)?.ok === false) throw new Error(String((n as any)?.error ?? "Failed to load"));
       setNext(n);
+
+      const bdi = (m?.memory && typeof m.memory === "object" ? (m.memory as any)?.worldview?.bdi : null) as any;
+      const toStrArr = (v: any) => (Array.isArray(v) ? v.map((x) => String(x)).filter(Boolean) : []);
+      setBelief(toStrArr(bdi?.belief));
+      setDesire(toStrArr(bdi?.desire));
+      setIntent(toStrArr(bdi?.intent));
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Failed to load memory");
     } finally {
@@ -108,6 +135,29 @@ export function FaithJourneyPanel(props: { identity: Identity; onClose: () => vo
     }
   }
 
+  async function saveBdi() {
+    setBdiSaving(true);
+    setError(null);
+    try {
+      const ops = [
+        { op: "set", path: "worldview.bdi.belief", value: belief, visibility: "self" },
+        { op: "set", path: "worldview.bdi.desire", value: desire, visibility: "self" },
+        { op: "set", path: "worldview.bdi.intent", value: intent, visibility: "self" },
+      ];
+      await postJson("/api/a2a/memory/apply_ops", { identity, ops });
+      await refresh();
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Failed to save check-in");
+    } finally {
+      setBdiSaving(false);
+    }
+  }
+
+  function toggle(setter: (next: string[]) => void, cur: string[], value: string) {
+    const has = cur.includes(value);
+    setter(has ? cur.filter((x) => x !== value) : [...cur, value]);
+  }
+
   const btn = {
     border: "1px solid #0f172a",
     background: "#0f172a",
@@ -139,58 +189,209 @@ export function FaithJourneyPanel(props: { identity: Identity; onClose: () => vo
           <div style={{ color: "#64748b" }}>Loading…</div>
         ) : (
           <>
-            <section style={{ border: "1px solid #e2e8f0", borderRadius: 12, padding: 14 }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: "#0f172a", marginBottom: 10 }}>Phase</div>
+            <section style={{ border: "1px solid #e2e8f0", borderRadius: 12, padding: 14, background: "white" }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: "#0f172a", marginBottom: 10 }}>Stage path</div>
               <p style={{ fontSize: 12, color: "#64748b", margin: "0 0 10px 0" }}>
-                Your current stage in your faith journey. This helps the church support you well.
+                A simple map of the journey. Your current stage is highlighted; the next stage shows what to aim for.
               </p>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                {stages.map((p) => (
-                  <button
-                    key={p.id}
-                    type="button"
-                    onClick={() => setStageId(p.id)}
-                    style={{
-                      ...btn,
-                      background: currentStage === p.id ? "#0f172a" : stageId === p.id ? "#334155" : "#f1f5f9",
-                      color: currentStage === p.id || stageId === p.id ? "white" : "#0f172a",
-                      border: currentStage === p.id ? "2px solid #0f172a" : "1px solid #e2e8f0",
-                    }}
-                  >
-                    {p.title}
-                  </button>
-                ))}
+
+              <div style={{ display: "grid", gap: 8 }}>
+                {stages.map((p, idx) => {
+                  const id = String(p.id);
+                  const isCurrent = currentStage === id;
+                  const isSelected = stageId === id;
+                  const isBeforeCurrent = currentStage ? stages.findIndex((x) => String(x.id) === currentStage) > idx : false;
+                  return (
+                    <button
+                      key={id}
+                      type="button"
+                      onClick={() => setStageId(id)}
+                      style={{
+                        textAlign: "left",
+                        padding: "10px 12px",
+                        borderRadius: 12,
+                        border: isCurrent ? "2px solid #0f172a" : isSelected ? "2px solid #334155" : "1px solid #e2e8f0",
+                        background: isCurrent ? "#0f172a" : isSelected ? "#f1f5f9" : "white",
+                        color: isCurrent ? "white" : "#0f172a",
+                        cursor: "pointer",
+                      }}
+                    >
+                      <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "baseline" }}>
+                        <div style={{ fontWeight: 900 }}>
+                          {idx + 1}. {p.title}
+                        </div>
+                        <div style={{ fontSize: 12, color: isCurrent ? "#e2e8f0" : "#94a3b8" }}>{isCurrent ? "You are here" : isBeforeCurrent ? "Earlier" : ""}</div>
+                      </div>
+                      {p.summary ? <div style={{ marginTop: 4, fontSize: 12, color: isCurrent ? "#e2e8f0" : "#64748b" }}>{p.summary}</div> : null}
+                    </button>
+                  );
+                })}
               </div>
+
               {stageId && stageId !== currentStage && (
                 <button type="button" onClick={() => void saveStage()} disabled={saving} style={{ ...btn, marginTop: 10 }}>
-                  {saving ? "Saving…" : "Save phase"}
+                  {saving ? "Saving…" : "Set my current stage"}
                 </button>
               )}
+            </section>
+
+            {nextStageId && nextReqs.length ? (
+              <section style={{ border: "1px solid #e2e8f0", borderRadius: 12, padding: 14, background: "white" }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: "#0f172a", marginBottom: 10 }}>To reach the next stage</div>
+                <p style={{ fontSize: 12, color: "#64748b", margin: "0 0 10px 0" }}>
+                  Target: <strong>{nextStageTitle || nextStageId}</strong>
+                </p>
+                <div style={{ display: "grid", gap: 10 }}>
+                  {nextReqs.map((r, idx) => {
+                    const nodeId = String((r as any)?.node?.id ?? "");
+                    const title = String((r as any)?.node?.title ?? "");
+                    const type = String((r as any)?.node?.type ?? "");
+                    const done = nodeId ? completed.has(nodeId) : false;
+                    return (
+                      <div key={idx} style={{ border: "1px solid #e2e8f0", borderRadius: 12, padding: 12, background: done ? "#f1f5f9" : "#f8fafc" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "baseline" }}>
+                          <div style={{ fontWeight: 900, color: "#0f172a" }}>{title}</div>
+                          <div style={{ fontSize: 12, color: "#64748b" }}>{type}</div>
+                        </div>
+                        <div style={{ marginTop: 10, display: "flex", gap: 8, alignItems: "center" }}>
+                          <button
+                            type="button"
+                            disabled={saving || done || !nodeId}
+                            onClick={() => void markComplete(nodeId)}
+                            style={{ ...btn, opacity: saving || done ? 0.7 : 1 }}
+                          >
+                            {done ? "Completed" : "Mark complete"}
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
+            ) : null}
+
+            <section style={{ border: "1px solid #e2e8f0", borderRadius: 12, padding: 14, background: "white" }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: "#0f172a", marginBottom: 10 }}>Truth · Longing · Next action</div>
+              <p style={{ fontSize: 12, color: "#64748b", margin: "0 0 10px 0" }}>
+                A quick check-in so your next steps fit what you actually believe, want, and intend right now.
+              </p>
+
+              {(
+                [
+                  {
+                    title: "Belief (Truth)",
+                    values: belief,
+                    set: setBelief,
+                    options: ["I’m not sure what the gospel is", "I want to know if I can be forgiven", "I trust the Bible is God’s word", "I believe Jesus rose from the dead"],
+                  },
+                  {
+                    title: "Desire (Longing)",
+                    values: desire,
+                    set: setDesire,
+                    options: ["Clarity about God / faith", "Community / relationships", "Peace / assurance", "Help with change / habits"],
+                  },
+                  {
+                    title: "Intent (This week)",
+                    values: intent,
+                    set: setIntent,
+                    options: ["Read a short passage this week", "Attend a Sunday gathering", "Join a group", "Talk with a Guide"],
+                  },
+                ] as const
+              ).map((g) => (
+                <div key={g.title} style={{ marginTop: 10 }}>
+                  <div style={{ fontSize: 12, fontWeight: 900, color: "#0f172a", marginBottom: 8 }}>{g.title}</div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                    {g.options.map((opt) => {
+                      const on = g.values.includes(opt);
+                      return (
+                        <button
+                          key={opt}
+                          type="button"
+                          onClick={() => toggle(g.set, g.values, opt)}
+                          style={{
+                            borderRadius: 999,
+                            padding: "7px 10px",
+                            border: on ? "2px solid #0f172a" : "1px solid #e2e8f0",
+                            background: on ? "#0f172a" : "#f8fafc",
+                            color: on ? "white" : "#0f172a",
+                            fontSize: 12,
+                            fontWeight: 700,
+                            cursor: "pointer",
+                          }}
+                        >
+                          {opt}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+
+              <button type="button" onClick={() => void saveBdi()} disabled={bdiSaving} style={{ ...btn, marginTop: 12 }}>
+                {bdiSaving ? "Saving…" : "Save check-in"}
+              </button>
             </section>
 
             <section style={{ border: "1px solid #e2e8f0", borderRadius: 12, padding: 14, background: "white" }}>
               <div style={{ fontSize: 12, fontWeight: 700, color: "#0f172a", marginBottom: 10 }}>Next steps</div>
               <p style={{ fontSize: 12, color: "#64748b", margin: "0 0 10px 0" }}>Small, concrete steps tied to your current stage.</p>
               {Array.isArray(next?.next_steps) && next!.next_steps!.length ? (
-                <div style={{ display: "grid", gap: 10 }}>
-                  {next!.next_steps!.map((s, idx) => {
-                    const nodeId = String((s as any)?.node?.id ?? "");
-                    const title = String((s as any)?.node?.title ?? "");
-                    const type = String((s as any)?.node?.type ?? "");
-                    const why = String((s as any)?.why ?? "");
-                    const done = nodeId ? completed.has(nodeId) : false;
+                <div style={{ display: "grid", gap: 12 }}>
+                  {(
+                    [
+                      {
+                        title: "Truth (Belief)",
+                        hint: "Learn and clarify what Christianity teaches.",
+                        filter: (t: string) => ["DoctrineTopic", "Resource"].includes(t),
+                      },
+                      {
+                        title: "Practice (Intent)",
+                        hint: "Small actions that build spiritual rhythms.",
+                        filter: (t: string) => ["Practice", "Milestone"].includes(t),
+                      },
+                      {
+                        title: "Support (Optional)",
+                        hint: "Help from people and next steps with the church.",
+                        filter: (t: string) => ["ActionStep", "Community"].includes(t),
+                      },
+                    ] as const
+                  ).map((group) => {
+                    const items = next!.next_steps!.filter((s) => group.filter(String((s as any)?.node?.type ?? "")));
+                    if (!items.length) return null;
                     return (
-                      <div key={idx} style={{ border: "1px solid #e2e8f0", borderRadius: 12, padding: 12, background: "#f8fafc" }}>
-                        <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "baseline" }}>
-                          <div style={{ fontWeight: 900, color: "#0f172a" }}>{title}</div>
-                          <div style={{ fontSize: 12, color: "#64748b" }}>{type}</div>
+                      <div key={group.title} style={{ display: "grid", gap: 8 }}>
+                        <div style={{ display: "grid", gap: 2 }}>
+                          <div style={{ fontSize: 12, fontWeight: 900, color: "#0f172a" }}>{group.title}</div>
+                          <div style={{ fontSize: 12, color: "#64748b" }}>{group.hint}</div>
                         </div>
-                        {why ? <div style={{ marginTop: 6, fontSize: 12, color: "#64748b" }}>{why}</div> : null}
-                        <div style={{ marginTop: 10, display: "flex", gap: 8, alignItems: "center" }}>
-                          <button type="button" disabled={saving || done || !nodeId} onClick={() => void markComplete(nodeId)} style={{ ...btn, opacity: saving || done ? 0.7 : 1 }}>
-                            {done ? "Completed" : "Mark complete"}
-                          </button>
-                          {nodeId ? <span style={{ fontSize: 12, color: "#94a3b8" }}>{nodeId}</span> : null}
+                        <div style={{ display: "grid", gap: 10 }}>
+                          {items.map((s, idx) => {
+                            const nodeId = String((s as any)?.node?.id ?? "");
+                            const title = String((s as any)?.node?.title ?? "");
+                            const type = String((s as any)?.node?.type ?? "");
+                            const why = String((s as any)?.why ?? "");
+                            const done = nodeId ? completed.has(nodeId) : false;
+                            return (
+                              <div key={`${group.title}-${idx}-${nodeId}`} style={{ border: "1px solid #e2e8f0", borderRadius: 12, padding: 12, background: "#f8fafc" }}>
+                                <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "baseline" }}>
+                                  <div style={{ fontWeight: 900, color: "#0f172a" }}>{title}</div>
+                                  <div style={{ fontSize: 12, color: "#64748b" }}>{type}</div>
+                                </div>
+                                {why ? <div style={{ marginTop: 6, fontSize: 12, color: "#64748b" }}>{why}</div> : null}
+                                <div style={{ marginTop: 10, display: "flex", gap: 8, alignItems: "center" }}>
+                                  <button
+                                    type="button"
+                                    disabled={saving || done || !nodeId}
+                                    onClick={() => void markComplete(nodeId)}
+                                    style={{ ...btn, opacity: saving || done ? 0.7 : 1 }}
+                                  >
+                                    {done ? "Completed" : "Mark complete"}
+                                  </button>
+                                  {nodeId ? <span style={{ fontSize: 12, color: "#94a3b8" }}>{nodeId}</span> : null}
+                                </div>
+                              </div>
+                            );
+                          })}
                         </div>
                       </div>
                     );

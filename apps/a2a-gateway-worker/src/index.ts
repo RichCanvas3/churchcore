@@ -705,11 +705,33 @@ async function handleJourneyGetState(req: Request, env: Env) {
     if (resolved) currentStageEntities.push({ ...resolved, relevance: l.relevance, metadata: l.metadata ?? null });
   }
 
+  // Provide explicit stage path + next-stage requirements for UI visualization.
+  const currentEdges = await listJourneyEdgesFrom(env, { churchId, fromNodeId: currentStageId });
+  const nextStageEdge = currentEdges
+    .filter((e) => String(e.edgeType) === "NEXT_STAGE")
+    .sort((a, b) => (b.weight ?? 0) - (a.weight ?? 0) || String(a.toNodeId).localeCompare(String(b.toNodeId)))[0];
+  const nextStageId = nextStageEdge?.toNodeId ? String(nextStageEdge.toNodeId) : null;
+
+  const nextStageRequirements: any[] = [];
+  if (nextStageId) {
+    const nextEdges = await listJourneyEdgesFrom(env, { churchId, fromNodeId: nextStageId });
+    const reqs = nextEdges
+      .filter((e) => String(e.edgeType) === "REQUIRES")
+      .sort((a, b) => (b.weight ?? 0) - (a.weight ?? 0) || String(a.toNodeId).localeCompare(String(b.toNodeId)));
+    for (const e of reqs.slice(0, 12)) {
+      const node = await getJourneyNode(env, { churchId, nodeId: String(e.toNodeId) });
+      if (node) nextStageRequirements.push({ node, edgeType: "REQUIRES", weight: e.weight ?? 1.0 });
+    }
+  }
+
   return json({
     ok: true,
     person_id: personId,
     current_stage: currentStage,
     stages,
+    stage_path: stages,
+    next_stage_id: nextStageId,
+    next_stage_requirements: nextStageRequirements,
     completed_node_ids: Array.from(completed.completedNodeIds.values()),
     current_stage_docs: currentStageDocs,
     current_stage_entities: currentStageEntities,
@@ -735,7 +757,7 @@ async function handleJourneyNextSteps(req: Request, env: Env) {
   const personMemory = await getPersonMemory(env, { churchId, personId });
   const state = await ensurePersonJourneyState(env, { churchId, personId, personMemory: personMemory.memory ?? {} });
   const currentStageId = state.currentStageId ?? "stage_seeker";
-  const nextSteps = await computeJourneyNextSteps(env, { churchId, personId, currentStageId, limit });
+  const nextSteps = await computeJourneyNextSteps(env, { churchId, personId, currentStageId, limit, personMemory: personMemory.memory ?? {} });
 
   const enriched: any[] = [];
   for (const s of nextSteps as any[]) {
@@ -811,14 +833,93 @@ async function auditMemoryOps(env: Env, args: { churchId: string; personId: stri
 
 type JourneyStage = { id: string; title: string; summary: string | null };
 
+type JourneyEdgeRow = { fromNodeId: string; toNodeId: string; edgeType: string; weight: number };
+
+async function listJourneyEdgesByType(env: Env, args: { churchId: string; edgeType: string }) {
+  const rows = (
+    await env.churchcore
+      .prepare(
+        `SELECT from_node_id AS fromNodeId, to_node_id AS toNodeId, edge_type AS edgeType, weight
+         FROM journey_edge
+         WHERE church_id=?1 AND edge_type=?2`,
+      )
+      .bind(args.churchId, args.edgeType)
+      .all()
+  ).results as any[];
+
+  return (rows ?? []).map((r) => ({
+    fromNodeId: String(r.fromNodeId),
+    toNodeId: String(r.toNodeId),
+    edgeType: String(r.edgeType),
+    weight: typeof r.weight === "number" ? r.weight : 1.0,
+  })) as JourneyEdgeRow[];
+}
+
 async function getJourneyStages(env: Env, args: { churchId: string }): Promise<JourneyStage[]> {
   const rows = (
     await env.churchcore
-      .prepare(`SELECT node_id AS id, title, summary FROM journey_node WHERE church_id=?1 AND node_type='Stage' ORDER BY node_id ASC`)
+      .prepare(`SELECT node_id AS id, title, summary FROM journey_node WHERE church_id=?1 AND node_type='Stage'`)
       .bind(args.churchId)
       .all()
   ).results as any[];
-  return (rows ?? []).map((r) => ({ id: String(r.id), title: String(r.title), summary: r.summary ?? null }));
+
+  const stages: JourneyStage[] = (rows ?? []).map((r) => ({ id: String(r.id), title: String(r.title), summary: r.summary ?? null }));
+  const byId = new Map<string, JourneyStage>(stages.map((s) => [s.id, s]));
+
+  // Order stages by walking the NEXT_STAGE chain (seeded as stage_seeker -> ...).
+  // If the graph is malformed (branching/cycles/missing head), fall back to a stable order.
+  const nextEdges = await listJourneyEdgesByType(env, { churchId: args.churchId, edgeType: "NEXT_STAGE" });
+  const filtered = nextEdges.filter((e) => byId.has(e.fromNodeId) && byId.has(e.toNodeId));
+
+  const incoming = new Map<string, number>();
+  const outgoing = new Map<string, Array<{ to: string; weight: number }>>();
+  for (const e of filtered) {
+    incoming.set(e.toNodeId, (incoming.get(e.toNodeId) ?? 0) + 1);
+    const list = outgoing.get(e.fromNodeId) ?? [];
+    list.push({ to: e.toNodeId, weight: e.weight });
+    outgoing.set(e.fromNodeId, list);
+  }
+
+  let head = byId.has("stage_seeker") ? "stage_seeker" : "";
+  if (!head) {
+    // Prefer any stage with no incoming NEXT_STAGE edges.
+    for (const s of stages) {
+      if ((incoming.get(s.id) ?? 0) === 0) {
+        head = s.id;
+        break;
+      }
+    }
+  }
+
+  const ordered: JourneyStage[] = [];
+  const visited = new Set<string>();
+  const pickNext = (from: string) => {
+    const outs = outgoing.get(from);
+    if (!outs?.length) return "";
+    const sorted = outs
+      .slice()
+      .sort((a, b) => (b.weight ?? 0) - (a.weight ?? 0) || String(a.to).localeCompare(String(b.to)));
+    return String(sorted[0]?.to ?? "");
+  };
+
+  if (head) {
+    let cur = head;
+    while (cur && !visited.has(cur)) {
+      const node = byId.get(cur);
+      if (!node) break;
+      ordered.push(node);
+      visited.add(cur);
+      cur = pickNext(cur);
+    }
+  }
+
+  // Append any missing stages in stable order (title then id).
+  const remaining = stages
+    .filter((s) => !visited.has(s.id))
+    .sort((a, b) => String(a.title).localeCompare(String(b.title)) || String(a.id).localeCompare(String(b.id)));
+  ordered.push(...remaining);
+
+  return ordered;
 }
 
 async function getJourneyNode(env: Env, args: { churchId: string; nodeId: string }) {
@@ -1068,7 +1169,10 @@ async function ensurePersonJourneyState(env: Env, args: { churchId: string; pers
   return await getPersonJourneyState(env, { churchId: args.churchId, personId: args.personId });
 }
 
-async function computeJourneyNextSteps(env: Env, args: { churchId: string; personId: string; currentStageId: string; limit: number }) {
+async function computeJourneyNextSteps(
+  env: Env,
+  args: { churchId: string; personId: string; currentStageId: string; limit: number; personMemory?: any },
+) {
   const { completedNodeIds } = await listPersonJourneyCompleted(env, { churchId: args.churchId, personId: args.personId });
   const stageEdges = await listJourneyEdgesFrom(env, { churchId: args.churchId, fromNodeId: args.currentStageId });
 
@@ -1083,9 +1187,30 @@ async function computeJourneyNextSteps(env: Env, args: { churchId: string; perso
     }
   }
 
+  // Prefer nodes that help satisfy the *next stage* requirements (keeps progression feeling concrete).
+  const nextStageEdge = stageEdges
+    .filter((e) => String(e.edgeType) === "NEXT_STAGE")
+    .sort((a, b) => (b.weight ?? 0) - (a.weight ?? 0) || String(a.toNodeId).localeCompare(String(b.toNodeId)))[0];
+  const nextStageId = nextStageEdge?.toNodeId ? String(nextStageEdge.toNodeId) : "";
+  const nextStageReqNodeIds = new Set<string>();
+  if (nextStageId) {
+    const nextEdges = await listJourneyEdgesFrom(env, { churchId: args.churchId, fromNodeId: nextStageId });
+    for (const e of nextEdges) {
+      if (String(e.edgeType) !== "REQUIRES") continue;
+      const nodeId = String(e.toNodeId ?? "");
+      if (!nodeId) continue;
+      nextStageReqNodeIds.add(nodeId);
+      if (!completedNodeIds.has(nodeId)) {
+        const weight = typeof e.weight === "number" ? e.weight : 1.0;
+        candidates.push({ nodeId, edgeType: "REQUIRES_NEXT_STAGE", score: weight + 0.35, why: "Moves you toward the next stage" });
+      }
+    }
+  }
+
   // Barrier-aware: if the person has an active barrier event, add RESOLVED_BY edges as priority candidates.
   const recent = await listPersonJourneyRecentEvents(env, { churchId: args.churchId, personId: args.personId, limit: 80 });
   const activeBarrierNodeIds: string[] = [];
+  let barrierSuggestsGuide = false;
   for (const ev of recent) {
     const nodeId = String(ev?.nodeId ?? "");
     if (!nodeId) continue;
@@ -1101,9 +1226,20 @@ async function computeJourneyNextSteps(env: Env, args: { churchId: string; perso
     for (const e of edges) {
       if (String(e.edgeType) !== "RESOLVED_BY") continue;
       const weight = typeof e.weight === "number" ? e.weight : 1.0;
-      candidates.push({ nodeId: e.toNodeId, edgeType: "RESOLVED_BY", score: weight + 0.5, why: "Helps address a current barrier" });
+      const toId = String(e.toNodeId ?? "");
+      if (toId === "step_talk_to_guide") barrierSuggestsGuide = true;
+      candidates.push({ nodeId: toId, edgeType: "RESOLVED_BY", score: weight + 0.5, why: "Helps address a current barrier" });
     }
   }
+
+  // Belief / Desire / Intent (BDI) from person memory to make next steps personal.
+  const bdiRaw = args.personMemory && typeof args.personMemory === "object" ? (args.personMemory as any)?.worldview?.bdi : null;
+  const asStrArray = (v: any) => (Array.isArray(v) ? v.map((x) => String(x)).filter(Boolean) : []);
+  const bdi = bdiRaw && typeof bdiRaw === "object" ? { belief: asStrArray((bdiRaw as any).belief), desire: asStrArray((bdiRaw as any).desire), intent: asStrArray((bdiRaw as any).intent) } : { belief: [], desire: [], intent: [] };
+  const wantsTalk = bdi.intent.some((x) => /talk|guide|mentor|pastor/i.test(x));
+  const wantsCommunity = bdi.desire.some((x) => /community|relationships?|belong|group/i.test(x));
+  const wantsClarity = bdi.desire.some((x) => /clarity|understand|truth|questions?|gospel|bible/i.test(x));
+  const wantsPractice = bdi.intent.some((x) => /read|pray|attend|serve|start|join/i.test(x)) || bdi.desire.some((x) => /grow|discipline|habit/i.test(x));
 
   // Fetch nodes and pick a balanced set: ActionStep + Community + Resource/Doctrine/Practice, then fill by score.
   const dedup = new Map<string, { node: any; edgeType: string; score: number; why: string }>();
@@ -1114,12 +1250,29 @@ async function computeJourneyNextSteps(env: Env, args: { churchId: string; perso
     if (!existing || c.score > existing.score) {
       const node = await getJourneyNode(env, { churchId: args.churchId, nodeId: c.nodeId });
       if (!node) continue;
-      dedup.set(c.nodeId, { node, edgeType: c.edgeType, score: c.score, why: c.why });
+      let score = c.score;
+
+      // Progression boost: required-for-next-stage gets a nudge (even if introduced via other edges).
+      if (nextStageReqNodeIds.has(String(node.id))) score += 0.25;
+
+      // BDI boosts (lightweight; UI copy explains categories).
+      const nodeType = String(node.type ?? "");
+      const nodeId = String(node.id ?? "");
+      if (wantsCommunity && (nodeType === "Community" || /join_group|group|community/i.test(nodeId))) score += 0.18;
+      if (wantsClarity && (nodeType === "DoctrineTopic" || nodeType === "Resource" || /topic_|res_/i.test(nodeId))) score += 0.15;
+      if (wantsPractice && (nodeType === "Practice" || nodeType === "Milestone" || /pr_|ms_/i.test(nodeId))) score += 0.12;
+
+      // De-emphasize “Talk with a Guide” unless intent-driven or barrier-driven.
+      if (nodeId === "step_talk_to_guide" && !wantsTalk && !barrierSuggestsGuide) score -= 0.35;
+
+      const whyParts = [c.why];
+      if (nextStageReqNodeIds.has(nodeId)) whyParts.push("Helps you reach the next stage");
+      dedup.set(c.nodeId, { node, edgeType: c.edgeType, score, why: whyParts.filter(Boolean).join(" · ") });
     }
   }
 
   const all = Array.from(dedup.values()).sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
-  const actions = all.filter((x) => x.node?.type === "ActionStep");
+  const actions = all.filter((x) => x.node?.type === "ActionStep").filter((x) => String(x.node?.id ?? "") !== "step_talk_to_guide" || wantsTalk || barrierSuggestsGuide);
   const communities = all.filter((x) => x.node?.type === "Community");
   const resources = all.filter((x) => ["Resource", "DoctrineTopic", "Practice", "Milestone"].includes(String(x.node?.type ?? "")));
 
@@ -1528,7 +1681,8 @@ async function handleChat(req: Request, env: Env) {
     : { currentStageId: null, confidence: 0.5, updatedAt: null };
   const currentStageId = journeyState.currentStageId ?? "stage_seeker";
   const journeyCurrentStage = personId ? await getJourneyNode(env, { churchId, nodeId: currentStageId }) : null;
-  const journeyNextSteps = wantsNextSteps && personId ? await computeJourneyNextSteps(env, { churchId, personId, currentStageId, limit: 3 }) : [];
+  const journeyNextSteps =
+    wantsNextSteps && personId ? await computeJourneyNextSteps(env, { churchId, personId, currentStageId, limit: 3, personMemory: (personMemory as any).memory ?? {} }) : [];
   const inputArgs = parsed.data.args && typeof parsed.data.args === "object" ? (parsed.data.args as Record<string, unknown>) : {};
   const session = {
     churchId,
@@ -1768,7 +1922,10 @@ async function handleChatStream(req: Request, env: Env) {
           : { currentStageId: null, confidence: 0.5, updatedAt: null };
         const currentStageId = journeyState.currentStageId ?? "stage_seeker";
         const journeyCurrentStage = personId ? await getJourneyNode(env, { churchId, nodeId: currentStageId }) : null;
-        const journeyNextSteps = wantsNextSteps && personId ? await computeJourneyNextSteps(env, { churchId, personId, currentStageId, limit: 3 }) : [];
+        const journeyNextSteps =
+          wantsNextSteps && personId
+            ? await computeJourneyNextSteps(env, { churchId, personId, currentStageId, limit: 3, personMemory: (personMemory as any).memory ?? {} })
+            : [];
         const inputArgs = parsed.data.args && typeof parsed.data.args === "object" ? (parsed.data.args as Record<string, unknown>) : {};
 
         const session = {
