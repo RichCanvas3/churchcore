@@ -1,0 +1,80 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+.yarn/
+.yarn-cache/
+
+# Build outputs
+dist/
+build/
+.next/
+.out/
+.turbo/
+.vercel/
+.wrangler/
+.cloudflare/
+
+# Coverage & test artifacts
+coverage/
+.playwright/
+test-results/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Database files
+*.sqlite
+*.sqlite3
+*.db
+
+# Large generated files
+*.lock
+package-lock.json
+pnpm-lock.yaml
+yarn.lock
+
+# Compiled artifacts
+*.tsbuildinfo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+
+# Docker
+docker-compose.override.yml
+
+# Python (if any agents use it)
+__pycache__/
+*.pyc
+venv/
+.venv/
+
+# Terraform (if applicable)
+.terraform/
+
+# Large data exports
+*.csv
+*.jsonl
+
+# Next.js cache
+.next/cache/
+
+# GraphDB / RDF dumps (if you're exporting TTL)
+*.ttl.bak
+*.rdf.bak
+
+# Wrangler local state
+.wrangler/state/

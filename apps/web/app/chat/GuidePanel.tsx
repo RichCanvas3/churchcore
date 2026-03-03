@@ -182,6 +182,7 @@ export function GuidePanel(props: { identity: Identity; onClose: () => void; onO
     const supportedToolIds = new Set([
       "guide",
       "faith_journey",
+      "community_manager",
       "memory_manager",
       "identity_contact",
       "comm_prefs",

@@ -178,6 +178,46 @@ def _ui_handoff_for_user_text(user_text: str) -> list[dict[str, Any]]:
             }
         ]
 
+    communityish = any(
+        k in u
+        for k in [
+            "community",
+            "group",
+            "groups",
+            "lifegroup",
+            "life group",
+            "lifegroups",
+            "small group",
+            "small groups",
+            "class",
+            "classes",
+            "adult class",
+            "adult classes",
+            "starting point",
+            "membership",
+            "baptism",
+            "serve",
+            "serving",
+            "serving team",
+            "volunteer",
+            "volunteering",
+            "outreach",
+            "missions",
+            "global outreach",
+            "trip",
+            "mission trip",
+        ]
+    )
+    if communityish:
+        return [
+            {
+                "type": "ui_tool",
+                "tool_id": "community_manager",
+                "title": "Community",
+                "instructions": "Open the community panel (groups, classes, outreach, missions, trips).",
+            }
+        ]
+
     faith_journeyish = any(
         k in u
         for k in [

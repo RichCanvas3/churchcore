@@ -14,6 +14,7 @@ import { TeamsSkillsPanel } from "./TeamsSkillsPanel";
 import { CarePastoralPanel } from "./CarePastoralPanel";
 import { KidsSafetyPanel } from "./KidsSafetyPanel";
 import { MemoryManagerPanel } from "./MemoryManagerPanel";
+import { CommunityManagerPanel } from "./CommunityManagerPanel";
 import { GuidePanel } from "./GuidePanel";
 import { ChurchOverviewPanel } from "./ChurchOverviewPanel";
 import { StrategicIntentPanel } from "./StrategicIntentPanel";
@@ -344,6 +345,8 @@ export default function ChatPage() {
               ? "Kids check-in"
               : p.toolId === "household_manager"
                 ? "Household"
+                : p.toolId === "community_manager"
+                  ? "Community"
                 : p.toolId === "calendar"
                   ? "Calendar"
                   : p.toolId === "bible_reader"
@@ -484,6 +487,8 @@ export default function ChatPage() {
     }
   }
 
+  const personaId = (identity as any).persona_id ?? null;
+
   const historyAdapter = useMemo(() => {
     const threadId = effectiveThreadId;
     return {
@@ -498,7 +503,7 @@ export default function ChatPage() {
               role: identity.role,
               campus_id: identity.campus_id ?? undefined,
               timezone: identity.timezone ?? undefined,
-              persona_id: (identity as any).persona_id ?? null,
+              persona_id: personaId,
             },
             thread_id: threadId,
             limit: 200,
@@ -601,7 +606,7 @@ export default function ChatPage() {
         // no-op: A2A gateway persists transcript in D1.
       },
     };
-  }, [effectiveThreadId, identity.campus_id, identity.role, identity.tenant_id, identity.timezone, identity.user_id]);
+  }, [effectiveThreadId, identity.campus_id, identity.role, identity.tenant_id, identity.timezone, identity.user_id, personaId]);
 
   return (
     <div
@@ -900,6 +905,18 @@ export default function ChatPage() {
           <div style={{ height: "100%", minHeight: 0 }}>
             {activeUiToolId === "household_manager" ? (
               <HouseholdManagerPanel
+                identity={{
+                  tenant_id: identity.tenant_id,
+                  user_id: identity.user_id,
+                  role: identity.role,
+                  campus_id: identity.campus_id ?? null,
+                  timezone: identity.timezone ?? null,
+                  persona_id: (identity as any).persona_id ?? null,
+                }}
+                onClose={closeTool}
+              />
+            ) : activeUiToolId === "community_manager" ? (
+              <CommunityManagerPanel
                 identity={{
                   tenant_id: identity.tenant_id,
                   user_id: identity.user_id,

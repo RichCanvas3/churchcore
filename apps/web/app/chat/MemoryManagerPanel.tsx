@@ -35,6 +35,7 @@ export function MemoryManagerPanel(props: {
   const items = [
     { toolId: "identity_contact", title: "Identity & Contact", desc: "Preferred name + email/phone" },
     { toolId: "faith_journey", title: "Faith Journey", desc: "Phase + milestones" },
+    { toolId: "community_manager", title: "Community", desc: "Groups, classes, outreach, missions" },
     { toolId: "comm_prefs", title: "Communication Preferences", desc: "SMS/email opt-in + channel" },
     { toolId: "care_pastoral", title: "Care & Prayer", desc: "Prayer requests (and more for staff)" },
     { toolId: "teams_skills", title: "Teams & Skills", desc: "Serving teams, skills, availability" },

@@ -227,6 +227,188 @@ function createServer(env: Env) {
     },
   );
 
+  // Community catalog + participation (broader than groups/opportunities/events)
+  server.tool(
+    "churchcore_list_community_catalog",
+    "List community catalog items (authoritative).",
+    {
+      churchId: z.string().min(1),
+      campusId: z.string().min(1).optional().nullable(),
+      kind: z.string().min(1).optional().nullable(),
+      search: z.string().min(1).optional().nullable(),
+      includeInactive: z.boolean().optional().nullable(),
+      limit: z.number().int().min(1).max(200).optional().nullable(),
+      offset: z.number().int().min(0).max(500000).optional().nullable(),
+    },
+    async (args) => {
+      const parsed = z
+        .object({
+          churchId: z.string().min(1),
+          campusId: z.string().min(1).optional().nullable(),
+          kind: z.string().min(1).optional().nullable(),
+          search: z.string().min(1).optional().nullable(),
+          includeInactive: z.boolean().optional().nullable(),
+          limit: z.number().int().min(1).max(200).optional().nullable(),
+          offset: z.number().int().min(0).max(500000).optional().nullable(),
+        })
+        .parse(args);
+
+      const lim = parsed.limit ?? 100;
+      const off = parsed.offset ?? 0;
+      const includeInactive = Boolean(parsed.includeInactive);
+
+      let sql = `SELECT id,campus_id,kind,title,description,source_url,signup_url,start_at,end_at,tags_json,is_active,created_at,updated_at
+                 FROM community_catalog
+                 WHERE church_id=?1`;
+      const binds: any[] = [parsed.churchId];
+
+      if (parsed.campusId) {
+        sql += ` AND (campus_id=?${binds.length + 1} OR campus_id IS NULL)`;
+        binds.push(parsed.campusId);
+      }
+      if (parsed.kind) {
+        sql += ` AND kind=?${binds.length + 1}`;
+        binds.push(parsed.kind);
+      }
+      if (!includeInactive) sql += ` AND is_active=1`;
+      if (parsed.search) {
+        sql += ` AND (lower(title) LIKE ?${binds.length + 1} OR lower(description) LIKE ?${binds.length + 1})`;
+        binds.push(`%${String(parsed.search).toLowerCase()}%`);
+      }
+
+      sql += ` ORDER BY kind ASC, title ASC LIMIT ${lim} OFFSET ${off}`;
+      const rows = (await env.churchcore.prepare(sql).bind(...binds).all()).results ?? [];
+      return jsonText({ items: rows });
+    },
+  );
+
+  server.tool(
+    "churchcore_list_person_community",
+    "List a person's community involvement (authoritative).",
+    {
+      churchId: z.string().min(1),
+      personId: z.string().min(1),
+      status: z.string().min(1).optional().nullable(), // optional filter
+      includeInactive: z.boolean().optional().nullable(),
+      limit: z.number().int().min(1).max(200).optional().nullable(),
+      offset: z.number().int().min(0).max(500000).optional().nullable(),
+    },
+    async (args) => {
+      const parsed = z
+        .object({
+          churchId: z.string().min(1),
+          personId: z.string().min(1),
+          status: z.string().min(1).optional().nullable(),
+          includeInactive: z.boolean().optional().nullable(),
+          limit: z.number().int().min(1).max(200).optional().nullable(),
+          offset: z.number().int().min(0).max(500000).optional().nullable(),
+        })
+        .parse(args);
+
+      const lim = parsed.limit ?? 100;
+      const off = parsed.offset ?? 0;
+      const includeInactive = Boolean(parsed.includeInactive);
+
+      let sql = `SELECT pc.community_id AS communityId, pc.status, pc.role, pc.joined_at AS joinedAt, pc.left_at AS leftAt, pc.notes_json AS notesJson, pc.updated_at AS updatedAt,
+                        cc.campus_id AS campusId, cc.kind, cc.title, cc.description, cc.source_url AS sourceUrl, cc.signup_url AS signupUrl, cc.start_at AS startAt, cc.end_at AS endAt, cc.tags_json AS tagsJson, cc.is_active AS isActive
+                 FROM person_community pc
+                 JOIN community_catalog cc ON cc.id = pc.community_id
+                 WHERE pc.church_id=?1 AND pc.person_id=?2`;
+      const binds: any[] = [parsed.churchId, parsed.personId];
+
+      if (parsed.status) {
+        sql += ` AND pc.status=?${binds.length + 1}`;
+        binds.push(parsed.status);
+      } else if (!includeInactive) {
+        sql += ` AND pc.status!='inactive'`;
+      }
+
+      sql += ` ORDER BY pc.updated_at DESC LIMIT ${lim} OFFSET ${off}`;
+      const rows = (await env.churchcore.prepare(sql).bind(...binds).all()).results ?? [];
+      return jsonText({ items: rows });
+    },
+  );
+
+  server.tool(
+    "churchcore_upsert_person_community",
+    "Join/leave/mark a person's community involvement (write).",
+    {
+      churchId: z.string().min(1),
+      personId: z.string().min(1),
+      communityId: z.string().min(1),
+      status: z.enum(["pending", "active", "inactive", "attended", "completed"]),
+      role: z.enum(["participant", "leader"]).optional().nullable(),
+      notes: z.any().optional().nullable(),
+      actorUserId: z.string().optional().nullable(),
+    },
+    async (args) => {
+      const parsed = z
+        .object({
+          churchId: z.string().min(1),
+          personId: z.string().min(1),
+          communityId: z.string().min(1),
+          status: z.enum(["pending", "active", "inactive", "attended", "completed"]),
+          role: z.enum(["participant", "leader"]).optional().nullable(),
+          notes: z.any().optional().nullable(),
+          actorUserId: z.string().optional().nullable(),
+        })
+        .parse(args);
+
+      const now = nowIso();
+      const existing = (await env.churchcore
+        .prepare(
+          `SELECT status, role, joined_at AS joinedAt, left_at AS leftAt
+           FROM person_community
+           WHERE church_id=?1 AND person_id=?2 AND community_id=?3`,
+        )
+        .bind(parsed.churchId, parsed.personId, parsed.communityId)
+        .first()) as any;
+
+      const nextRole = parsed.role ?? (typeof existing?.role === "string" ? existing.role : "participant");
+      const priorJoinedAt = typeof existing?.joinedAt === "string" ? existing.joinedAt : null;
+      const priorLeftAt = typeof existing?.leftAt === "string" ? existing.leftAt : null;
+
+      const joinedAt = (parsed.status === "active" || parsed.status === "pending") && !priorJoinedAt ? now : priorJoinedAt;
+      const leftAt = parsed.status === "inactive" ? now : parsed.status === "active" || parsed.status === "pending" ? null : priorLeftAt;
+
+      await env.churchcore
+        .prepare(
+          `INSERT INTO person_community (church_id, person_id, community_id, status, role, joined_at, left_at, notes_json, updated_at)
+           VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
+           ON CONFLICT(church_id, person_id, community_id) DO UPDATE SET
+             status=excluded.status,
+             role=excluded.role,
+             joined_at=excluded.joined_at,
+             left_at=excluded.left_at,
+             notes_json=excluded.notes_json,
+             updated_at=excluded.updated_at`,
+        )
+        .bind(
+          parsed.churchId,
+          parsed.personId,
+          parsed.communityId,
+          parsed.status,
+          nextRole,
+          joinedAt,
+          leftAt,
+          parsed.notes !== undefined ? JSON.stringify(parsed.notes) : null,
+          now,
+        )
+        .run();
+
+      await auditAppend(env, {
+        churchId: parsed.churchId,
+        actorUserId: parsed.actorUserId ?? null,
+        action: "person.community.upsert",
+        entityType: "person_community",
+        entityId: `${parsed.personId}:${parsed.communityId}`,
+        payload: { personId: parsed.personId, communityId: parsed.communityId, status: parsed.status, role: nextRole },
+      });
+
+      return jsonText({ ok: true });
+    },
+  );
+
   server.tool(
     "churchcore_request_contact",
     "Create a contact request (write).",
@@ -1171,6 +1353,7 @@ function createServer(env: Env) {
       const servicePlanItems = (await env.churchcore.prepare(`SELECT * FROM service_plan_items WHERE church_id=?1 LIMIT ${limit}`).bind(parsed.churchId).all()).results ?? [];
       const events = (await env.churchcore.prepare(`SELECT * FROM events WHERE church_id=?1 LIMIT ${limit}`).bind(parsed.churchId).all()).results ?? [];
       const outreaches = (await env.churchcore.prepare(`SELECT * FROM outreach_campaigns WHERE church_id=?1 LIMIT ${limit}`).bind(parsed.churchId).all()).results ?? [];
+      const communityCatalog = (await env.churchcore.prepare(`SELECT * FROM community_catalog WHERE church_id=?1 LIMIT ${limit}`).bind(parsed.churchId).all()).results ?? [];
       const groups = (await env.churchcore.prepare(`SELECT * FROM groups WHERE church_id=?1 LIMIT ${limit}`).bind(parsed.churchId).all()).results ?? [];
       const opportunities = (await env.churchcore.prepare(`SELECT * FROM opportunities WHERE church_id=?1 LIMIT ${limit}`).bind(parsed.churchId).all()).results ?? [];
       const resources = (await env.churchcore.prepare(`SELECT * FROM resources WHERE church_id=?1 LIMIT ${limit}`).bind(parsed.churchId).all()).results ?? [];
@@ -1194,6 +1377,7 @@ function createServer(env: Env) {
         { sourceId: "church/church.json", text: JSON.stringify({ church, branding, campuses, locations }, null, 2) },
         { sourceId: "church/services.json", text: JSON.stringify({ services, servicePlans, servicePlanItems }, null, 2) },
         { sourceId: "church/events.json", text: JSON.stringify({ events, outreaches }, null, 2) },
+        { sourceId: "church/community.json", text: JSON.stringify({ communityCatalog }, null, 2) },
         { sourceId: "church/groups.json", text: JSON.stringify({ groups, opportunities }, null, 2) },
         { sourceId: "church/resources.json", text: JSON.stringify({ resources }, null, 2) },
         { sourceId: "church/strategy.json", text: JSON.stringify({ strategicIntents, strategicLinks }, null, 2) },

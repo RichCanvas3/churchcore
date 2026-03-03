@@ -294,6 +294,37 @@ INSERT OR REPLACE INTO events (
 INSERT OR REPLACE INTO outreach_campaigns (id, church_id, campus_id, title, description, start_at, end_at, status, created_at, updated_at) VALUES
 ('out1','calvarybible','campus_boulder','Community Outreach','Serve and love neighbors through outreach opportunities.',datetime('now','+21 days'),datetime('now','+21 days','+3 hours'),'active',datetime('now'),datetime('now'));
 
+-- Community catalog (groups/classes/outreach/missions/trips)
+INSERT OR REPLACE INTO community_catalog (
+  id, church_id, campus_id, kind, title, description, source_url, signup_url, start_at, end_at, tags_json, is_active, created_at, updated_at
+) VALUES
+('comm_starting_point_erie','calvarybible','campus_erie','class','Starting Point (Erie)','Lunch + childcare. Meet staff and learn more about Calvary.','https://calvarybible.com/startingpoint','https://calvarybiblechurch.churchcenter.com/registrations/events/3322649','2026-03-08T12:00:00',NULL,'[\"new\",\"intro\"]',1,datetime('now'),datetime('now')),
+('comm_starting_point_thornton','calvarybible','campus_thornton','class','Starting Point (Thornton)','Lunch + childcare. Meet staff and learn more about Calvary.','https://calvarybible.com/startingpoint','https://calvarybiblechurch.churchcenter.com/registrations/events/3398696','2026-04-12T12:00:00',NULL,'[\"new\",\"intro\"]',1,datetime('now'),datetime('now')),
+('comm_starting_point_boulder','calvarybible','campus_boulder','class','Starting Point (Boulder)','Lunch + childcare. Meet staff and learn more about Calvary.','https://calvarybible.com/startingpoint','https://calvarybiblechurch.churchcenter.com/people/forms/1131634','2026-04-12T12:00:00',NULL,'[\"new\",\"intro\"]',1,datetime('now'),datetime('now')),
+
+('comm_lifegroups','calvarybible',NULL,'lifegroup','LifeGroups','Small gatherings that meet to discuss the sermon, pray, enjoy community, and serve.','https://calvarybible.com/lifegroups','https://calvarybiblechurch.churchcenter.com/people/forms/424826',NULL,NULL,'[\"community\",\"sermon_discussion\"]',1,datetime('now'),datetime('now')),
+
+('comm_membership_boulder','calvarybible','campus_boulder','class','Membership Class (Boulder)','Learn Calvary history, beliefs, and vision. Led by pastors; Q&A; option to interview for membership.','https://calvarybible.com/membership/','https://calvarybiblechurch.churchcenter.com/people/forms/690889','2026-04-19T12:00:00',NULL,'[\"membership\",\"foundations\"]',1,datetime('now'),datetime('now')),
+('comm_membership_erie','calvarybible','campus_erie','class','Membership Class (Erie)','Learn Calvary history, beliefs, and vision. Led by pastors; Q&A; option to interview for membership.','https://calvarybible.com/membership/','https://calvarybiblechurch.churchcenter.com/registrations/events/3414280','2026-04-12T12:00:00',NULL,'[\"membership\",\"foundations\"]',1,datetime('now'),datetime('now')),
+('comm_membership_thornton','calvarybible','campus_thornton','class','Membership Class (Thornton)','Learn Calvary history, beliefs, and vision. Led by pastors; Q&A; option to interview for membership.','https://calvarybible.com/membership/','https://calvarybiblechurch.churchcenter.com/registrations/events/3404932','2026-04-19T12:00:00',NULL,'[\"membership\",\"foundations\"]',1,datetime('now'),datetime('now')),
+
+('comm_baptism_erie','calvarybible','campus_erie','ministry','Baptism (Erie)','Publicly declare faith in Jesus.','https://calvarybible.com/baptism','https://calvarybiblechurch.churchcenter.com/registrations/events/3441060','2026-04-12T12:00:00',NULL,'[\"baptism\",\"ordinance\"]',1,datetime('now'),datetime('now')),
+('comm_baptism_boulder_thornton','calvarybible',NULL,'ministry','Baptism (Boulder/Thornton)','Publicly declare faith in Jesus.','https://calvarybible.com/baptism','https://calvarybiblechurch.churchcenter.com/people/forms/366387','2026-04-12T12:00:00',NULL,'[\"baptism\",\"ordinance\"]',1,datetime('now'),datetime('now')),
+
+('comm_adult_classes_boulder','calvarybible','campus_boulder','class','Adult Classes (Boulder)','Sunday morning classes (e.g., Verse-by-verse, Women of the Word).','https://calvarybible.com/adults-groups/classes',NULL,NULL,NULL,'[\"class\",\"biblical_authority\"]',1,datetime('now'),datetime('now')),
+
+('comm_serve_boulder','calvarybible','campus_boulder','serving_team','Serve Teams (Boulder)','Serve on teams that make Sundays and programming happen.','https://calvarybible.com/serve','https://calvarybiblechurch.churchcenter.com/people/forms/752262',NULL,NULL,'[\"serve\",\"teams\"]',1,datetime('now'),datetime('now')),
+('comm_serve_erie','calvarybible','campus_erie','serving_team','Serve Teams (Erie)','Serve on teams that make Sundays and programming happen.','https://calvarybible.com/serve','https://calvarybiblechurch.churchcenter.com/people/forms/584281',NULL,NULL,'[\"serve\",\"teams\"]',1,datetime('now'),datetime('now')),
+('comm_serve_thornton','calvarybible','campus_thornton','serving_team','Serve Teams (Thornton)','Serve on teams that make Sundays and programming happen.','https://calvarybible.com/serve','https://calvarybiblechurch.churchcenter.com/people/forms/752265',NULL,NULL,'[\"serve\",\"teams\"]',1,datetime('now'),datetime('now')),
+
+('comm_outreach_local_boulder','calvarybible','campus_boulder','outreach_local','Local Outreach (Boulder)','Strategic local partnerships: at-risk families + children, affordable housing, aging adults, homelessness.','https://calvarybible.com/local/boulder/',NULL,NULL,NULL,'[\"outreach\",\"boulder\"]',1,datetime('now'),datetime('now')),
+('comm_outreach_local_erie','calvarybible','campus_erie','outreach_local','Local Outreach (Erie)','Serve Erie through schools, GAP team, snow removal, Men of Action, and more.','https://calvarybible.com/local/erie/',NULL,NULL,NULL,'[\"outreach\",\"erie\"]',1,datetime('now'),datetime('now')),
+('comm_outreach_local_thornton','calvarybible','campus_thornton','outreach_local','Local Outreach (Thornton)','Pray • Learn • Engage; schools, food banks, pregnancy care, GAP team, and more.','https://calvarybible.com/local/thornton/',NULL,NULL,NULL,'[\"outreach\",\"thornton\"]',1,datetime('now'),datetime('now')),
+
+('comm_outreach_global','calvarybible',NULL,'outreach_global','Global Outreach','Support missionaries, church planting, crisis relief; trips + prayer.','https://calvarybible.com/global','https://calvarybiblechurch.churchcenter.com/groups/global-outreach-and-global-missions/go-global-outreach',NULL,NULL,'[\"missions\",\"global\"]',1,datetime('now'),datetime('now')),
+('comm_outreach_global_serve','calvarybible',NULL,'outreach_global','Serve with Global Outreach','Serve with Global Outreach team.','https://calvarybible.com/global','https://calvarybiblechurch.churchcenter.com/people/forms/751731',NULL,NULL,'[\"missions\",\"serve\"]',1,datetime('now'),datetime('now')),
+('comm_brazil_trip_interest','calvarybible',NULL,'trip','Brazil Mission Trip Interest','Get notified about future Brazil mission trips (and 21st annual medical mission).','https://calvarybible.com/global','https://calvarybiblechurch.churchcenter.com/groups/outreach/go-brazil-mission-trip-interest',NULL,NULL,'[\"missions\",\"trip\"]',1,datetime('now'),datetime('now'));
+
 -- Groups
 INSERT OR REPLACE INTO groups (
   id, church_id, campus_id, name, description, leader_person_id, meeting_details, is_open,
@@ -527,6 +558,237 @@ INSERT OR REPLACE INTO journey_resource_link (link_id, church_id, node_id, resou
 ('jrl3','calvarybible','step_talk_to_guide','doc_journey_step_talk_to_guide',1.0,datetime('now')),
 ('jrl4','calvarybible','step_join_group','doc_journey_step_join_group',1.0,datetime('now'));
 
+-- Expanded journey docs for every stage + key nodes (Calvary first; evangelical where needed)
+INSERT OR REPLACE INTO content_docs (id, church_id, entity_type, entity_id, locale, title, body_markdown, created_at, updated_at) VALUES
+('doc_scripture_1john5_11_13','calvarybible','scripture_ref','1 John 5:11-13','en','1 John 5:11–13','Reference only (no stored translation text).\\n\\n- Ref: 1 John 5:11–13\\n- Link: https://www.openbible.info/labs/cross-references/search?q=1%20John%205%3A11-13',datetime('now'),datetime('now')),
+('doc_scripture_rom8_1','calvarybible','scripture_ref','Romans 8:1','en','Romans 8:1','Reference only (no stored translation text).\\n\\n- Ref: Romans 8:1\\n- Link: https://www.openbible.info/labs/cross-references/search?q=Romans%208%3A1',datetime('now'),datetime('now')),
+('doc_scripture_eph1_13_14','calvarybible','scripture_ref','Ephesians 1:13-14','en','Ephesians 1:13–14','Reference only (no stored translation text).\\n\\n- Ref: Ephesians 1:13–14\\n- Link: https://www.openbible.info/labs/cross-references/search?q=Ephesians%201%3A13-14',datetime('now'),datetime('now')),
+('doc_scripture_john10_27_29','calvarybible','scripture_ref','John 10:27-29','en','John 10:27–29','Reference only (no stored translation text).\\n\\n- Ref: John 10:27–29\\n- Link: https://www.openbible.info/labs/cross-references/search?q=John%2010%3A27-29',datetime('now'),datetime('now')),
+('doc_scripture_phil4_6_7','calvarybible','scripture_ref','Philippians 4:6-7','en','Philippians 4:6–7','Reference only (no stored translation text).\\n\\n- Ref: Philippians 4:6–7\\n- Link: https://www.openbible.info/labs/cross-references/search?q=Philippians%204%3A6-7',datetime('now'),datetime('now')),
+('doc_scripture_matt6_9_13','calvarybible','scripture_ref','Matthew 6:9-13','en','Matthew 6:9–13','Reference only (no stored translation text).\\n\\n- Ref: Matthew 6:9–13\\n- Link: https://www.openbible.info/labs/cross-references/search?q=Matthew%206%3A9-13',datetime('now'),datetime('now')),
+('doc_scripture_acts2_42_47','calvarybible','scripture_ref','Acts 2:42-47','en','Acts 2:42–47','Reference only (no stored translation text).\\n\\n- Ref: Acts 2:42–47\\n- Link: https://www.openbible.info/labs/cross-references/search?q=Acts%202%3A42-47',datetime('now'),datetime('now')),
+('doc_scripture_heb10_24_25','calvarybible','scripture_ref','Hebrews 10:24-25','en','Hebrews 10:24–25','Reference only (no stored translation text).\\n\\n- Ref: Hebrews 10:24–25\\n- Link: https://www.openbible.info/labs/cross-references/search?q=Hebrews%2010%3A24-25',datetime('now'),datetime('now')),
+('doc_scripture_1pet4_10_11','calvarybible','scripture_ref','1 Peter 4:10-11','en','1 Peter 4:10–11','Reference only (no stored translation text).\\n\\n- Ref: 1 Peter 4:10–11\\n- Link: https://www.openbible.info/labs/cross-references/search?q=1%20Peter%204%3A10-11',datetime('now'),datetime('now')),
+('doc_scripture_matt28_18_20','calvarybible','scripture_ref','Matthew 28:18-20','en','Matthew 28:18–20','Reference only (no stored translation text).\\n\\n- Ref: Matthew 28:18–20\\n- Link: https://www.openbible.info/labs/cross-references/search?q=Matthew%2028%3A18-20',datetime('now'),datetime('now')),
+('doc_scripture_2tim2_2','calvarybible','scripture_ref','2 Timothy 2:2','en','2 Timothy 2:2','Reference only (no stored translation text).\\n\\n- Ref: 2 Timothy 2:2\\n- Link: https://www.openbible.info/labs/cross-references/search?q=2%20Timothy%202%3A2',datetime('now'),datetime('now')),
+
+('doc_stage_seeker_guide','calvarybible','journey_stage','stage_seeker','en','Seeker: a simple path',
+ '## Where you are\\n\\nIf you are exploring faith, you do not have to pretend. A good next step is one small, honest step toward Jesus and his people.\\n\\n## Calvary next steps\\n\\n- Starting Point (meet staff, lunch + childcare): https://calvarybible.com/startingpoint\\n- Next steps hub: https://calvarybible.com/nextsteps/\\n- Watch online (messages posted Sunday afternoon): https://calvarybible.com/\\n\\n## Good first reads\\n\\n- John 3:16\\n- Ephesians 2:8–9\\n- Romans 3:23–24\\n\\nSource links:\\n- https://calvarybible.com/nextsteps/\\n- https://calvarybible.com/startingpoint\\n- https://calvarybible.com/',
+ datetime('now'),datetime('now')),
+
+('doc_stage_gospel_clarity_guide','calvarybible','journey_stage','stage_gospel_clarity','en','Gospel clarity: the core message',
+ '## Goal\\n\\nBe able to explain the gospel clearly and personally: who Jesus is, what sin is, what grace is, what faith is, and what new life means.\\n\\n## A short gospel outline\\n\\n1) God is holy and good.\\n2) We are sinners by nature and choice.\\n3) Jesus lived, died, and rose as our substitute.\\n4) Salvation is by grace through faith, not by works.\\n5) Following Jesus changes how we live.\\n\\n## Calvary anchors\\n\\nCalvary explains its beliefs (God, Bible, human condition, Jesus, salvation, church): https://calvarybible.com/beliefs/\\n\\nSource: https://calvarybible.com/beliefs/',
+ datetime('now'),datetime('now')),
+
+('doc_stage_conversion_guide','calvarybible','journey_stage','stage_conversion','en','Conversion: repentance and faith',
+ '## What this stage is\\n\\nConversion is turning to God in repentance and trusting Jesus Christ.\\n\\n## What to do now\\n\\n- Tell someone you trust what you are trusting Jesus for.\\n- Start a simple Bible + prayer rhythm (small, consistent).\\n- Consider baptism as your public next step.\\n\\nCalvary baptism: https://calvarybible.com/baptism\\n\\nSource: https://calvarybible.com/baptism',
+ datetime('now'),datetime('now')),
+
+('doc_stage_new_believer_guide','calvarybible','journey_stage','stage_new_believer','en','New believer guide (first 30 days)',
+ '## What you are building\\n\\nEarly formation is about assurance, habits, and community. Aim for small, steady steps.\\n\\n## Your first 30 days\\n\\nWeek 1: Read Mark 1–2, pray Matthew 6:9–13 daily.\\nWeek 2: Read Mark 3–4, add Philippians 4:6–7 when anxious.\\nWeek 3: Read Mark 5–6, begin one simple obedience step.\\nWeek 4: Read Mark 7–8, talk to a Guide about questions.\\n\\n## Calvary next steps\\n\\n- LifeGroups (community): https://calvarybible.com/lifegroups\\n- Starting Point: https://calvarybible.com/startingpoint\\n- Prayer requests (staff prays weekly): https://calvarybible.com/prayer/\\n\\nSource links:\\n- https://calvarybible.com/lifegroups\\n- https://calvarybible.com/startingpoint\\n- https://calvarybible.com/prayer/',
+ datetime('now'),datetime('now')),
+
+('doc_stage_connected_guide','calvarybible','journey_stage','stage_connected','en','Connected: belonging in community',
+ '## What this stage means\\n\\nNot just attending, but belonging: known by name, prayed for, growing with others, serving together.\\n\\n## Calvary pathways\\n\\n- LifeGroups: https://calvarybible.com/lifegroups\\n- Adults + Groups overview: https://calvarybible.com/adults-groups/\\n- Membership class: https://calvarybible.com/membership/\\n\\nSource links:\\n- https://calvarybible.com/lifegroups\\n- https://calvarybible.com/adults-groups/\\n- https://calvarybible.com/membership/',
+ datetime('now'),datetime('now')),
+
+('doc_stage_growing_guide','calvarybible','journey_stage','stage_growing','en','Growing disciple: habits and doctrine',
+ '## What to build\\n\\n- Scripture intake (read + understand + apply)\\n- Prayer (adoration, confession, thanksgiving, supplication)\\n- Community that encourages obedience\\n\\n## Calvary options\\n\\nCalvary offers adult classes through Adults + Groups: https://calvarybible.com/adults-groups/\\n\\nSource: https://calvarybible.com/adults-groups/',
+ datetime('now'),datetime('now')),
+
+('doc_stage_serving_guide','calvarybible','journey_stage','stage_serving','en','Serving: use your gifts to build up the church',
+ '## What this stage means\\n\\nServing is love made practical: using gifts and time to help others follow Jesus.\\n\\n## Calvary next step\\n\\nServe opportunities: https://calvarybible.com/serve\\n\\nSource: https://calvarybible.com/nextsteps/',
+ datetime('now'),datetime('now')),
+
+('doc_stage_multiplying_guide','calvarybible','journey_stage','stage_multiplying','en','Multiplying: share faith and disciple others',
+ '## What this stage means\\n\\nYou begin to help others take their next step with Jesus: prayer, invitation, and simple disciple-making.\\n\\n## Calvary vision language\\n\\nCalvary vision includes: Make disciples, empower leaders, multiply churches.\\n\\nSource: https://calvarybible.com/mission-vision/',
+ datetime('now'),datetime('now')),
+
+('doc_stage_leader_guide','calvarybible','journey_stage','stage_leader','en','Leader: shepherd and equip others',
+ '## What this stage means\\n\\nLeadership in the church is character, competence, and care: helping others grow and serving the body faithfully.\\n\\nA simple biblical picture: entrust to faithful people who will teach others also (2 Timothy 2:2).',
+ datetime('now'),datetime('now')),
+
+('doc_pr_bible_howto','calvarybible','journey_practice','pr_bible','en','Bible reading: a simple method',
+ '## A 10-minute daily rhythm\\n\\n1) Pray: ask God for light.\\n2) Read a short passage (10-25 verses).\\n3) Observe: what does it say?\\n4) Understand: what does it mean?\\n5) Apply: what should I do or trust today?\\n6) Share: tell a friend or write one sentence.\\n\\nSuggested starting books: Mark, John, Ephesians, Psalms.',
+ datetime('now'),datetime('now')),
+
+('doc_pr_prayer_howto','calvarybible','journey_practice','pr_prayer','en','Prayer: a simple pattern',
+ '## A simple prayer pattern (ACTS)\\n\\n- Adoration: praise God for who he is.\\n- Confession: admit sin honestly.\\n- Thanksgiving: name gifts received.\\n- Supplication: ask for needs (you + others).\\n\\nAnchor passages:\\n- Matthew 6:9–13\\n- Philippians 4:6–7',
+ datetime('now'),datetime('now')),
+
+('doc_step_start_bible_plan_detail','calvarybible','journey_step','step_start_bible_plan','en','Start a Bible reading plan (4 weeks)',
+ '## A simple plan (5 days/week)\\n\\nWeek 1: Mark 1–5\\nWeek 2: Mark 6–10\\nWeek 3: Mark 11–16\\nWeek 4: John 1–6\\n\\nOptional: add one Psalm each weekend (Psalm 23, 27, 46, 103).\\n\\nTip: ask one question after reading: What does this show me about Jesus?',
+ datetime('now'),datetime('now')),
+
+('doc_ms_joined_group_detail','calvarybible','journey_milestone','ms_joined_group','en','Joined a Small Group: what counts',
+ '## What this milestone means\\n\\nYou have attended a group more than once and are building relationships where you can be known, prayed for, and encouraged toward obedience.\\n\\n## Calvary LifeGroups\\n\\nLifeGroups meet to discuss the sermon, pray, enjoy community, and serve.\\n\\n- LifeGroups: https://calvarybible.com/lifegroups\\n- Interest form: https://calvarybiblechurch.churchcenter.com/people/forms/424826\\n\\nSource: https://calvarybible.com/lifegroups',
+ datetime('now'),datetime('now')),
+
+('doc_topic_assurance_detail','calvarybible','journey_topic','topic_assurance','en','Assurance of Salvation: where confidence comes from',
+ '## What assurance is\\n\\nAssurance is confidence grounded in Christ and his promises, not in perfect feelings.\\n\\n## Three checks (in a healthy order)\\n\\n1) Promise: what does God promise to those who trust Christ?\\n2) Direction: is there real repentance and a desire to obey?\\n3) Practice: are you staying close to Jesus in Word, prayer, and community?\\n\\nIf anxiety is loud, take one small step: read 1 John 5:11–13 and tell a Guide what you fear most.',
+ datetime('now'),datetime('now')),
+
+('doc_topic_scripture_detail','calvarybible','journey_topic','topic_scripture','en','Scripture: why it matters and how to read it',
+ 'Calvary teaches that the Bible is God''s Word and the ultimate authority, to be believed, obeyed, and trusted.\\n\\nSource: https://calvarybible.com/beliefs/\\n\\nNext step: start with a Gospel (Mark or John) and read one short section per day.',
+ datetime('now'),datetime('now')),
+
+('doc_step_request_prayer_detail','calvarybible','journey_step','step_request_prayer','en','Request prayer at Calvary',
+ 'Calvary invites you to submit a prayer request and notes that staff prays for requests each week.\\n\\n- Request prayer: https://calvarybible.com/prayer/\\n\\nSource: https://calvarybible.com/prayer/',
+ datetime('now'),datetime('now')),
+
+('doc_step_join_group_detail','calvarybible','journey_step','step_join_group','en','Join a LifeGroup at Calvary',
+ '## What LifeGroups are\\n\\nLifeGroups are small gatherings that meet to discuss the sermon, pray, enjoy community, and serve.\\n\\n## How to join\\n\\n- LifeGroups page: https://calvarybible.com/lifegroups\\n- Interest form: https://calvarybiblechurch.churchcenter.com/people/forms/424826\\n\\nSource: https://calvarybible.com/lifegroups',
+ datetime('now'),datetime('now')),
+
+('doc_step_attend_sunday_detail','calvarybible','journey_step','step_attend_sunday','en','Attend a Sunday gathering (Calvary)',
+ 'Calvary has three campuses (Boulder, Erie, Thornton). Service times are listed on the site home page and locations page.\\n\\n- Home (service times): https://calvarybible.com/\\n- Locations: https://calvarybible.com/locations/',
+ datetime('now'),datetime('now')),
+
+('doc_step_membership_detail','calvarybible','journey_step','step_membership','en','Membership at Calvary (what it is)',
+ 'Membership class covers Calvary''s history, beliefs, and vision, led by pastors, with time for questions.\\n\\n- Membership: https://calvarybible.com/membership/\\n\\nSource: https://calvarybible.com/membership/',
+ datetime('now'),datetime('now')),
+
+('doc_ms_baptism_detail','calvarybible','journey_milestone','ms_baptism','en','Baptism: outward sign, inward reality',
+ 'Calvary teaches baptism is an outward expression of an inward reality and a next step after saving faith in Jesus.\\n\\n- Baptism: https://calvarybible.com/baptism\\n\\nSource: https://calvarybible.com/baptism',
+ datetime('now'),datetime('now')),
+
+('doc_step_serve_detail','calvarybible','journey_step','step_interest_serving','en','Serve on a team at Calvary',
+ 'Find a place to serve on a team at Calvary and in local communities.\\n\\n- Serve: https://calvarybible.com/serve\\n\\nSource: https://calvarybible.com/nextsteps/',
+ datetime('now'),datetime('now'));
+
+INSERT OR REPLACE INTO journey_resource_link (link_id, church_id, node_id, resource_id, relevance, created_at) VALUES
+('jrl_stage_seeker_guide','calvarybible','stage_seeker','doc_stage_seeker_guide',1.0,datetime('now')),
+('jrl_stage_gospel_clarity_guide','calvarybible','stage_gospel_clarity','doc_stage_gospel_clarity_guide',1.0,datetime('now')),
+('jrl_stage_conversion_guide','calvarybible','stage_conversion','doc_stage_conversion_guide',1.0,datetime('now')),
+('jrl_stage_new_believer_guide','calvarybible','stage_new_believer','doc_stage_new_believer_guide',1.0,datetime('now')),
+('jrl_stage_connected_guide','calvarybible','stage_connected','doc_stage_connected_guide',1.0,datetime('now')),
+('jrl_stage_growing_guide','calvarybible','stage_growing','doc_stage_growing_guide',1.0,datetime('now')),
+('jrl_stage_serving_guide','calvarybible','stage_serving','doc_stage_serving_guide',1.0,datetime('now')),
+('jrl_stage_multiplying_guide','calvarybible','stage_multiplying','doc_stage_multiplying_guide',1.0,datetime('now')),
+('jrl_stage_leader_guide','calvarybible','stage_leader','doc_stage_leader_guide',1.0,datetime('now')),
+
+('jrl_assurance_1john','calvarybible','topic_assurance','doc_scripture_1john5_11_13',1.0,datetime('now')),
+('jrl_assurance_rom8','calvarybible','topic_assurance','doc_scripture_rom8_1',0.95,datetime('now')),
+('jrl_assurance_eph1','calvarybible','topic_assurance','doc_scripture_eph1_13_14',0.9,datetime('now')),
+('jrl_assurance_john10','calvarybible','topic_assurance','doc_scripture_john10_27_29',0.85,datetime('now')),
+('jrl_assurance_detail','calvarybible','topic_assurance','doc_topic_assurance_detail',1.0,datetime('now')),
+
+('jrl_scripture_detail','calvarybible','topic_scripture','doc_topic_scripture_detail',1.0,datetime('now')),
+
+('jrl_pr_bible_howto','calvarybible','pr_bible','doc_pr_bible_howto',1.0,datetime('now')),
+('jrl_pr_prayer_howto','calvarybible','pr_prayer','doc_pr_prayer_howto',1.0,datetime('now')),
+('jrl_pr_prayer_matt6','calvarybible','pr_prayer','doc_scripture_matt6_9_13',0.95,datetime('now')),
+('jrl_pr_prayer_phil4','calvarybible','pr_prayer','doc_scripture_phil4_6_7',0.95,datetime('now')),
+
+('jrl_step_bible_plan_detail','calvarybible','step_start_bible_plan','doc_step_start_bible_plan_detail',1.0,datetime('now')),
+('jrl_step_request_prayer_detail','calvarybible','step_request_prayer','doc_step_request_prayer_detail',1.0,datetime('now')),
+('jrl_step_join_group_detail','calvarybible','step_join_group','doc_step_join_group_detail',1.0,datetime('now')),
+('jrl_ms_joined_group_detail','calvarybible','ms_joined_group','doc_ms_joined_group_detail',1.0,datetime('now')),
+('jrl_step_attend_sunday_detail','calvarybible','step_attend_sunday','doc_step_attend_sunday_detail',1.0,datetime('now')),
+('jrl_ms_baptism_detail','calvarybible','ms_baptism','doc_ms_baptism_detail',1.0,datetime('now')),
+('jrl_step_serve_detail','calvarybible','step_interest_serving','doc_step_serve_detail',1.0,datetime('now')),
+
+('jrl_comm_acts2','calvarybible','stage_connected','doc_scripture_acts2_42_47',0.9,datetime('now')),
+('jrl_comm_heb10','calvarybible','stage_connected','doc_scripture_heb10_24_25',0.9,datetime('now')),
+
+('jrl_serve_1pet4','calvarybible','stage_serving','doc_scripture_1pet4_10_11',0.9,datetime('now')),
+
+('jrl_multiply_matt28','calvarybible','stage_multiplying','doc_scripture_matt28_18_20',0.9,datetime('now')),
+
+('jrl_leader_2tim2','calvarybible','stage_leader','doc_scripture_2tim2_2',0.9,datetime('now'));
+
+INSERT OR REPLACE INTO content_docs (id, church_id, entity_type, entity_id, locale, title, body_markdown, created_at, updated_at) VALUES
+('doc_scripture_mark9_24','calvarybible','scripture_ref','Mark 9:24','en','Mark 9:24','Reference only (no stored translation text).\\n\\n- Ref: Mark 9:24\\n- Link: https://www.openbible.info/labs/cross-references/search?q=Mark%209%3A24',datetime('now'),datetime('now')),
+('doc_scripture_john20_24_29','calvarybible','scripture_ref','John 20:24-29','en','John 20:24–29','Reference only (no stored translation text).\\n\\n- Ref: John 20:24–29\\n- Link: https://www.openbible.info/labs/cross-references/search?q=John%2020%3A24-29',datetime('now'),datetime('now')),
+('doc_scripture_james1_5','calvarybible','scripture_ref','James 1:5','en','James 1:5','Reference only (no stored translation text).\\n\\n- Ref: James 1:5\\n- Link: https://www.openbible.info/labs/cross-references/search?q=James%201%3A5',datetime('now'),datetime('now')),
+('doc_scripture_1john1_9','calvarybible','scripture_ref','1 John 1:9','en','1 John 1:9','Reference only (no stored translation text).\\n\\n- Ref: 1 John 1:9\\n- Link: https://www.openbible.info/labs/cross-references/search?q=1%20John%201%3A9',datetime('now'),datetime('now')),
+('doc_scripture_psalm32_1_5','calvarybible','scripture_ref','Psalm 32:1-5','en','Psalm 32:1–5','Reference only (no stored translation text).\\n\\n- Ref: Psalm 32:1–5\\n- Link: https://www.openbible.info/labs/cross-references/search?q=Psalm%2032%3A1-5',datetime('now'),datetime('now')),
+('doc_scripture_rom10_9_10','calvarybible','scripture_ref','Romans 10:9-10','en','Romans 10:9–10','Reference only (no stored translation text).\\n\\n- Ref: Romans 10:9–10\\n- Link: https://www.openbible.info/labs/cross-references/search?q=Romans%2010%3A9-10',datetime('now'),datetime('now')),
+
+('doc_ms_understood_gospel_detail','calvarybible','journey_milestone','ms_understood_gospel','en','Understood the Gospel: a simple check',
+ 'You can explain the gospel in your own words:\\n\\n- Who is Jesus?\\n- What is sin?\\n- What did Jesus do (cross + resurrection)?\\n- How is someone saved (grace through faith, not works)?\\n- What changes in your life when you follow Jesus?\\n\\nCalvary beliefs (helpful summary): https://calvarybible.com/beliefs/\\n\\nSource: https://calvarybible.com/beliefs/',
+ datetime('now'),datetime('now')),
+
+('doc_ms_profession_faith_detail','calvarybible','journey_milestone','ms_profession_faith','en','Profession of Faith: what it is',
+ 'Profession of faith is openly trusting Jesus Christ (not just admiring him).\\n\\nA simple sentence: "Jesus, I turn from sin and trust you as my Savior and Lord."\\n\\nScripture anchors:\\n- Romans 10:9–10\\n- Ephesians 2:8–9',
+ datetime('now'),datetime('now')),
+
+('doc_step_foundations_class_detail','calvarybible','journey_step','step_foundations_class','en','Foundations: take a learning step',
+ '## What this step is\\n\\nA focused season of learning: basics of doctrine, habits, and how to live as a disciple.\\n\\n## Calvary options\\n\\n- Adult Classes (Sunday morning): https://calvarybible.com/adults-groups/classes\\n- Membership class (history, beliefs, vision): https://calvarybible.com/membership/\\n\\nSource links:\\n- https://calvarybible.com/adults-groups/classes\\n- https://calvarybible.com/membership/',
+ datetime('now'),datetime('now')),
+
+('doc_ms_foundations_class_detail','calvarybible','journey_milestone','ms_foundations_class','en','Completed Foundations: what changes',
+ 'This milestone means you have a workable foundation: gospel clarity, Bible + prayer habits, and a plan for community and service.\\n\\nSuggested next moves: keep a weekly habit, join a group if you have not, and start serving in one area.',
+ datetime('now'),datetime('now')),
+
+('doc_ms_started_serving_detail','calvarybible','journey_milestone','ms_started_serving','en','Started Serving: what counts',
+ 'Serving is consistent participation on a team (not a one-off).\\n\\nCalvary serve teams: https://calvarybible.com/serve\\n\\nSource: https://calvarybible.com/serve',
+ datetime('now'),datetime('now')),
+
+('doc_pr_worship_gathering_detail','calvarybible','journey_practice','pr_worship_gathering','en','Worship gathering: why Sundays matter',
+ 'Regular gathering helps you hear the Word, worship with others, and be known.\\n\\nCalvary service times + campuses:\\n- Home: https://calvarybible.com/\\n- Locations: https://calvarybible.com/locations/\\n\\nWatch online: messages are posted early Sunday afternoon (Calvary home page).\\n\\nSource: https://calvarybible.com/',
+ datetime('now'),datetime('now')),
+
+('doc_pr_community_detail','calvarybible','journey_practice','pr_community','en','Community: a practical way to belong',
+ 'A healthy community helps you learn and apply the Bible, pray, and serve together.\\n\\nCalvary LifeGroups: https://calvarybible.com/lifegroups\\n\\nSource: https://calvarybible.com/lifegroups',
+ datetime('now'),datetime('now')),
+
+('doc_pr_serving_detail','calvarybible','journey_practice','pr_serving','en','Serving: a weekly rhythm',
+ 'Serving is a practice: a repeatable pattern of love. Start small and stay consistent.\\n\\nCalvary serve teams: https://calvarybible.com/serve\\n\\nSource: https://calvarybible.com/serve',
+ datetime('now'),datetime('now')),
+
+('doc_pr_evangelism_detail','calvarybible','journey_practice','pr_evangelism','en','Evangelism: confident witness',
+ 'Calvary shaping value: Confident Witness (salvation is found in Christ alone).\\n\\nA simple pattern:\\n- Pray for 1-2 people by name\\n- Listen well\\n- Share one piece of your story\\n- Invite them to a next step (a meal, a group, a Sunday gathering)\\n\\nSource: https://calvarybible.com/mission-vision/',
+ datetime('now'),datetime('now')),
+
+('doc_topic_prayer_detail','calvarybible','journey_topic','topic_prayer','en','Prayer: dependence and faith',
+ 'Calvary shaping value: Prayer in Faith (God accomplishes his will through our prayers).\\n\\nScripture anchors:\\n- Matthew 6:9–13\\n- Philippians 4:6–7\\n\\nSource: https://calvarybible.com/mission-vision/',
+ datetime('now'),datetime('now')),
+
+('doc_topic_church_detail','calvarybible','journey_topic','topic_church','en','The Church: people, ordinances, belonging',
+ 'Calvary beliefs: the true church is all who are justified by grace through faith in Christ; local churches are communities of believers. Jesus mandated baptism and the Lord''s Supper as ordinances that express the gospel.\\n\\nSource: https://calvarybible.com/beliefs/',
+ datetime('now'),datetime('now')),
+
+('doc_topic_mission_detail','calvarybible','journey_topic','topic_mission','en','Mission: make disciples',
+ 'Calvary vision emphasizes making disciples, empowering leaders, and multiplying churches.\\n\\nSource: https://calvarybible.com/mission-vision/',
+ datetime('now'),datetime('now')),
+
+('doc_barrier_doubt_detail','calvarybible','journey_barrier','barrier_doubt','en','Doubt: what to do when you are unsure',
+ 'Doubt is not the opposite of faith; it is often the place where faith grows. Take one honest step.\\n\\nTry this:\\n- Ask God for wisdom (James 1:5).\\n- Read John 20:24–29 and notice how Jesus treats questions.\\n- Pray Mark 9:24: "I believe; help my unbelief."\\n\\nIf you want, write down your top 2 questions and bring them to a Guide.',
+ datetime('now'),datetime('now')),
+
+('doc_barrier_shame_detail','calvarybible','journey_barrier','barrier_shame','en','Shame: return to grace',
+ 'Shame says: "hide." Grace says: "come into the light."\\n\\nTry this:\\n- Confess honestly (1 John 1:9).\\n- Read Psalm 32:1–5.\\n- Remember: in Christ there is no condemnation (Romans 8:1).',
+ datetime('now'),datetime('now'));
+
+INSERT OR REPLACE INTO journey_resource_link (link_id, church_id, node_id, resource_id, relevance, created_at) VALUES
+('jrl_ms_understood_gospel_detail','calvarybible','ms_understood_gospel','doc_ms_understood_gospel_detail',1.0,datetime('now')),
+('jrl_ms_profession_faith_detail','calvarybible','ms_profession_faith','doc_ms_profession_faith_detail',1.0,datetime('now')),
+('jrl_ms_profession_rom10','calvarybible','ms_profession_faith','doc_scripture_rom10_9_10',0.95,datetime('now')),
+
+('jrl_step_foundations_detail','calvarybible','step_foundations_class','doc_step_foundations_class_detail',1.0,datetime('now')),
+('jrl_ms_foundations_detail','calvarybible','ms_foundations_class','doc_ms_foundations_class_detail',1.0,datetime('now')),
+
+('jrl_ms_started_serving_detail','calvarybible','ms_started_serving','doc_ms_started_serving_detail',1.0,datetime('now')),
+
+('jrl_pr_worship_gathering_detail','calvarybible','pr_worship_gathering','doc_pr_worship_gathering_detail',1.0,datetime('now')),
+('jrl_pr_community_detail','calvarybible','pr_community','doc_pr_community_detail',1.0,datetime('now')),
+('jrl_pr_serving_detail','calvarybible','pr_serving','doc_pr_serving_detail',1.0,datetime('now')),
+('jrl_pr_evangelism_detail','calvarybible','pr_evangelism','doc_pr_evangelism_detail',1.0,datetime('now')),
+
+('jrl_topic_prayer_detail','calvarybible','topic_prayer','doc_topic_prayer_detail',1.0,datetime('now')),
+('jrl_topic_church_detail','calvarybible','topic_church','doc_topic_church_detail',1.0,datetime('now')),
+('jrl_topic_mission_detail','calvarybible','topic_mission','doc_topic_mission_detail',1.0,datetime('now')),
+
+('jrl_barrier_doubt_detail','calvarybible','barrier_doubt','doc_barrier_doubt_detail',1.0,datetime('now')),
+('jrl_barrier_doubt_mark9','calvarybible','barrier_doubt','doc_scripture_mark9_24',0.95,datetime('now')),
+('jrl_barrier_doubt_john20','calvarybible','barrier_doubt','doc_scripture_john20_24_29',0.9,datetime('now')),
+('jrl_barrier_doubt_james1','calvarybible','barrier_doubt','doc_scripture_james1_5',0.85,datetime('now')),
+
+('jrl_barrier_shame_detail','calvarybible','barrier_shame','doc_barrier_shame_detail',1.0,datetime('now')),
+('jrl_barrier_shame_1john1','calvarybible','barrier_shame','doc_scripture_1john1_9',0.95,datetime('now')),
+('jrl_barrier_shame_ps32','calvarybible','barrier_shame','doc_scripture_psalm32_1_5',0.9,datetime('now'));
+
 -- Link journey nodes to real ChurchCore entities (for CTAs in UI)
 INSERT OR REPLACE INTO journey_entity_link (link_id, church_id, node_id, entity_type, entity_id, relevance, metadata_json, created_at) VALUES
 ('jel1','calvarybible','res_what_to_expect','resource','res1',1.0,'{}',datetime('now')),
@@ -535,6 +797,22 @@ INSERT OR REPLACE INTO journey_entity_link (link_id, church_id, node_id, entity_
 ('jel4','calvarybible','comm_parents_group','group','g2',1.0,'{}',datetime('now')),
 ('jel5','calvarybible','step_join_group','group','g1',0.9,'{\"cta\":\"Explore groups\"}',datetime('now')),
 ('jel6','calvarybible','step_interest_serving','opportunity','opp1',0.9,'{\"cta\":\"Serve on a team\"}',datetime('now'));
+
+-- Link stages/steps to community catalog (for Community tool recommendations)
+INSERT OR REPLACE INTO journey_entity_link (link_id, church_id, node_id, entity_type, entity_id, relevance, metadata_json, created_at) VALUES
+('jel_comm_newbeliever_starting_point','calvarybible','stage_new_believer','community','comm_starting_point_boulder',0.9,'{\"cta\":\"Starting Point\"}',datetime('now')),
+('jel_comm_newbeliever_lifegroups','calvarybible','stage_new_believer','community','comm_lifegroups',0.9,'{\"cta\":\"LifeGroups\"}',datetime('now')),
+('jel_comm_connected_lifegroups','calvarybible','stage_connected','community','comm_lifegroups',1.0,'{\"cta\":\"Join a LifeGroup\"}',datetime('now')),
+('jel_comm_connected_membership','calvarybible','stage_connected','community','comm_membership_boulder',0.8,'{\"cta\":\"Membership\"}',datetime('now')),
+('jel_comm_growing_classes','calvarybible','stage_growing','community','comm_adult_classes_boulder',0.8,'{\"cta\":\"Adult classes\"}',datetime('now')),
+('jel_comm_serving_serve','calvarybible','stage_serving','community','comm_serve_boulder',1.0,'{\"cta\":\"Serve\"}',datetime('now')),
+('jel_comm_serving_outreach','calvarybible','stage_serving','community','comm_outreach_local_boulder',0.8,'{\"cta\":\"Local outreach\"}',datetime('now')),
+('jel_comm_multiplying_outreach_global','calvarybible','stage_multiplying','community','comm_outreach_global',0.9,'{\"cta\":\"Global outreach\"}',datetime('now')),
+('jel_comm_multiplying_brazil','calvarybible','stage_multiplying','community','comm_brazil_trip_interest',0.8,'{\"cta\":\"Brazil trip interest\"}',datetime('now')),
+('jel_comm_step_join_group','calvarybible','step_join_group','community','comm_lifegroups',1.0,'{\"cta\":\"LifeGroups\"}',datetime('now')),
+('jel_comm_step_foundations','calvarybible','step_foundations_class','community','comm_adult_classes_boulder',0.8,'{\"cta\":\"Classes\"}',datetime('now')),
+('jel_comm_step_serve','calvarybible','step_interest_serving','community','comm_serve_boulder',1.0,'{\"cta\":\"Serve\"}',datetime('now')),
+('jel_comm_ms_baptism','calvarybible','ms_baptism','community','comm_baptism_boulder_thornton',0.9,'{\"cta\":\"Baptism\"}',datetime('now'));
 
 -- Person journey instance (seed)
 INSERT OR REPLACE INTO person_journey_state (church_id, person_id, current_stage_id, confidence, updated_at) VALUES

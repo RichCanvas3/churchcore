@@ -449,6 +449,45 @@ CREATE TABLE IF NOT EXISTS registrations (
 );
 CREATE INDEX IF NOT EXISTS idx_registrations ON registrations(church_id, event_id, status, created_at);
 
+-- Community catalog + per-person participation
+-- This is broader than groups/opportunities/events and is meant to unify:
+-- - groups/classes/ministry programs
+-- - local outreach partners/opportunities
+-- - global outreach + missions trips
+CREATE TABLE IF NOT EXISTS community_catalog (
+  id TEXT PRIMARY KEY,
+  church_id TEXT NOT NULL,
+  campus_id TEXT,
+  kind TEXT NOT NULL, -- lifegroup|class|ministry|outreach_local|outreach_global|trip|serving_team|bible_study|other
+  title TEXT NOT NULL,
+  description TEXT,
+  source_url TEXT,
+  signup_url TEXT,
+  start_at TEXT,
+  end_at TEXT,
+  tags_json TEXT,
+  is_active INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_community_catalog ON community_catalog(church_id, campus_id, kind, is_active);
+
+CREATE TABLE IF NOT EXISTS person_community (
+  church_id TEXT NOT NULL,
+  person_id TEXT NOT NULL,
+  community_id TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'active', -- pending|active|inactive|attended|completed
+  role TEXT NOT NULL DEFAULT 'participant', -- participant|leader
+  joined_at TEXT,
+  left_at TEXT,
+  notes_json TEXT,
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (church_id, person_id, community_id),
+  FOREIGN KEY (person_id) REFERENCES people(id) ON DELETE CASCADE,
+  FOREIGN KEY (community_id) REFERENCES community_catalog(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_person_community ON person_community(church_id, person_id, status, updated_at);
+
 CREATE TABLE IF NOT EXISTS groups (
   id TEXT PRIMARY KEY,
   church_id TEXT NOT NULL,

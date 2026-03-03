@@ -102,6 +102,13 @@ function agentCard(req: Request, env: Env) {
           ],
         },
         {
+          id: "community",
+          name: "Community",
+          description: "Browse and manage groups/classes/outreach/missions/trips; join/leave and track participation.",
+          tags: ["community", "groups", "classes", "outreach", "missions"],
+          examples: ["Show me LifeGroups", "Join Starting Point", "What outreach is available?", "Mark that I attended"],
+        },
+        {
           id: "calendar",
           name: "Calendar",
           description: "Week-view calendar of church events; outdoor events include a weather snapshot (48h/8d forecast).",
@@ -138,6 +145,11 @@ function agentCard(req: Request, env: Env) {
         household_get: `${baseUrl}a2a/household.get`,
         household_member_upsert: `${baseUrl}a2a/household.member.upsert`,
         household_member_remove: `${baseUrl}a2a/household.member.remove`,
+        community_catalog_list: `${baseUrl}a2a/community.catalog.list`,
+        community_my_list: `${baseUrl}a2a/community.my.list`,
+        community_join: `${baseUrl}a2a/community.join`,
+        community_leave: `${baseUrl}a2a/community.leave`,
+        community_mark: `${baseUrl}a2a/community.mark`,
         checkin_start: `${baseUrl}a2a/checkin.start`,
         checkin_preview: `${baseUrl}a2a/checkin.preview`,
         checkin_commit: `${baseUrl}a2a/checkin.commit`,
@@ -540,6 +552,8 @@ function isAllowedMemoryPathForSeeker(path: string) {
   if (p.startsWith("identity.")) return true;
   if (p.startsWith("contact.")) return true;
   if (p.startsWith("communicationPreferences.")) return true;
+  if (p.startsWith("household.")) return true;
+  if (p.startsWith("community.")) return true;
   if (p.startsWith("spiritualJourney.")) return true;
   if (p.startsWith("intentProfile.")) return true;
   if (p.startsWith("pastoralCare.prayerRequests")) return true;
@@ -1030,6 +1044,19 @@ async function resolveJourneyNodeEntity(env: Env, args: { churchId: string; node
     const row = (await env.churchcore.prepare(`SELECT * FROM content_docs WHERE church_id=?1 AND id=?2`).bind(args.churchId, entityId).first()) as any;
     return row ? { type: "content_doc", doc: row } : null;
   }
+  if (entityType === "community") {
+    const row = (
+      await env.churchcore
+        .prepare(
+          `SELECT id,campus_id,kind,title,description,source_url,signup_url,start_at,end_at,tags_json,is_active,created_at,updated_at
+           FROM community_catalog
+           WHERE church_id=?1 AND id=?2`,
+        )
+        .bind(args.churchId, entityId)
+        .first()
+    ) as any;
+    return row ? { type: "community", community: row } : null;
+  }
   return null;
 }
 
@@ -1059,6 +1086,19 @@ async function resolveEntityByLink(env: Env, args: { churchId: string; entityTyp
   if (entityType === "content_doc") {
     const row = (await env.churchcore.prepare(`SELECT * FROM content_docs WHERE church_id=?1 AND id=?2`).bind(args.churchId, entityId).first()) as any;
     return row ? { type: "content_doc", doc: row } : null;
+  }
+  if (entityType === "community") {
+    const row = (
+      await env.churchcore
+        .prepare(
+          `SELECT id,campus_id,kind,title,description,source_url,signup_url,start_at,end_at,tags_json,is_active,created_at,updated_at
+           FROM community_catalog
+           WHERE church_id=?1 AND id=?2`,
+        )
+        .bind(args.churchId, entityId)
+        .first()
+    ) as any;
+    return row ? { type: "community", community: row } : null;
   }
   return null;
 }
@@ -1427,6 +1467,41 @@ const HouseholdMemberRemoveSchema = z.object({
   identity: IdentitySchema,
   household_id: z.string().min(1),
   person_id: z.string().min(1),
+});
+
+// Community (catalog + per-person involvement)
+const CommunityCatalogListSchema = z.object({
+  identity: IdentitySchema,
+  campus_id: z.string().min(1).optional().nullable(),
+  kind: z.string().min(1).optional().nullable(),
+  search: z.string().min(1).optional().nullable(),
+  include_inactive: z.boolean().optional().nullable(),
+  limit: z.number().int().min(1).max(200).optional().nullable(),
+  offset: z.number().int().min(0).max(500000).optional().nullable(),
+});
+
+const CommunityMyListSchema = z.object({
+  identity: IdentitySchema,
+  include_inactive: z.boolean().optional().nullable(),
+  limit: z.number().int().min(1).max(200).optional().nullable(),
+  offset: z.number().int().min(0).max(500000).optional().nullable(),
+});
+
+const CommunityJoinSchema = z.object({
+  identity: IdentitySchema,
+  community_id: z.string().min(1),
+  status: z.enum(["pending", "active"]).optional().nullable(),
+});
+
+const CommunityLeaveSchema = z.object({
+  identity: IdentitySchema,
+  community_id: z.string().min(1),
+});
+
+const CommunityMarkSchema = z.object({
+  identity: IdentitySchema,
+  community_id: z.string().min(1),
+  status: z.enum(["attended", "completed"]),
 });
 
 const CheckinStartSchema = z.object({
@@ -2450,6 +2525,168 @@ async function handleHouseholdMemberRemove(req: Request, env: Env) {
   return json({ ok: true, household, members, children, actor: { userId, role, personId: actorPersonId } });
 }
 
+async function handleCommunityCatalogList(req: Request, env: Env) {
+  const parsed = CommunityCatalogListSchema.safeParse(await parseJson(req));
+  if (!parsed.success) return json({ error: "Invalid body", issues: parsed.error.issues }, { status: 400 });
+  const { identity } = parsed.data;
+  const churchId = identity.tenant_id;
+  const userId = identity.user_id;
+  const role = (identity.role ?? "seeker") as string;
+
+  const campusId = (parsed.data.campus_id ?? identity.campus_id ?? "").trim() || null;
+  const kind = (parsed.data.kind ?? "").trim() || null;
+  const search = (parsed.data.search ?? "").trim() || null;
+  const includeInactive = Boolean(parsed.data.include_inactive);
+  const limit = parsed.data.limit ?? 100;
+  const offset = parsed.data.offset ?? 0;
+
+  let sql = `SELECT id,campus_id AS campusId,kind,title,description,source_url AS sourceUrl,signup_url AS signupUrl,start_at AS startAt,end_at AS endAt,tags_json AS tagsJson,is_active AS isActive,created_at AS createdAt,updated_at AS updatedAt
+             FROM community_catalog
+             WHERE church_id=?1`;
+  const binds: any[] = [churchId];
+
+  if (campusId) {
+    sql += ` AND (campus_id=?${binds.length + 1} OR campus_id IS NULL)`;
+    binds.push(campusId);
+  }
+  if (kind) {
+    sql += ` AND kind=?${binds.length + 1}`;
+    binds.push(kind);
+  }
+  if (!includeInactive) sql += ` AND is_active=1`;
+  if (search) {
+    sql += ` AND (lower(title) LIKE ?${binds.length + 1} OR lower(description) LIKE ?${binds.length + 1})`;
+    binds.push(`%${search.toLowerCase()}%`);
+  }
+  sql += ` ORDER BY kind ASC, title ASC LIMIT ${limit} OFFSET ${offset}`;
+
+  const rows = (await env.churchcore.prepare(sql).bind(...binds).all()).results ?? [];
+  return json({ ok: true, items: rows, actor: { userId, role } });
+}
+
+async function handleCommunityMyList(req: Request, env: Env) {
+  const parsed = CommunityMyListSchema.safeParse(await parseJson(req));
+  if (!parsed.success) return json({ error: "Invalid body", issues: parsed.error.issues }, { status: 400 });
+  const { identity } = parsed.data;
+  const churchId = identity.tenant_id;
+  const userId = identity.user_id;
+  const role = (identity.role ?? "seeker") as string;
+  const includeInactive = Boolean(parsed.data.include_inactive);
+  const limit = parsed.data.limit ?? 100;
+  const offset = parsed.data.offset ?? 0;
+
+  const { personId } = await resolvePerson(env, identity);
+  if (!personId) return json({ ok: true, person_id: null, items: [], actor: { userId, role } });
+
+  let sql = `SELECT pc.community_id AS communityId, pc.status, pc.role, pc.joined_at AS joinedAt, pc.left_at AS leftAt, pc.notes_json AS notesJson, pc.updated_at AS updatedAt,
+                    cc.campus_id AS campusId, cc.kind, cc.title, cc.description, cc.source_url AS sourceUrl, cc.signup_url AS signupUrl, cc.start_at AS startAt, cc.end_at AS endAt, cc.tags_json AS tagsJson, cc.is_active AS isActive
+             FROM person_community pc
+             JOIN community_catalog cc ON cc.id = pc.community_id
+             WHERE pc.church_id=?1 AND pc.person_id=?2`;
+  const binds: any[] = [churchId, personId];
+  if (!includeInactive) sql += ` AND pc.status!='inactive'`;
+  sql += ` ORDER BY pc.updated_at DESC LIMIT ${limit} OFFSET ${offset}`;
+
+  const rows = (await env.churchcore.prepare(sql).bind(...binds).all()).results ?? [];
+  return json({ ok: true, person_id: personId, items: rows, actor: { userId, role } });
+}
+
+async function handleCommunityJoin(req: Request, env: Env) {
+  const parsed = CommunityJoinSchema.safeParse(await parseJson(req));
+  if (!parsed.success) return json({ error: "Invalid body", issues: parsed.error.issues }, { status: 400 });
+  const { identity } = parsed.data;
+  const churchId = identity.tenant_id;
+  const userId = identity.user_id;
+  const role = (identity.role ?? "seeker") as string;
+  const communityId = parsed.data.community_id.trim();
+  const status = (parsed.data.status ?? "active").trim() as "pending" | "active";
+
+  const { personId } = await resolvePerson(env, identity);
+  if (!personId) return json({ ok: false, error: "No personId" }, { status: 400 });
+
+  const exists = (await env.churchcore.prepare(`SELECT 1 FROM community_catalog WHERE church_id=?1 AND id=?2 LIMIT 1`).bind(churchId, communityId).first()) as any;
+  if (!exists) return json({ ok: false, error: "Unknown community_id" }, { status: 404 });
+
+  const now = nowIso();
+  const existing = (await env.churchcore
+    .prepare(`SELECT joined_at AS joinedAt FROM person_community WHERE church_id=?1 AND person_id=?2 AND community_id=?3`)
+    .bind(churchId, personId, communityId)
+    .first()) as any;
+  const joinedAt = typeof existing?.joinedAt === "string" ? existing.joinedAt : now;
+
+  await env.churchcore
+    .prepare(
+      `INSERT INTO person_community (church_id, person_id, community_id, status, role, joined_at, left_at, notes_json, updated_at)
+       VALUES (?1, ?2, ?3, ?4, 'participant', ?5, NULL, NULL, ?6)
+       ON CONFLICT(church_id, person_id, community_id) DO UPDATE SET
+         status=excluded.status,
+         role=excluded.role,
+         joined_at=excluded.joined_at,
+         left_at=NULL,
+         updated_at=excluded.updated_at`,
+    )
+    .bind(churchId, personId, communityId, status, joinedAt, now)
+    .run();
+
+  return json({ ok: true, person_id: personId, community_id: communityId, status, actor: { userId, role } });
+}
+
+async function handleCommunityLeave(req: Request, env: Env) {
+  const parsed = CommunityLeaveSchema.safeParse(await parseJson(req));
+  if (!parsed.success) return json({ error: "Invalid body", issues: parsed.error.issues }, { status: 400 });
+  const { identity } = parsed.data;
+  const churchId = identity.tenant_id;
+  const userId = identity.user_id;
+  const role = (identity.role ?? "seeker") as string;
+  const communityId = parsed.data.community_id.trim();
+
+  const { personId } = await resolvePerson(env, identity);
+  if (!personId) return json({ ok: false, error: "No personId" }, { status: 400 });
+
+  const now = nowIso();
+  await env.churchcore
+    .prepare(
+      `INSERT INTO person_community (church_id, person_id, community_id, status, role, joined_at, left_at, notes_json, updated_at)
+       VALUES (?1, ?2, ?3, 'inactive', 'participant', NULL, ?4, NULL, ?5)
+       ON CONFLICT(church_id, person_id, community_id) DO UPDATE SET
+         status='inactive',
+         left_at=?4,
+         updated_at=?5`,
+    )
+    .bind(churchId, personId, communityId, now, now)
+    .run();
+
+  return json({ ok: true, person_id: personId, community_id: communityId, status: "inactive", actor: { userId, role } });
+}
+
+async function handleCommunityMark(req: Request, env: Env) {
+  const parsed = CommunityMarkSchema.safeParse(await parseJson(req));
+  if (!parsed.success) return json({ error: "Invalid body", issues: parsed.error.issues }, { status: 400 });
+  const { identity } = parsed.data;
+  const churchId = identity.tenant_id;
+  const userId = identity.user_id;
+  const role = (identity.role ?? "seeker") as string;
+  const communityId = parsed.data.community_id.trim();
+  const status = parsed.data.status;
+
+  const { personId } = await resolvePerson(env, identity);
+  if (!personId) return json({ ok: false, error: "No personId" }, { status: 400 });
+
+  const now = nowIso();
+  await env.churchcore
+    .prepare(
+      `INSERT INTO person_community (church_id, person_id, community_id, status, role, joined_at, left_at, notes_json, updated_at)
+       VALUES (?1, ?2, ?3, ?4, 'participant', ?5, NULL, NULL, ?6)
+       ON CONFLICT(church_id, person_id, community_id) DO UPDATE SET
+         status=excluded.status,
+         updated_at=excluded.updated_at`,
+    )
+    .bind(churchId, personId, communityId, status, now, now)
+    .run();
+
+  return json({ ok: true, person_id: personId, community_id: communityId, status, actor: { userId, role } });
+}
+
 async function handleCheckinStart(req: Request, env: Env) {
   const parsed = CheckinStartSchema.safeParse(await parseJson(req));
   if (!parsed.success) return json({ error: "Invalid body", issues: parsed.error.issues }, { status: 400 });
@@ -2695,6 +2932,16 @@ export default {
         return handleHouseholdMemberUpsert(req, env);
       case "/a2a/household.member.remove":
         return handleHouseholdMemberRemove(req, env);
+      case "/a2a/community.catalog.list":
+        return handleCommunityCatalogList(req, env);
+      case "/a2a/community.my.list":
+        return handleCommunityMyList(req, env);
+      case "/a2a/community.join":
+        return handleCommunityJoin(req, env);
+      case "/a2a/community.leave":
+        return handleCommunityLeave(req, env);
+      case "/a2a/community.mark":
+        return handleCommunityMark(req, env);
       case "/a2a/checkin.start":
         return handleCheckinStart(req, env);
       case "/a2a/checkin.preview":
