@@ -147,6 +147,17 @@ CREATE TABLE IF NOT EXISTS household_members (
   FOREIGN KEY (person_id) REFERENCES people(id) ON DELETE CASCADE
 );
 
+-- Household profile (household-level notes/preferences that are not per-person)
+CREATE TABLE IF NOT EXISTS household_profiles (
+  household_id TEXT PRIMARY KEY,
+  church_id TEXT NOT NULL,
+  allergy_notes TEXT, -- household-level notes (in addition to per-child allergies)
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  FOREIGN KEY (household_id) REFERENCES households(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_household_profiles ON household_profiles(church_id, household_id);
+
 -- Person relationships (guardian, spouse, emergency contact, etc.)
 CREATE TABLE IF NOT EXISTS person_relationships (
   id TEXT PRIMARY KEY,

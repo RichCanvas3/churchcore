@@ -295,9 +295,9 @@ def _ui_handoff_for_user_text(user_text: str) -> list[dict[str, Any]]:
         return [
             {
                 "type": "ui_tool",
-                "tool_id": "household_memory",
+                "tool_id": "household_manager",
                 "title": "Household",
-                "instructions": "Open household memory (includes pickup/custody/allergy notes).",
+                "instructions": "Open the household manager panel (includes pickup/custody/allergy notes).",
             }
         ]
 
@@ -1015,13 +1015,12 @@ async def handle_seeker_skill(
             "- strategic_intent: show purpose/vision/mission/strategy (church strategic intent).\n"
             "- calendar: show events calendar (week view, with outdoor weather).\n"
             "- bible_reader: read Bible passages (WEB text in-panel, NIV link).\n"
-            "- household_manager: manage household members (add/edit/remove kids, allergies, special needs).\n"
+            "- household_manager: manage household (kids, custody notes, allergies; authorized pickup + extended family).\n"
             "- kids_checkin: run kids check-in flow (find family, preview rooms, commit check-in).\n"
             "- guide: show journey position + next steps + resources.\n"
             "- memory_manager: manage person memory areas (hub).\n"
             "- identity_contact: view/edit preferred name + email/phone.\n"
             "- faith_journey: view/edit faith journey phase and milestones (Seeker, New Believer, Growing, etc.).\n"
-            "- household_memory: view/edit household memory (family structure, kids notes, extended family definitions).\n"
             "- comm_prefs: view/edit communication preferences (SMS/email opt-in, preferred channel).\n"
             "- care_pastoral: manage prayer requests (and staff-only care notes).\n"
             "- teams_skills: staff-only serving teams/skills.\n"

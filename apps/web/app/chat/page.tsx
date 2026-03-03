@@ -14,7 +14,6 @@ import { TeamsSkillsPanel } from "./TeamsSkillsPanel";
 import { CarePastoralPanel } from "./CarePastoralPanel";
 import { MemoryManagerPanel } from "./MemoryManagerPanel";
 import { CommunityManagerPanel } from "./CommunityManagerPanel";
-import { HouseholdMemoryPanel } from "./HouseholdMemoryPanel";
 import { GuidePanel } from "./GuidePanel";
 import { ChurchOverviewPanel } from "./ChurchOverviewPanel";
 import { StrategicIntentPanel } from "./StrategicIntentPanel";
@@ -94,7 +93,7 @@ export default function ChatPage() {
   };
 
   function openTool(toolId: string, args?: Record<string, unknown> | null) {
-    const nextToolId = toolId === "kids_safety" ? "household_memory" : toolId;
+    const nextToolId = toolId === "kids_safety" || toolId === "household_memory" ? "household_manager" : toolId;
     setActiveUiToolId(nextToolId);
     setActiveUiToolArgs(args ?? null);
   }
@@ -348,8 +347,6 @@ export default function ChatPage() {
                 ? "Household"
                 : p.toolId === "community_manager"
                   ? "Community"
-                  : p.toolId === "household_memory" || p.toolId === "kids_safety"
-                    ? "Household"
                 : p.toolId === "calendar"
                   ? "Calendar"
                   : p.toolId === "bible_reader"
@@ -1002,18 +999,6 @@ export default function ChatPage() {
               />
             ) : activeUiToolId === "teams_skills" ? (
               <TeamsSkillsPanel
-                identity={{
-                  tenant_id: identity.tenant_id,
-                  user_id: identity.user_id,
-                  role: identity.role,
-                  campus_id: identity.campus_id ?? null,
-                  timezone: identity.timezone ?? null,
-                  persona_id: (identity as any).persona_id ?? null,
-                }}
-                onClose={closeTool}
-              />
-            ) : activeUiToolId === "household_memory" ? (
-              <HouseholdMemoryPanel
                 identity={{
                   tenant_id: identity.tenant_id,
                   user_id: identity.user_id,

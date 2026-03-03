@@ -36,7 +36,7 @@ export function MemoryManagerPanel(props: {
     { toolId: "identity_contact", title: "Identity & Contact", desc: "Preferred name + email/phone" },
     { toolId: "faith_journey", title: "Faith Journey", desc: "Phase + milestones" },
     { toolId: "community_manager", title: "Community", desc: "Groups, classes, outreach, missions" },
-    { toolId: "household_memory", title: "Household", desc: "Family structure, kids notes, extended family" },
+    { toolId: "household_manager", title: "Household", desc: "Family, kids notes, pickup, extended family" },
     { toolId: "comm_prefs", title: "Communication Preferences", desc: "SMS/email opt-in + channel" },
     { toolId: "care_pastoral", title: "Care & Prayer", desc: "Prayer requests (and more for staff)" },
     { toolId: "teams_skills", title: "Teams & Skills", desc: "Serving teams, skills, availability" },

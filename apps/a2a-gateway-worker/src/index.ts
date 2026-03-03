@@ -145,6 +145,9 @@ function agentCard(req: Request, env: Env) {
         household_get: `${baseUrl}a2a/household.get`,
         household_member_upsert: `${baseUrl}a2a/household.member.upsert`,
         household_member_remove: `${baseUrl}a2a/household.member.remove`,
+        household_profile_upsert: `${baseUrl}a2a/household.profile.upsert`,
+        household_relationship_upsert: `${baseUrl}a2a/household.relationship.upsert`,
+        household_relationship_remove: `${baseUrl}a2a/household.relationship.remove`,
         community_catalog_list: `${baseUrl}a2a/community.catalog.list`,
         community_my_list: `${baseUrl}a2a/community.my.list`,
         community_join: `${baseUrl}a2a/community.join`,
@@ -552,7 +555,6 @@ function isAllowedMemoryPathForSeeker(path: string) {
   if (p.startsWith("identity.")) return true;
   if (p.startsWith("contact.")) return true;
   if (p.startsWith("communicationPreferences.")) return true;
-  if (p.startsWith("household.")) return true;
   if (p.startsWith("community.")) return true;
   if (p.startsWith("spiritualJourney.")) return true;
   if (p.startsWith("intentProfile.")) return true;
@@ -566,7 +568,6 @@ function canEditArea(identityRole: string, roles: Set<string>, area: string) {
   const a = String(area || "").toLowerCase();
   if (a === "identity_contact") return true;
   if (a === "faith_journey") return true;
-  if (a === "household_memory") return true;
   if (a === "comm_prefs") return true;
   if (a === "care_pastoral") return true; // seekers can manage their own prayer requests
   return false;
@@ -596,7 +597,6 @@ async function handleMemoryGet(req: Request, env: Env) {
     can_edit: {
       identity_contact: canEditArea(role, roles, "identity_contact"),
       faith_journey: canEditArea(role, roles, "faith_journey"),
-      household_memory: canEditArea(role, roles, "household_memory"),
       comm_prefs: canEditArea(role, roles, "comm_prefs"),
       teams_skills: canEditArea(role, roles, "teams_skills"),
       care_pastoral: canEditArea(role, roles, "care_pastoral"),
@@ -1461,6 +1461,7 @@ const HouseholdMemberUpsertSchema = z.object({
     birthdate: z.string().optional().nullable(), // YYYY-MM-DD (optional, primarily for children)
     allergies: z.string().optional().nullable(),
     special_needs: z.boolean().optional().nullable(),
+    custody_notes: z.string().optional().nullable(),
   }),
 });
 
@@ -1468,6 +1469,31 @@ const HouseholdMemberRemoveSchema = z.object({
   identity: IdentitySchema,
   household_id: z.string().min(1),
   person_id: z.string().min(1),
+});
+
+const HouseholdProfileUpsertSchema = z.object({
+  identity: IdentitySchema,
+  household_id: z.string().min(1),
+  allergy_notes: z.string().optional().nullable(),
+});
+
+const HouseholdRelationshipUpsertSchema = z.object({
+  identity: IdentitySchema,
+  household_id: z.string().min(1),
+  child_person_id: z.string().min(1),
+  relationship: z.enum(["authorized_pickup", "grandparent", "aunt", "uncle", "aunt_uncle", "other_family"]),
+  person: z.object({
+    person_id: z.string().min(1).optional().nullable(),
+    first_name: z.string().min(1),
+    last_name: z.string().optional().nullable(),
+    notes: z.string().optional().nullable(),
+  }),
+});
+
+const HouseholdRelationshipRemoveSchema = z.object({
+  identity: IdentitySchema,
+  household_id: z.string().min(1),
+  relationship_id: z.string().min(1),
 });
 
 // Community (catalog + per-person involvement)
@@ -2318,8 +2344,8 @@ async function handleHouseholdCreate(req: Request, env: Env) {
     await env.churchcore.prepare(`INSERT INTO household_members (household_id, person_id, role) VALUES (?1, ?2, 'child')`).bind(householdId, childId).run();
     await env.churchcore
       .prepare(
-        `INSERT INTO child_profiles (person_id, church_id, allergies, special_needs, created_at, updated_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6)`,
+        `INSERT INTO child_profiles (person_id, church_id, allergies, special_needs, custody_notes, created_at, updated_at)
+         VALUES (?1, ?2, ?3, ?4, NULL, ?5, ?6)`,
       )
       .bind(childId, churchId, c.allergies ?? null, c.special_needs ? 1 : 0, now, now)
       .run();
@@ -2339,12 +2365,18 @@ async function handleHouseholdCreate(req: Request, env: Env) {
       .run();
   }
 
+  await syncHouseholdSnapshotToAdults(env, { churchId, householdId });
   return json({ ok: true, household_id: householdId, parent_person_id: parentPersonId, child_person_ids: childIds, actor: { userId, role } });
 }
 
 async function loadHouseholdFull(env: Env, args: { churchId: string; householdId: string }) {
   const household = (await env.churchcore.prepare(`SELECT * FROM households WHERE church_id=?1 AND id=?2`).bind(args.churchId, args.householdId).first()) as any;
-  if (!household) return { household: null, members: [], children: [] };
+  if (!household) return { household: null, profile: null as any, members: [], children: [], relationships: [] as any[] };
+
+  const profile = (await env.churchcore
+    .prepare(`SELECT household_id AS householdId, allergy_notes AS allergyNotes, created_at AS createdAt, updated_at AS updatedAt FROM household_profiles WHERE church_id=?1 AND household_id=?2`)
+    .bind(args.churchId, args.householdId)
+    .first()) as any;
 
   const members =
     (
@@ -2364,7 +2396,7 @@ async function loadHouseholdFull(env: Env, args: { churchId: string; householdId
     (
       await env.churchcore
         .prepare(
-          `SELECT p.id, p.first_name, p.last_name, p.birthdate, cp.grade, cp.allergies, cp.medical_notes, cp.special_needs
+          `SELECT p.id, p.first_name, p.last_name, p.birthdate, cp.grade, cp.allergies, cp.medical_notes, cp.special_needs, cp.custody_notes AS custody_notes
            FROM household_members hm
            JOIN people p ON p.id = hm.person_id
            LEFT JOIN child_profiles cp ON cp.person_id = p.id
@@ -2374,7 +2406,31 @@ async function loadHouseholdFull(env: Env, args: { churchId: string; householdId
         .all()
     ).results ?? [];
 
-  return { household, members, children };
+  const childIds = (children as any[]).map((c) => String(c?.id ?? "")).filter(Boolean);
+  let relationships: any[] = [];
+  if (childIds.length) {
+    const placeholders = childIds.map((_, i) => `?${i + 2}`).join(",");
+    const rows =
+      (
+        await env.churchcore
+          .prepare(
+            `SELECT pr.id, pr.from_person_id AS fromPersonId, pr.to_person_id AS toPersonId, pr.relationship_type AS relationshipType, pr.status, pr.notes, pr.created_at AS createdAt, pr.updated_at AS updatedAt,
+                    fp.first_name AS fromFirstName, fp.last_name AS fromLastName,
+                    tp.first_name AS toFirstName, tp.last_name AS toLastName
+             FROM person_relationships pr
+             JOIN people fp ON fp.id = pr.from_person_id AND fp.church_id = pr.church_id
+             JOIN people tp ON tp.id = pr.to_person_id AND tp.church_id = pr.church_id
+             WHERE pr.church_id=?1 AND pr.status='active' AND pr.to_person_id IN (${placeholders})
+               AND pr.relationship_type IN ('guardian','authorized_pickup','grandparent','aunt','uncle','aunt_uncle','other_family')
+             ORDER BY pr.relationship_type ASC, fp.last_name ASC, fp.first_name ASC`,
+          )
+          .bind(args.churchId, ...childIds)
+          .all()
+      ).results ?? [];
+    relationships = rows as any[];
+  }
+
+  return { household, profile: profile ?? null, members, children, relationships };
 }
 
 async function canManageHousehold(env: Env, args: { churchId: string; userId: string; role: string; personId: string | null; householdId: string }) {
@@ -2424,8 +2480,8 @@ async function handleHouseholdGet(req: Request, env: Env) {
   const ok = await canManageHousehold(env, { churchId, userId, role, personId, householdId });
   if (!ok) return json({ error: "Forbidden" }, { status: 403 });
 
-  const { household, members, children } = await loadHouseholdFull(env, { churchId, householdId });
-  return json({ ok: true, households: householdRows, household, members, children, actor: { userId, role, personId } });
+  const { household, profile, members, children, relationships } = await loadHouseholdFull(env, { churchId, householdId });
+  return json({ ok: true, households: householdRows, household, profile, members, children, relationships, actor: { userId, role, personId } });
 }
 
 async function handleHouseholdMemberUpsert(req: Request, env: Env) {
@@ -2473,11 +2529,11 @@ async function handleHouseholdMemberUpsert(req: Request, env: Env) {
   if (member.role === "child") {
     await env.churchcore
       .prepare(
-        `INSERT INTO child_profiles (person_id, church_id, allergies, special_needs, created_at, updated_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6)
-         ON CONFLICT(person_id) DO UPDATE SET allergies=excluded.allergies, special_needs=excluded.special_needs, updated_at=excluded.updated_at`,
+        `INSERT INTO child_profiles (person_id, church_id, allergies, special_needs, custody_notes, created_at, updated_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+         ON CONFLICT(person_id) DO UPDATE SET allergies=excluded.allergies, special_needs=excluded.special_needs, custody_notes=excluded.custody_notes, updated_at=excluded.updated_at`,
       )
-      .bind(nextPersonId, churchId, member.allergies ?? null, member.special_needs ? 1 : 0, now, now)
+      .bind(nextPersonId, churchId, member.allergies ?? null, member.special_needs ? 1 : 0, member.custody_notes ?? null, now, now)
       .run();
 
     if (actorPersonId) {
@@ -2503,8 +2559,9 @@ async function handleHouseholdMemberUpsert(req: Request, env: Env) {
     }
   }
 
-  const { household, members, children } = await loadHouseholdFull(env, { churchId, householdId });
-  return json({ ok: true, household, members, children, member_person_id: nextPersonId, actor: { userId, role, personId: actorPersonId } });
+  await syncHouseholdSnapshotToAdults(env, { churchId, householdId });
+  const { household, profile, members, children, relationships } = await loadHouseholdFull(env, { churchId, householdId });
+  return json({ ok: true, household, profile, members, children, relationships, member_person_id: nextPersonId, actor: { userId, role, personId: actorPersonId } });
 }
 
 async function handleHouseholdMemberRemove(req: Request, env: Env) {
@@ -2522,8 +2579,134 @@ async function handleHouseholdMemberRemove(req: Request, env: Env) {
   if (!ok) return json({ error: "Forbidden" }, { status: 403 });
 
   await env.churchcore.prepare(`DELETE FROM household_members WHERE household_id=?1 AND person_id=?2`).bind(householdId, personIdToRemove).run();
-  const { household, members, children } = await loadHouseholdFull(env, { churchId, householdId });
-  return json({ ok: true, household, members, children, actor: { userId, role, personId: actorPersonId } });
+  await syncHouseholdSnapshotToAdults(env, { churchId, householdId });
+  const { household, profile, members, children, relationships } = await loadHouseholdFull(env, { churchId, householdId });
+  return json({ ok: true, household, profile, members, children, relationships, actor: { userId, role, personId: actorPersonId } });
+}
+
+async function syncHouseholdSnapshotToAdults(env: Env, args: { churchId: string; householdId: string }) {
+  const { household, profile, members, children, relationships } = await loadHouseholdFull(env, { churchId: args.churchId, householdId: args.householdId });
+  if (!household) return;
+  const adultIds = (Array.isArray(members) ? members : [])
+    .filter((m: any) => String(m?.household_role ?? "").toLowerCase() === "adult")
+    .map((m: any) => String(m?.id ?? ""))
+    .filter(Boolean);
+  if (!adultIds.length) return;
+
+  const snapshot = {
+    household_id: String(household?.id ?? args.householdId),
+    name: household?.name ?? null,
+    profile: profile ?? null,
+    members,
+    children,
+    relationships,
+    synced_at: nowIso(),
+  };
+
+  for (const personId of adultIds) {
+    const row = await getPersonMemory(env, { churchId: args.churchId, personId });
+    const base = row.memory && typeof row.memory === "object" ? row.memory : {};
+    const next = { ...base, household: snapshot };
+    await upsertPersonMemory(env, { churchId: args.churchId, personId, memory: next });
+  }
+}
+
+async function handleHouseholdProfileUpsert(req: Request, env: Env) {
+  const parsed = HouseholdProfileUpsertSchema.safeParse(await parseJson(req));
+  if (!parsed.success) return json({ error: "Invalid body", issues: parsed.error.issues }, { status: 400 });
+  const { identity } = parsed.data;
+  const churchId = identity.tenant_id;
+  const userId = identity.user_id;
+  const role = (identity.role ?? "seeker") as string;
+  const householdId = parsed.data.household_id;
+
+  const { personId: actorPersonId } = await resolvePerson(env, identity);
+  const ok = await canManageHousehold(env, { churchId, userId, role, personId: actorPersonId, householdId });
+  if (!ok) return json({ error: "Forbidden" }, { status: 403 });
+
+  const now = nowIso();
+  await env.churchcore
+    .prepare(
+      `INSERT INTO household_profiles (household_id, church_id, allergy_notes, created_at, updated_at)
+       VALUES (?1, ?2, ?3, ?4, ?5)
+       ON CONFLICT(household_id) DO UPDATE SET allergy_notes=excluded.allergy_notes, updated_at=excluded.updated_at`,
+    )
+    .bind(householdId, churchId, (parsed.data.allergy_notes ?? null) as any, now, now)
+    .run();
+
+  await syncHouseholdSnapshotToAdults(env, { churchId, householdId });
+  const out = await loadHouseholdFull(env, { churchId, householdId });
+  return json({ ok: true, ...out, actor: { userId, role, personId: actorPersonId } });
+}
+
+async function handleHouseholdRelationshipUpsert(req: Request, env: Env) {
+  const parsed = HouseholdRelationshipUpsertSchema.safeParse(await parseJson(req));
+  if (!parsed.success) return json({ error: "Invalid body", issues: parsed.error.issues }, { status: 400 });
+  const { identity } = parsed.data;
+  const churchId = identity.tenant_id;
+  const userId = identity.user_id;
+  const role = (identity.role ?? "seeker") as string;
+  const householdId = parsed.data.household_id;
+  const childPersonId = parsed.data.child_person_id;
+  const relationshipType = parsed.data.relationship;
+  const p = parsed.data.person;
+
+  const { personId: actorPersonId } = await resolvePerson(env, identity);
+  const ok = await canManageHousehold(env, { churchId, userId, role, personId: actorPersonId, householdId });
+  if (!ok) return json({ error: "Forbidden" }, { status: 403 });
+
+  const childRow = (await env.churchcore
+    .prepare(`SELECT 1 FROM household_members WHERE household_id=?1 AND person_id=?2 AND role='child' LIMIT 1`)
+    .bind(householdId, childPersonId)
+    .first()) as any;
+  if (!childRow) return json({ error: "Unknown child_person_id for household" }, { status: 400 });
+
+  const now = nowIso();
+  const relPersonId = (p.person_id ?? "").trim() || crypto.randomUUID();
+  const existing = (await env.churchcore.prepare(`SELECT id FROM people WHERE church_id=?1 AND id=?2`).bind(churchId, relPersonId).first()) as any;
+  if (!existing) {
+    await env.churchcore
+      .prepare(`INSERT INTO people (id, church_id, campus_id, first_name, last_name, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)`)
+      .bind(relPersonId, churchId, identity.campus_id ?? null, p.first_name, p.last_name ?? null, now, now)
+      .run();
+  } else {
+    await env.churchcore
+      .prepare(`UPDATE people SET first_name=?3, last_name=?4, updated_at=?5 WHERE church_id=?1 AND id=?2`)
+      .bind(churchId, relPersonId, p.first_name, p.last_name ?? null, now)
+      .run();
+  }
+
+  await env.churchcore
+    .prepare(
+      `INSERT INTO person_relationships (id, church_id, from_person_id, to_person_id, relationship_type, status, notes, created_at, updated_at)
+       VALUES (?1, ?2, ?3, ?4, ?5, 'active', ?6, ?7, ?8)`,
+    )
+    .bind(crypto.randomUUID(), churchId, relPersonId, childPersonId, relationshipType, p.notes ?? null, now, now)
+    .run();
+
+  await syncHouseholdSnapshotToAdults(env, { churchId, householdId });
+  const out = await loadHouseholdFull(env, { churchId, householdId });
+  return json({ ok: true, ...out, actor: { userId, role, personId: actorPersonId } });
+}
+
+async function handleHouseholdRelationshipRemove(req: Request, env: Env) {
+  const parsed = HouseholdRelationshipRemoveSchema.safeParse(await parseJson(req));
+  if (!parsed.success) return json({ error: "Invalid body", issues: parsed.error.issues }, { status: 400 });
+  const { identity } = parsed.data;
+  const churchId = identity.tenant_id;
+  const userId = identity.user_id;
+  const role = (identity.role ?? "seeker") as string;
+  const householdId = parsed.data.household_id;
+  const relationshipId = parsed.data.relationship_id;
+
+  const { personId: actorPersonId } = await resolvePerson(env, identity);
+  const ok = await canManageHousehold(env, { churchId, userId, role, personId: actorPersonId, householdId });
+  if (!ok) return json({ error: "Forbidden" }, { status: 403 });
+
+  await env.churchcore.prepare(`UPDATE person_relationships SET status='inactive', updated_at=?3 WHERE church_id=?1 AND id=?2`).bind(churchId, relationshipId, nowIso()).run();
+  await syncHouseholdSnapshotToAdults(env, { churchId, householdId });
+  const out = await loadHouseholdFull(env, { churchId, householdId });
+  return json({ ok: true, ...out, actor: { userId, role, personId: actorPersonId } });
 }
 
 async function handleCommunityCatalogList(req: Request, env: Env) {
@@ -2933,6 +3116,12 @@ export default {
         return handleHouseholdMemberUpsert(req, env);
       case "/a2a/household.member.remove":
         return handleHouseholdMemberRemove(req, env);
+      case "/a2a/household.profile.upsert":
+        return handleHouseholdProfileUpsert(req, env);
+      case "/a2a/household.relationship.upsert":
+        return handleHouseholdRelationshipUpsert(req, env);
+      case "/a2a/household.relationship.remove":
+        return handleHouseholdRelationshipRemove(req, env);
       case "/a2a/community.catalog.list":
         return handleCommunityCatalogList(req, env);
       case "/a2a/community.my.list":

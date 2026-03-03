@@ -15,8 +15,10 @@ type HouseholdGetResponse = {
   ok?: boolean;
   households?: Array<{ id: string; name?: string | null }>;
   household?: { id: string; name?: string | null } | null;
+  profile?: { householdId?: string; allergyNotes?: string | null } | null;
   members?: any[];
   children?: any[];
+  relationships?: any[];
   error?: string;
 };
 
@@ -41,6 +43,12 @@ export function HouseholdManagerPanel(props: { identity: Identity; onClose: () =
   }, [data?.members]);
 
   const [newChild, setNewChild] = useState({ first_name: "", last_name: "", birthdate: "", allergies: "", special_needs: false });
+  const [allergyNotes, setAllergyNotes] = useState("");
+  const [relChildId, setRelChildId] = useState<string>("");
+  const [relType, setRelType] = useState<"authorized_pickup" | "grandparent" | "aunt" | "uncle" | "aunt_uncle" | "other_family">("authorized_pickup");
+  const [relFirst, setRelFirst] = useState("");
+  const [relLast, setRelLast] = useState("");
+  const [relNotes, setRelNotes] = useState("");
 
   async function refresh() {
     setLoading(true);
@@ -48,6 +56,8 @@ export function HouseholdManagerPanel(props: { identity: Identity; onClose: () =
     try {
       const out = await postJson<HouseholdGetResponse>("/api/a2a/household/get", { identity });
       setData(out);
+      const notes = out?.profile && typeof (out.profile as any)?.allergyNotes === "string" ? String((out.profile as any).allergyNotes) : "";
+      setAllergyNotes(notes);
     } catch (e: any) {
       setUiError(String(e?.message ?? e ?? "Failed to load household"));
     } finally {
@@ -103,6 +113,7 @@ export function HouseholdManagerPanel(props: { identity: Identity; onClose: () =
           birthdate: child.birthdate ?? null,
           allergies: child.allergies ?? null,
           special_needs: Boolean(child.special_needs),
+          custody_notes: child.custody_notes ?? null,
         },
       });
       setData((prev) => (prev ? { ...prev, ...(out as any) } : (out as any)));
@@ -156,6 +167,7 @@ export function HouseholdManagerPanel(props: { identity: Identity; onClose: () =
           birthdate: newChild.birthdate.trim() || null,
           allergies: newChild.allergies.trim() || null,
           special_needs: Boolean(newChild.special_needs),
+          custody_notes: null,
         },
       });
       setNewChild({ first_name: "", last_name: "", birthdate: "", allergies: "", special_needs: false });
@@ -187,6 +199,40 @@ export function HouseholdManagerPanel(props: { identity: Identity; onClose: () =
 
       <div style={{ padding: 14, overflow: "auto", display: "grid", gap: 14, alignContent: "start" }}>
         {uiError ? <div style={{ color: "#b91c1c", fontSize: 12 }}>{uiError}</div> : null}
+
+        {householdId ? (
+          <div style={{ border: "1px solid #e2e8f0", borderRadius: 12, padding: 12, background: "#f8fafc", display: "grid", gap: 8 }}>
+            <div style={{ fontSize: 12, fontWeight: 900, color: "#0f172a" }}>Household notes</div>
+            <label style={{ display: "grid", gap: 6 }}>
+              <div style={{ fontSize: 12, color: "#64748b" }}>Allergy notes (household-level)</div>
+              <textarea
+                value={allergyNotes}
+                onChange={(e) => setAllergyNotes(e.target.value)}
+                rows={2}
+                style={{ border: "1px solid #cbd5e1", borderRadius: 10, padding: "8px 10px", resize: "vertical" }}
+              />
+            </label>
+            <button
+              type="button"
+              disabled={loading}
+              onClick={async () => {
+                setLoading(true);
+                setUiError(null);
+                try {
+                  await postJson("/api/a2a/household/profile/upsert", { identity, household_id: householdId, allergy_notes: allergyNotes.trim() || null });
+                  await refresh();
+                } catch (e: any) {
+                  setUiError(String(e?.message ?? e ?? "Save failed"));
+                } finally {
+                  setLoading(false);
+                }
+              }}
+              style={{ border: "1px solid #e2e8f0", background: "white", borderRadius: 10, padding: "6px 10px", cursor: "pointer", fontSize: 12, justifySelf: "start", opacity: loading ? 0.7 : 1 }}
+            >
+              Save household notes
+            </button>
+          </div>
+        ) : null}
 
         <div style={{ display: "grid", gap: 8 }}>
           <div style={{ fontSize: 12, fontWeight: 900, color: "#0f172a" }}>Adults</div>
@@ -308,6 +354,19 @@ export function HouseholdManagerPanel(props: { identity: Identity; onClose: () =
                     />
                   </label>
 
+                  <label style={{ display: "grid", gap: 4 }}>
+                    <div style={{ fontSize: 12, color: "#64748b" }}>Custody notes</div>
+                    <textarea
+                      value={String((k as any).custody_notes ?? "")}
+                      onChange={(e) =>
+                        setData((prev) => (prev ? { ...prev, children: kids.map((x) => (x.id === k.id ? { ...x, custody_notes: e.target.value } : x)) } : prev))
+                      }
+                      rows={2}
+                      style={{ border: "1px solid #cbd5e1", borderRadius: 10, padding: "8px 10px", resize: "vertical" }}
+                      placeholder="Optional"
+                    />
+                  </label>
+
                   <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
                     <input
                       type="checkbox"
@@ -331,6 +390,119 @@ export function HouseholdManagerPanel(props: { identity: Identity; onClose: () =
             <div style={{ fontSize: 12, color: "#64748b" }}>No kids on household.</div>
           )}
         </div>
+
+        {householdId && kids.length ? (
+          <div style={{ border: "1px solid #e2e8f0", borderRadius: 12, padding: 12, background: "#f8fafc", display: "grid", gap: 10 }}>
+            <div style={{ fontSize: 12, fontWeight: 900, color: "#0f172a" }}>Pickup + extended family (per child)</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+              <label style={{ display: "grid", gap: 4 }}>
+                <div style={{ fontSize: 12, color: "#64748b" }}>Child</div>
+                <select value={relChildId} onChange={(e) => setRelChildId(e.target.value)} style={{ border: "1px solid #cbd5e1", borderRadius: 10, padding: "8px 10px" }}>
+                  <option value="">Select…</option>
+                  {kids.map((k: any) => (
+                    <option key={String(k.id)} value={String(k.id)}>
+                      {String(k.first_name ?? "")} {String(k.last_name ?? "")}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label style={{ display: "grid", gap: 4 }}>
+                <div style={{ fontSize: 12, color: "#64748b" }}>Relationship</div>
+                <select value={relType} onChange={(e) => setRelType(e.target.value as any)} style={{ border: "1px solid #cbd5e1", borderRadius: 10, padding: "8px 10px" }}>
+                  <option value="authorized_pickup">Authorized pickup</option>
+                  <option value="grandparent">Grandparent</option>
+                  <option value="aunt">Aunt</option>
+                  <option value="uncle">Uncle</option>
+                  <option value="aunt_uncle">Aunt/Uncle</option>
+                  <option value="other_family">Other family</option>
+                </select>
+              </label>
+              <label style={{ display: "grid", gap: 4 }}>
+                <div style={{ fontSize: 12, color: "#64748b" }}>First name</div>
+                <input value={relFirst} onChange={(e) => setRelFirst(e.target.value)} style={{ border: "1px solid #cbd5e1", borderRadius: 10, padding: "8px 10px" }} />
+              </label>
+              <label style={{ display: "grid", gap: 4 }}>
+                <div style={{ fontSize: 12, color: "#64748b" }}>Last name</div>
+                <input value={relLast} onChange={(e) => setRelLast(e.target.value)} style={{ border: "1px solid #cbd5e1", borderRadius: 10, padding: "8px 10px" }} />
+              </label>
+              <label style={{ display: "grid", gap: 4, gridColumn: "1 / -1" }}>
+                <div style={{ fontSize: 12, color: "#64748b" }}>Notes (optional)</div>
+                <input value={relNotes} onChange={(e) => setRelNotes(e.target.value)} style={{ border: "1px solid #cbd5e1", borderRadius: 10, padding: "8px 10px" }} />
+              </label>
+            </div>
+            <button
+              type="button"
+              disabled={loading || !relChildId || !relFirst.trim()}
+              onClick={async () => {
+                if (!householdId || !relChildId || !relFirst.trim()) return;
+                setLoading(true);
+                setUiError(null);
+                try {
+                  await postJson("/api/a2a/household/relationship/upsert", {
+                    identity,
+                    household_id: householdId,
+                    child_person_id: relChildId,
+                    relationship: relType,
+                    person: { first_name: relFirst.trim(), last_name: relLast.trim() || null, notes: relNotes.trim() || null },
+                  });
+                  setRelFirst("");
+                  setRelLast("");
+                  setRelNotes("");
+                  await refresh();
+                } catch (e: any) {
+                  setUiError(String(e?.message ?? e ?? "Save failed"));
+                } finally {
+                  setLoading(false);
+                }
+              }}
+              style={{ border: "1px solid #e2e8f0", background: "white", borderRadius: 10, padding: "6px 10px", cursor: "pointer", fontSize: 12, justifySelf: "start", opacity: loading ? 0.7 : 1 }}
+            >
+              Add relationship
+            </button>
+
+            {Array.isArray((data as any)?.relationships) && (data as any).relationships.length ? (
+              <div style={{ display: "grid", gap: 8 }}>
+                <div style={{ fontSize: 12, fontWeight: 900, color: "#0f172a" }}>Current relationships</div>
+                {(data as any).relationships.map((r: any) => (
+                  <div key={String(r.id)} style={{ border: "1px solid #e2e8f0", borderRadius: 12, padding: 10, background: "white", display: "grid", gap: 6 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
+                      <div style={{ fontSize: 12, color: "#0f172a", fontWeight: 900 }}>
+                        {String(r.fromFirstName ?? "")} {String(r.fromLastName ?? "")}
+                      </div>
+                      <div style={{ fontSize: 12, color: "#64748b" }}>{String(r.relationshipType ?? "")}</div>
+                    </div>
+                    <div style={{ fontSize: 12, color: "#64748b" }}>
+                      Child: {String(r.toFirstName ?? "")} {String(r.toLastName ?? "")}
+                    </div>
+                    {r.notes ? <div style={{ fontSize: 12, color: "#64748b" }}>Notes: {String(r.notes)}</div> : null}
+                    <button
+                      type="button"
+                      disabled={loading}
+                      onClick={async () => {
+                        if (!householdId) return;
+                        setLoading(true);
+                        setUiError(null);
+                        try {
+                          await postJson("/api/a2a/household/relationship/remove", { identity, household_id: householdId, relationship_id: String(r.id) });
+                          await refresh();
+                        } catch (e: any) {
+                          setUiError(String(e?.message ?? e ?? "Remove failed"));
+                        } finally {
+                          setLoading(false);
+                        }
+                      }}
+                      style={{ border: "1px solid #e2e8f0", background: "white", borderRadius: 10, padding: "6px 10px", cursor: "pointer", fontSize: 12, justifySelf: "start", opacity: loading ? 0.7 : 1 }}
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div style={{ fontSize: 12, color: "#64748b" }}>No pickup/extended-family relationships yet.</div>
+            )}
+          </div>
+        ) : null}
 
         <div style={{ border: "1px solid #e2e8f0", borderRadius: 12, padding: 12, display: "grid", gap: 10 }}>
           <div style={{ fontSize: 12, fontWeight: 900, color: "#0f172a" }}>Add child</div>
