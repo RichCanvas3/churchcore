@@ -12,9 +12,9 @@ import { IdentityContactPanel } from "./IdentityContactPanel";
 import { CommPrefsPanel } from "./CommPrefsPanel";
 import { TeamsSkillsPanel } from "./TeamsSkillsPanel";
 import { CarePastoralPanel } from "./CarePastoralPanel";
-import { KidsSafetyPanel } from "./KidsSafetyPanel";
 import { MemoryManagerPanel } from "./MemoryManagerPanel";
 import { CommunityManagerPanel } from "./CommunityManagerPanel";
+import { HouseholdMemoryPanel } from "./HouseholdMemoryPanel";
 import { GuidePanel } from "./GuidePanel";
 import { ChurchOverviewPanel } from "./ChurchOverviewPanel";
 import { StrategicIntentPanel } from "./StrategicIntentPanel";
@@ -94,7 +94,8 @@ export default function ChatPage() {
   };
 
   function openTool(toolId: string, args?: Record<string, unknown> | null) {
-    setActiveUiToolId(toolId);
+    const nextToolId = toolId === "kids_safety" ? "household_memory" : toolId;
+    setActiveUiToolId(nextToolId);
     setActiveUiToolArgs(args ?? null);
   }
 
@@ -347,6 +348,8 @@ export default function ChatPage() {
                 ? "Household"
                 : p.toolId === "community_manager"
                   ? "Community"
+                  : p.toolId === "household_memory" || p.toolId === "kids_safety"
+                    ? "Household"
                 : p.toolId === "calendar"
                   ? "Calendar"
                   : p.toolId === "bible_reader"
@@ -361,8 +364,6 @@ export default function ChatPage() {
                         ? "Care & prayer"
                         : p.toolId === "teams_skills"
                           ? "Teams & skills"
-                          : p.toolId === "kids_safety"
-                            ? "Kids safety"
                             : p.toolId === "memory_manager"
                               ? "Memory manager"
                     : p.toolId === "guide"
@@ -1011,8 +1012,8 @@ export default function ChatPage() {
                 }}
                 onClose={closeTool}
               />
-            ) : activeUiToolId === "kids_safety" ? (
-              <KidsSafetyPanel
+            ) : activeUiToolId === "household_memory" ? (
+              <HouseholdMemoryPanel
                 identity={{
                   tenant_id: identity.tenant_id,
                   user_id: identity.user_id,

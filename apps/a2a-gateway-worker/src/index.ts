@@ -566,6 +566,7 @@ function canEditArea(identityRole: string, roles: Set<string>, area: string) {
   const a = String(area || "").toLowerCase();
   if (a === "identity_contact") return true;
   if (a === "faith_journey") return true;
+  if (a === "household_memory") return true;
   if (a === "comm_prefs") return true;
   if (a === "care_pastoral") return true; // seekers can manage their own prayer requests
   return false;
@@ -595,10 +596,10 @@ async function handleMemoryGet(req: Request, env: Env) {
     can_edit: {
       identity_contact: canEditArea(role, roles, "identity_contact"),
       faith_journey: canEditArea(role, roles, "faith_journey"),
+      household_memory: canEditArea(role, roles, "household_memory"),
       comm_prefs: canEditArea(role, roles, "comm_prefs"),
       teams_skills: canEditArea(role, roles, "teams_skills"),
       care_pastoral: canEditArea(role, roles, "care_pastoral"),
-      kids_safety: canEditArea(role, roles, "kids_safety"),
     },
     actor: { userId, role, roles: Array.from(roles.values()) },
   });

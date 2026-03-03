@@ -183,6 +183,7 @@ export function GuidePanel(props: { identity: Identity; onClose: () => void; onO
       "guide",
       "faith_journey",
       "community_manager",
+      "household_memory",
       "memory_manager",
       "identity_contact",
       "comm_prefs",

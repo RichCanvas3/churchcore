@@ -295,9 +295,9 @@ def _ui_handoff_for_user_text(user_text: str) -> list[dict[str, Any]]:
         return [
             {
                 "type": "ui_tool",
-                "tool_id": "kids_safety",
-                "title": "Kids safety",
-                "instructions": "Open the kids safety panel.",
+                "tool_id": "household_memory",
+                "title": "Household",
+                "instructions": "Open household memory (includes pickup/custody/allergy notes).",
             }
         ]
 
@@ -1021,10 +1021,10 @@ async def handle_seeker_skill(
             "- memory_manager: manage person memory areas (hub).\n"
             "- identity_contact: view/edit preferred name + email/phone.\n"
             "- faith_journey: view/edit faith journey phase and milestones (Seeker, New Believer, Growing, etc.).\n"
+            "- household_memory: view/edit household memory (family structure, kids notes, extended family definitions).\n"
             "- comm_prefs: view/edit communication preferences (SMS/email opt-in, preferred channel).\n"
             "- care_pastoral: manage prayer requests (and staff-only care notes).\n"
             "- teams_skills: staff-only serving teams/skills.\n"
-            "- kids_safety: staff-only kids safety notes.\n"
             'If a UI tool should open, include a handoff item like: {"type":"ui_tool","tool_id":"identity_contact"}.\n\n'
             + (("Faith journey context:\n" + journey_summary + "\n\n") if journey_summary else "")
             + (("Known person memory (shared across topics):\n" + mem_summary + "\n\n") if mem_summary else "")
