@@ -8,6 +8,8 @@ type Env = {
   A2A_API_KEY?: string;
   SENDGRID_MCP_URL?: string;
   SENDGRID_MCP_API_KEY?: string;
+  OPENAI_API_KEY?: string;
+  OPENAI_TRANSCRIBE_MODEL?: string;
 };
 
 function nowIso() {
@@ -1513,11 +1515,17 @@ const WeeklyPodcastGetSchema = z.object({
   podcast_id: z.string().min(1),
 });
 
-const WeeklyPodcastAnalyzeSchema = z.object({
-  identity: IdentitySchema,
-  podcast_id: z.string().min(1),
-  source_text: z.string().min(20), // transcript/notes pasted by user
-});
+const WeeklyPodcastAnalyzeSchema = z
+  .object({
+    identity: IdentitySchema,
+    podcast_id: z.string().min(1),
+    source_text: z.string().optional().nullable(), // transcript/notes (optional if mp3_url is provided)
+    mp3_url: z.string().url().optional().nullable(), // will be fetched + transcribed
+  })
+  .refine((v) => (typeof v.source_text === "string" && v.source_text.trim().length >= 20) || (typeof v.mp3_url === "string" && v.mp3_url.trim().length > 0), {
+    message: "Provide source_text (20+ chars) or mp3_url",
+    path: ["source_text"],
+  });
 
 // Community (catalog + per-person involvement)
 const CommunityCatalogListSchema = z.object({
@@ -1778,6 +1786,36 @@ async function runAgentStream(env: Env, args: { threadId: string; inputPayload: 
     throw new Error(`LangGraph stream error (${res.status}): ${raw || "no body"}`);
   }
   return res;
+}
+
+async function transcribeMp3WithOpenAI(env: Env, args: { mp3Url: string }) {
+  const apiKey = (env.OPENAI_API_KEY ?? "").trim();
+  if (!apiKey) throw new Error("Missing OPENAI_API_KEY (needed for mp3 transcription)");
+  const model = (env.OPENAI_TRANSCRIBE_MODEL ?? "whisper-1").trim() || "whisper-1";
+
+  const mp3Url = String(args.mp3Url || "").trim();
+  if (!mp3Url) throw new Error("Missing mp3Url");
+
+  const audioRes = await fetch(mp3Url);
+  if (!audioRes.ok) throw new Error(`Failed to fetch MP3 (${audioRes.status})`);
+  const ct = audioRes.headers.get("content-type") ?? "";
+  const buf = await audioRes.arrayBuffer();
+  if (buf.byteLength <= 0) throw new Error("Empty MP3 download");
+
+  const form = new FormData();
+  form.append("model", model);
+  form.append("file", new Blob([buf], { type: ct || "audio/mpeg" }), "audio.mp3");
+
+  const res = await fetch("https://api.openai.com/v1/audio/transcriptions", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${apiKey}` },
+    body: form,
+  });
+  const data = (await res.json().catch(() => ({}))) as any;
+  if (!res.ok) throw new Error(`OpenAI transcription error (${res.status}): ${data?.error?.message ?? "unknown"}`);
+  const text = typeof data?.text === "string" ? data.text : "";
+  if (!text.trim()) throw new Error("Transcription returned empty text");
+  return { text, model, bytes: buf.byteLength };
 }
 
 async function handleChat(req: Request, env: Env) {
@@ -2817,10 +2855,19 @@ async function handleWeeklyPodcastAnalyze(req: Request, env: Env) {
   const userId = identity.user_id;
   const role = (identity.role ?? "seeker") as string;
   const podcastId = parsed.data.podcast_id.trim();
-  const sourceText = parsed.data.source_text;
+  const sourceText = typeof (parsed.data as any).source_text === "string" ? String((parsed.data as any).source_text) : "";
+  const mp3Url = typeof (parsed.data as any).mp3_url === "string" ? String((parsed.data as any).mp3_url) : "";
 
   const podcast = (await env.churchcore.prepare(`SELECT id,title FROM weekly_podcasts WHERE church_id=?1 AND id=?2`).bind(churchId, podcastId).first()) as any;
   if (!podcast) return json({ error: "Unknown podcast_id" }, { status: 404 });
+
+  let transcriptText = sourceText.trim();
+  let transcriptionMeta: any = null;
+  if ((!transcriptText || transcriptText.length < 20) && mp3Url.trim()) {
+    const t = await transcribeMp3WithOpenAI(env, { mp3Url: mp3Url.trim() });
+    transcriptText = t.text;
+    transcriptionMeta = { model: t.model, bytes: t.bytes, mp3_url: mp3Url.trim() };
+  }
 
   // Ask LangGraph agent to extract a structured analysis from pasted transcript/notes.
   const lgThreadId = crypto.randomUUID();
@@ -2829,7 +2876,7 @@ async function handleWeeklyPodcastAnalyze(req: Request, env: Env) {
     inputPayload: {
       session: { churchId, userId, role, threadId: `weekly_podcast:${podcastId}` },
       skill: "weekly_podcast.analyze",
-      args: { podcast_id: podcastId, source_text: sourceText },
+      args: { podcast_id: podcastId, source_text: transcriptText, mp3_url: mp3Url.trim() || null, transcription: transcriptionMeta },
       input: `Analyze Weekly Podcast episode and return summary/topics/verses.`,
     },
   });

@@ -50,6 +50,7 @@ export function WeeklyPodcastsPanel(props: { identity: Identity; onClose: () => 
   const [selected, setSelected] = useState<PodcastRow | null>(null);
   const [analysis, setAnalysis] = useState<PodcastAnalysis | null>(null);
   const [sourceText, setSourceText] = useState("");
+  const [mp3Url, setMp3Url] = useState("");
 
   const selectedTitle = useMemo(() => (selected ? `${selected.title}` : ""), [selected]);
 
@@ -86,6 +87,7 @@ export function WeeklyPodcastsPanel(props: { identity: Identity; onClose: () => 
     setSelected(null);
     setAnalysis(null);
     setSourceText("");
+    setMp3Url("");
     void refreshList();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [identity.tenant_id, identity.user_id]);
@@ -99,14 +101,20 @@ export function WeeklyPodcastsPanel(props: { identity: Identity; onClose: () => 
   async function analyzeNow() {
     if (!selectedId) return;
     const txt = sourceText.trim();
-    if (txt.length < 20) {
-      setUiError("Paste transcript/notes first (20+ chars).");
+    const url = (mp3Url.trim() || selected?.listenUrl || "").trim();
+    if (txt.length < 20 && !url) {
+      setUiError("Paste transcript/notes (20+ chars) or provide an MP3 URL.");
       return;
     }
     setLoading(true);
     setUiError(null);
     try {
-      const out = await postJson<{ analysis?: any }>("/api/a2a/weekly_podcast/analyze", { identity, podcast_id: selectedId, source_text: txt });
+      const out = await postJson<{ analysis?: any }>("/api/a2a/weekly_podcast/analyze", {
+        identity,
+        podcast_id: selectedId,
+        source_text: txt.length >= 20 ? txt : null,
+        mp3_url: url || null,
+      });
       await loadOne(selectedId);
       setAnalysis((out as any)?.analysis ?? null);
     } catch (e: any) {
@@ -203,7 +211,13 @@ export function WeeklyPodcastsPanel(props: { identity: Identity; onClose: () => 
 
         <div style={{ border: "1px solid #e2e8f0", borderRadius: 12, padding: 12, display: "grid", gap: 10 }}>
           <div style={{ fontSize: 12, fontWeight: 900, color: "#0f172a" }}>Create/refresh analysis</div>
-          <div style={{ fontSize: 12, color: "#64748b" }}>Paste transcript/notes (for now we analyze pasted text; we’re not auto-transcribing MP3 yet).</div>
+          <div style={{ fontSize: 12, color: "#64748b" }}>Paste transcript/notes, or provide an MP3 URL to auto-transcribe.</div>
+          <input
+            value={mp3Url}
+            onChange={(e) => setMp3Url(e.target.value)}
+            placeholder="MP3 URL (optional)"
+            style={{ border: "1px solid #cbd5e1", borderRadius: 10, padding: "8px 10px" }}
+          />
           <textarea
             value={sourceText}
             onChange={(e) => setSourceText(e.target.value)}
@@ -216,7 +230,7 @@ export function WeeklyPodcastsPanel(props: { identity: Identity; onClose: () => 
             onClick={() => void analyzeNow()}
             style={{ border: "1px solid #0f172a", background: "#0f172a", color: "white", borderRadius: 10, padding: "8px 10px", cursor: "pointer", fontSize: 12, fontWeight: 900, opacity: loading ? 0.7 : 1, justifySelf: "start" }}
           >
-            Analyze + cache
+            Transcribe/analyze + cache
           </button>
         </div>
       </div>

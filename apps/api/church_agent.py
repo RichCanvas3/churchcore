@@ -950,6 +950,57 @@ async def handle_seeker_skill(
             data={"skill": skill},
         )
 
+    if skill == "weekly_podcast.analyze":
+        model_name = os.environ.get("OPENAI_MODEL", "gpt-5.2")
+        model = ChatOpenAI(model=model_name)
+        src = str(args.get("source_text") or "").strip()
+        if len(src) < 20:
+            return OutputEnvelope(message="Missing transcript/notes.", data={"skill": skill})
+
+        sys = (
+            "You extract a podcast analysis from transcript/notes.\n"
+            "Return ONLY valid JSON with keys:\n"
+            '- "summary_markdown": string (6-20 bullets/short paragraphs)\n'
+            '- "topics": array of short strings (deduped)\n'
+            '- "verses": array of scripture references like \"John 13:3-5\" (deduped)\n'
+            '- "source": string (e.g. \"user_paste\" or \"openai_whisper\")\n'
+        )
+        user = (
+            f"Podcast id: {args.get('podcast_id')}\n"
+            f"Source: {args.get('mp3_url') or 'text'}\n\n"
+            "Transcript/notes:\n"
+            + src
+        )
+        raw = model.invoke([{"role": "system", "content": sys}, {"role": "user", "content": user}]).content
+        parsed = None
+        try:
+            parsed = json.loads(str(raw or "{}"))
+        except Exception:
+            parsed = None
+
+        if not isinstance(parsed, dict):
+            return OutputEnvelope(message="Could not parse analysis.", data={"skill": skill})
+
+        summary = str(parsed.get("summary_markdown") or "").strip()
+        topics = parsed.get("topics") if isinstance(parsed.get("topics"), list) else []
+        verses = parsed.get("verses") if isinstance(parsed.get("verses"), list) else []
+        topics_clean = [str(t).strip() for t in topics if str(t).strip()][:50]
+        verses_clean = [str(v).strip() for v in verses if str(v).strip()][:80]
+        source = str(parsed.get("source") or (args.get("mp3_url") and "openai_whisper") or "user_paste")
+
+        return OutputEnvelope(
+            message="",
+            data={
+                "weekly_podcast_analysis": {
+                    "summary_markdown": summary,
+                    "topics": topics_clean,
+                    "verses": verses_clean,
+                    "model": model_name,
+                    "source": source,
+                }
+            },
+        )
+
     if skill in {"chat", "chat.stream"}:
         model = ChatOpenAI(model=os.environ.get("OPENAI_MODEL", "gpt-5.2"))
         user = (message or "").strip()
@@ -1363,6 +1414,10 @@ async def handle_guide_skill(
         if tool_txt is None:
             return _missing_mcp("sendgrid_scheduleEmail")
         return OutputEnvelope(message=tool_txt or f"Email scheduled (send_at={send_at_i}).", data={"to": to, "subject": subject, "send_at": send_at_i})
+
+    if skill == "weekly_podcast.analyze":
+        # Same behavior as seeker: produce structured analysis for caching.
+        return await handle_seeker_skill(skill=skill, message=message, args=args, session=session, tools=tools)
 
     if not await _require_guide_permission(session, tools):
         return _permission_denied()
