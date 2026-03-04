@@ -18,6 +18,7 @@ import { GuidePanel } from "./GuidePanel";
 import { ChurchOverviewPanel } from "./ChurchOverviewPanel";
 import { StrategicIntentPanel } from "./StrategicIntentPanel";
 import { CalendarPanel } from "./CalendarPanel";
+import { WeeklyPodcastsPanel } from "./WeeklyPodcastsPanel";
 import { BibleReaderPanel } from "./BibleReaderPanel";
 import styles from "./ChatLayout.module.css";
 
@@ -345,6 +346,8 @@ export default function ChatPage() {
               ? "Kids check-in"
               : p.toolId === "household_manager"
                 ? "Household"
+                : p.toolId === "weekly_podcasts"
+                  ? "Weekly podcast"
                 : p.toolId === "community_manager"
                   ? "Community"
                 : p.toolId === "calendar"
@@ -903,6 +906,18 @@ export default function ChatPage() {
           <div style={{ height: "100%", minHeight: 0 }}>
             {activeUiToolId === "household_manager" ? (
               <HouseholdManagerPanel
+                identity={{
+                  tenant_id: identity.tenant_id,
+                  user_id: identity.user_id,
+                  role: identity.role,
+                  campus_id: identity.campus_id ?? null,
+                  timezone: identity.timezone ?? null,
+                  persona_id: (identity as any).persona_id ?? null,
+                }}
+                onClose={closeTool}
+              />
+            ) : activeUiToolId === "weekly_podcasts" ? (
+              <WeeklyPodcastsPanel
                 identity={{
                   tenant_id: identity.tenant_id,
                   user_id: identity.user_id,

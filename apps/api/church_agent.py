@@ -290,6 +290,17 @@ def _ui_handoff_for_user_text(user_text: str) -> list[dict[str, Any]]:
             }
         ]
 
+    podcastish = any(k in u for k in ["the weekly", "weekly podcast", "podcast", "episode 19", "episode 18", "sermon of the day"])
+    if podcastish:
+        return [
+            {
+                "type": "ui_tool",
+                "tool_id": "weekly_podcasts",
+                "title": "Weekly podcast",
+                "instructions": "Open Weekly Podcast episodes and analysis.",
+            }
+        ]
+
     kids_safetyish = any(k in u for k in ["kids safety", "authorized pickup", "authorised pickup", "custody", "allergy note", "release to", "do not release"])
     if kids_safetyish:
         return [
@@ -1016,6 +1027,7 @@ async def handle_seeker_skill(
             "- calendar: show events calendar (week view, with outdoor weather).\n"
             "- bible_reader: read Bible passages (WEB text in-panel, NIV link).\n"
             "- household_manager: manage household (kids, custody notes, allergies; authorized pickup + extended family).\n"
+            "- weekly_podcasts: browse Weekly Podcast episodes; cache summary/topics/verses.\n"
             "- kids_checkin: run kids check-in flow (find family, preview rooms, commit check-in).\n"
             "- guide: show journey position + next steps + resources.\n"
             "- memory_manager: manage person memory areas (hub).\n"

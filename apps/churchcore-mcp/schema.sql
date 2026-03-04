@@ -499,6 +499,39 @@ CREATE TABLE IF NOT EXISTS person_community (
 );
 CREATE INDEX IF NOT EXISTS idx_person_community ON person_community(church_id, person_id, status, updated_at);
 
+-- Weekly Podcast (The Weekly) – episodes + cached analysis (summary/topics/verses)
+CREATE TABLE IF NOT EXISTS weekly_podcasts (
+  id TEXT PRIMARY KEY,
+  church_id TEXT NOT NULL,
+  episode_number INTEGER,
+  title TEXT NOT NULL,
+  speaker TEXT,
+  published_at TEXT, -- ISO date/time
+  passage TEXT, -- e.g. John 6:1-21
+  source_url TEXT, -- canonical page/permalink
+  watch_url TEXT,
+  listen_url TEXT,
+  image_url TEXT,
+  is_active INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_weekly_podcasts ON weekly_podcasts(church_id, published_at, is_active);
+
+CREATE TABLE IF NOT EXISTS weekly_podcast_analysis (
+  podcast_id TEXT PRIMARY KEY,
+  church_id TEXT NOT NULL,
+  summary_markdown TEXT,
+  topics_json TEXT, -- JSON array of strings/topics
+  verses_json TEXT, -- JSON array of scripture references (strings)
+  model TEXT,
+  source TEXT, -- e.g. youtube_captions|manual|unknown
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  FOREIGN KEY (podcast_id) REFERENCES weekly_podcasts(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_weekly_podcast_analysis ON weekly_podcast_analysis(church_id, updated_at);
+
 CREATE TABLE IF NOT EXISTS groups (
   id TEXT PRIMARY KEY,
   church_id TEXT NOT NULL,

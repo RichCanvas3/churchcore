@@ -164,6 +164,138 @@ function createServer(env: Env) {
   );
 
   server.tool(
+    "churchcore_list_weekly_podcasts",
+    "List Weekly Podcast episodes (The Weekly).",
+    {
+      churchId: BaseSessionArgs.shape.churchId,
+      search: z.string().min(1).optional().nullable(),
+      includeInactive: z.boolean().optional().nullable(),
+      limit: z.number().int().min(1).max(200).optional().nullable(),
+      offset: z.number().int().min(0).max(500000).optional().nullable(),
+    },
+    async (args) => {
+      const churchId = String((args as any).churchId);
+      const search = typeof (args as any).search === "string" ? String((args as any).search).trim().toLowerCase() : "";
+      const includeInactive = Boolean((args as any).includeInactive);
+      const limit = (args as any).limit ?? 50;
+      const offset = (args as any).offset ?? 0;
+
+      let sql = `SELECT p.id, p.episode_number AS episodeNumber, p.title, p.speaker, p.published_at AS publishedAt, p.passage,
+                        p.source_url AS sourceUrl, p.watch_url AS watchUrl, p.listen_url AS listenUrl, p.image_url AS imageUrl,
+                        a.updated_at AS analysisUpdatedAt
+                 FROM weekly_podcasts p
+                 LEFT JOIN weekly_podcast_analysis a ON a.podcast_id = p.id
+                 WHERE p.church_id=?1`;
+      const binds: any[] = [churchId];
+      if (!includeInactive) sql += ` AND p.is_active=1`;
+      if (search) {
+        sql += ` AND (lower(p.title) LIKE ?${binds.length + 1} OR lower(p.speaker) LIKE ?${binds.length + 1})`;
+        binds.push(`%${search}%`);
+      }
+      sql += ` ORDER BY p.published_at DESC, p.episode_number DESC LIMIT ${limit} OFFSET ${offset}`;
+
+      const rows = (await env.churchcore.prepare(sql).bind(...binds).all()).results ?? [];
+      return jsonText({ podcasts: rows });
+    },
+  );
+
+  server.tool(
+    "churchcore_get_weekly_podcast",
+    "Get a Weekly Podcast episode, including cached analysis if present.",
+    {
+      churchId: BaseSessionArgs.shape.churchId,
+      podcastId: z.string().min(1),
+    },
+    async (args) => {
+      const churchId = String((args as any).churchId);
+      const podcastId = String((args as any).podcastId);
+
+      const podcast = (await env.churchcore
+        .prepare(
+          `SELECT id, church_id AS churchId, episode_number AS episodeNumber, title, speaker, published_at AS publishedAt, passage,
+                  source_url AS sourceUrl, watch_url AS watchUrl, listen_url AS listenUrl, image_url AS imageUrl,
+                  is_active AS isActive, created_at AS createdAt, updated_at AS updatedAt
+           FROM weekly_podcasts WHERE church_id=?1 AND id=?2`,
+        )
+        .bind(churchId, podcastId)
+        .first()) as any;
+
+      if (!podcast) return jsonText({ podcast: null, analysis: null });
+
+      const analysis = (await env.churchcore
+        .prepare(
+          `SELECT podcast_id AS podcastId, summary_markdown AS summaryMarkdown, topics_json AS topicsJson, verses_json AS versesJson,
+                  model, source, created_at AS createdAt, updated_at AS updatedAt
+           FROM weekly_podcast_analysis WHERE church_id=?1 AND podcast_id=?2`,
+        )
+        .bind(churchId, podcastId)
+        .first()) as any;
+
+      const topics = analysis?.topicsJson ? JSON.parse(String(analysis.topicsJson)) : null;
+      const verses = analysis?.versesJson ? JSON.parse(String(analysis.versesJson)) : null;
+      const normalizedAnalysis = analysis
+        ? {
+            podcastId: analysis.podcastId,
+            summaryMarkdown: analysis.summaryMarkdown ?? null,
+            topics: Array.isArray(topics) ? topics : [],
+            verses: Array.isArray(verses) ? verses : [],
+            model: analysis.model ?? null,
+            source: analysis.source ?? null,
+            createdAt: analysis.createdAt,
+            updatedAt: analysis.updatedAt,
+          }
+        : null;
+
+      return jsonText({ podcast, analysis: normalizedAnalysis });
+    },
+  );
+
+  server.tool(
+    "churchcore_upsert_weekly_podcast_analysis",
+    "Upsert cached Weekly Podcast analysis (summary/topics/verses).",
+    {
+      churchId: BaseSessionArgs.shape.churchId,
+      actorUserId: z.string().min(1).optional().nullable(),
+      podcastId: z.string().min(1),
+      summaryMarkdown: z.string().min(1),
+      topics: z.array(z.string()).optional().nullable(),
+      verses: z.array(z.string()).optional().nullable(),
+      model: z.string().min(1).optional().nullable(),
+      source: z.string().min(1).optional().nullable(),
+    },
+    async (args) => {
+      const churchId = String((args as any).churchId);
+      const podcastId = String((args as any).podcastId);
+      const actorUserId = (args as any).actorUserId ? String((args as any).actorUserId) : null;
+      const summaryMarkdown = String((args as any).summaryMarkdown);
+      const topics = Array.isArray((args as any).topics) ? ((args as any).topics as any[]).map((s) => String(s)) : [];
+      const verses = Array.isArray((args as any).verses) ? ((args as any).verses as any[]).map((s) => String(s)) : [];
+      const model = (args as any).model ? String((args as any).model) : null;
+      const source = (args as any).source ? String((args as any).source) : null;
+      const now = nowIso();
+
+      await env.churchcore
+        .prepare(
+          `INSERT INTO weekly_podcast_analysis (podcast_id, church_id, summary_markdown, topics_json, verses_json, model, source, created_at, updated_at)
+           VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
+           ON CONFLICT(podcast_id) DO UPDATE
+             SET summary_markdown=excluded.summary_markdown,
+                 topics_json=excluded.topics_json,
+                 verses_json=excluded.verses_json,
+                 model=excluded.model,
+                 source=excluded.source,
+                 updated_at=excluded.updated_at`,
+        )
+        .bind(podcastId, churchId, summaryMarkdown, JSON.stringify(topics), JSON.stringify(verses), model, source, now, now)
+        .run();
+
+      await env.churchcore.prepare(`UPDATE weekly_podcasts SET updated_at=?3 WHERE church_id=?1 AND id=?2`).bind(churchId, podcastId, now).run();
+      await auditAppend(env, { churchId, actorUserId, action: "weekly_podcast_analysis_upsert", entityType: "weekly_podcasts", entityId: podcastId, payload: { model, source } });
+      return jsonText({ ok: true });
+    },
+  );
+
+  server.tool(
     "churchcore_list_groups",
     "List groups (authoritative).",
     {

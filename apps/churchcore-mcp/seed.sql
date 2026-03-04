@@ -28,6 +28,24 @@ INSERT OR REPLACE INTO campuses (
 ('campus_erie','calvarybible','Erie Campus','America/Denver','615 Evans St.','Erie','CO','80516','US',datetime('now'),datetime('now')),
 ('campus_thornton','calvarybible','Thornton Campus','America/Denver','11989 St Paul St.','Thornton','CO','80233','US',datetime('now'),datetime('now'));
 
+-- Weekly Podcast (The Weekly) – seed a few recent episodes (metadata only)
+INSERT OR REPLACE INTO weekly_podcasts (
+  id, church_id, episode_number, title, speaker, published_at, passage,
+  source_url, watch_url, listen_url, image_url, is_active, created_at, updated_at
+) VALUES
+('weekly_194','calvarybible',194,'The Least, The Last, and The Lost','Tom Shirk','2026-02-11',NULL,'https://calvarybible.com/theweekly/',NULL,NULL,NULL,1,datetime('now'),datetime('now')),
+('weekly_193','calvarybible',193,'Paying Attention','Perry Marshall','2026-02-04',NULL,'https://calvarybible.com/theweekly/',NULL,NULL,NULL,1,datetime('now'),datetime('now')),
+('weekly_192','calvarybible',192,'Full Send Faith','Jennie Fletemeyer','2026-01-28',NULL,'https://calvarybible.com/theweekly/',NULL,NULL,NULL,1,datetime('now'),datetime('now')),
+('weekly_191','calvarybible',191,'When Jesus Waits','Mark Wicks','2026-01-21',NULL,'https://calvarybible.com/theweekly/',NULL,NULL,NULL,1,datetime('now'),datetime('now')),
+('weekly_190','calvarybible',190,'Belief & Assurance','Perry Marshall','2026-01-14',NULL,'https://calvarybible.com/theweekly/',NULL,NULL,NULL,1,datetime('now'),datetime('now')),
+('weekly_189','calvarybible',189,'Abundant Life','Mark Wicks','2026-01-07',NULL,'https://calvarybible.com/theweekly/',NULL,NULL,NULL,1,datetime('now'),datetime('now')),
+('weekly_188','calvarybible',188,'The Hope of Advent','Thomas Milburn','2025-12-17',NULL,'https://calvarybible.com/theweekly/',NULL,NULL,NULL,1,datetime('now'),datetime('now')),
+('weekly_187','calvarybible',187,'Abiding With Jesus','Zack Thompson','2025-11-19',NULL,'https://calvarybible.com/theweekly/',NULL,NULL,NULL,1,datetime('now'),datetime('now')),
+('weekly_186','calvarybible',186,'Embracing the Light','John Boyle','2025-11-13',NULL,'https://calvarybible.com/theweekly/',NULL,NULL,NULL,1,datetime('now'),datetime('now')),
+('weekly_185','calvarybible',185,'The Words of Life','Thomas Milburn','2025-10-27',NULL,'https://calvarybible.com/theweekly/',NULL,NULL,NULL,1,datetime('now'),datetime('now')),
+('weekly_184','calvarybible',184,'Storm-Proof Life','Perry Marshall','2025-10-22','John 6:1-21','https://calvarybible.com/theweekly/',NULL,NULL,NULL,1,datetime('now'),datetime('now')),
+('weekly_183','calvarybible',183,'Seeing Christ','Paul Petersen','2025-10-15',NULL,'https://calvarybible.com/theweekly/',NULL,NULL,NULL,1,datetime('now'),datetime('now'));
+
 INSERT OR REPLACE INTO locations (
   id, church_id, campus_id, name, address_line1, city, region, postal_code, country, notes,
   created_at, updated_at

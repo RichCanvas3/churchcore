@@ -148,6 +148,9 @@ function agentCard(req: Request, env: Env) {
         household_profile_upsert: `${baseUrl}a2a/household.profile.upsert`,
         household_relationship_upsert: `${baseUrl}a2a/household.relationship.upsert`,
         household_relationship_remove: `${baseUrl}a2a/household.relationship.remove`,
+        weekly_podcast_list: `${baseUrl}a2a/weekly_podcast.list`,
+        weekly_podcast_get: `${baseUrl}a2a/weekly_podcast.get`,
+        weekly_podcast_analyze: `${baseUrl}a2a/weekly_podcast.analyze`,
         community_catalog_list: `${baseUrl}a2a/community.catalog.list`,
         community_my_list: `${baseUrl}a2a/community.my.list`,
         community_join: `${baseUrl}a2a/community.join`,
@@ -1496,6 +1499,26 @@ const HouseholdRelationshipRemoveSchema = z.object({
   relationship_id: z.string().min(1),
 });
 
+// Weekly Podcast (The Weekly)
+const WeeklyPodcastListSchema = z.object({
+  identity: IdentitySchema,
+  search: z.string().min(1).optional().nullable(),
+  include_inactive: z.boolean().optional().nullable(),
+  limit: z.number().int().min(1).max(200).optional().nullable(),
+  offset: z.number().int().min(0).max(500000).optional().nullable(),
+});
+
+const WeeklyPodcastGetSchema = z.object({
+  identity: IdentitySchema,
+  podcast_id: z.string().min(1),
+});
+
+const WeeklyPodcastAnalyzeSchema = z.object({
+  identity: IdentitySchema,
+  podcast_id: z.string().min(1),
+  source_text: z.string().min(20), // transcript/notes pasted by user
+});
+
 // Community (catalog + per-person involvement)
 const CommunityCatalogListSchema = z.object({
   identity: IdentitySchema,
@@ -2709,6 +2732,150 @@ async function handleHouseholdRelationshipRemove(req: Request, env: Env) {
   return json({ ok: true, ...out, actor: { userId, role, personId: actorPersonId } });
 }
 
+async function handleWeeklyPodcastList(req: Request, env: Env) {
+  const parsed = WeeklyPodcastListSchema.safeParse(await parseJson(req));
+  if (!parsed.success) return json({ error: "Invalid body", issues: parsed.error.issues }, { status: 400 });
+  const { identity } = parsed.data;
+  const churchId = identity.tenant_id;
+  const userId = identity.user_id;
+  const role = (identity.role ?? "seeker") as string;
+
+  const search = (parsed.data.search ?? "").trim().toLowerCase();
+  const includeInactive = Boolean(parsed.data.include_inactive);
+  const limit = parsed.data.limit ?? 50;
+  const offset = parsed.data.offset ?? 0;
+
+  let sql = `SELECT p.id, p.episode_number AS episodeNumber, p.title, p.speaker, p.published_at AS publishedAt, p.passage,
+                    p.source_url AS sourceUrl, p.watch_url AS watchUrl, p.listen_url AS listenUrl, p.image_url AS imageUrl,
+                    a.updated_at AS analysisUpdatedAt
+             FROM weekly_podcasts p
+             LEFT JOIN weekly_podcast_analysis a ON a.podcast_id = p.id
+             WHERE p.church_id=?1`;
+  const binds: any[] = [churchId];
+  if (!includeInactive) sql += ` AND p.is_active=1`;
+  if (search) {
+    sql += ` AND (lower(p.title) LIKE ?${binds.length + 1} OR lower(p.speaker) LIKE ?${binds.length + 1})`;
+    binds.push(`%${search}%`);
+  }
+  sql += ` ORDER BY p.published_at DESC, p.episode_number DESC LIMIT ${limit} OFFSET ${offset}`;
+
+  const rows = (await env.churchcore.prepare(sql).bind(...binds).all()).results ?? [];
+  return json({ ok: true, podcasts: rows, actor: { userId, role } });
+}
+
+async function handleWeeklyPodcastGet(req: Request, env: Env) {
+  const parsed = WeeklyPodcastGetSchema.safeParse(await parseJson(req));
+  if (!parsed.success) return json({ error: "Invalid body", issues: parsed.error.issues }, { status: 400 });
+  const { identity } = parsed.data;
+  const churchId = identity.tenant_id;
+  const userId = identity.user_id;
+  const role = (identity.role ?? "seeker") as string;
+  const podcastId = parsed.data.podcast_id.trim();
+
+  const podcast = (await env.churchcore
+    .prepare(
+      `SELECT id, episode_number AS episodeNumber, title, speaker, published_at AS publishedAt, passage,
+              source_url AS sourceUrl, watch_url AS watchUrl, listen_url AS listenUrl, image_url AS imageUrl,
+              is_active AS isActive, created_at AS createdAt, updated_at AS updatedAt
+       FROM weekly_podcasts WHERE church_id=?1 AND id=?2`,
+    )
+    .bind(churchId, podcastId)
+    .first()) as any;
+  if (!podcast) return json({ ok: true, podcast: null, analysis: null, actor: { userId, role } });
+
+  const analysis = (await env.churchcore
+    .prepare(
+      `SELECT podcast_id AS podcastId, summary_markdown AS summaryMarkdown, topics_json AS topicsJson, verses_json AS versesJson,
+              model, source, created_at AS createdAt, updated_at AS updatedAt
+       FROM weekly_podcast_analysis WHERE church_id=?1 AND podcast_id=?2`,
+    )
+    .bind(churchId, podcastId)
+    .first()) as any;
+  const topics = analysis?.topicsJson ? JSON.parse(String(analysis.topicsJson)) : null;
+  const verses = analysis?.versesJson ? JSON.parse(String(analysis.versesJson)) : null;
+  const normalizedAnalysis = analysis
+    ? {
+        podcastId: analysis.podcastId,
+        summaryMarkdown: analysis.summaryMarkdown ?? null,
+        topics: Array.isArray(topics) ? topics : [],
+        verses: Array.isArray(verses) ? verses : [],
+        model: analysis.model ?? null,
+        source: analysis.source ?? null,
+        createdAt: analysis.createdAt,
+        updatedAt: analysis.updatedAt,
+      }
+    : null;
+
+  return json({ ok: true, podcast, analysis: normalizedAnalysis, actor: { userId, role } });
+}
+
+async function handleWeeklyPodcastAnalyze(req: Request, env: Env) {
+  const parsed = WeeklyPodcastAnalyzeSchema.safeParse(await parseJson(req));
+  if (!parsed.success) return json({ error: "Invalid body", issues: parsed.error.issues }, { status: 400 });
+  const { identity } = parsed.data;
+  const churchId = identity.tenant_id;
+  const userId = identity.user_id;
+  const role = (identity.role ?? "seeker") as string;
+  const podcastId = parsed.data.podcast_id.trim();
+  const sourceText = parsed.data.source_text;
+
+  const podcast = (await env.churchcore.prepare(`SELECT id,title FROM weekly_podcasts WHERE church_id=?1 AND id=?2`).bind(churchId, podcastId).first()) as any;
+  if (!podcast) return json({ error: "Unknown podcast_id" }, { status: 404 });
+
+  // Ask LangGraph agent to extract a structured analysis from pasted transcript/notes.
+  const lgThreadId = crypto.randomUUID();
+  const envelope = await runAgent(env, {
+    threadId: lgThreadId,
+    inputPayload: {
+      session: { churchId, userId, role, threadId: `weekly_podcast:${podcastId}` },
+      skill: "weekly_podcast.analyze",
+      args: { podcast_id: podcastId, source_text: sourceText },
+      input: `Analyze Weekly Podcast episode and return summary/topics/verses.`,
+    },
+  });
+
+  const analysis = (envelope as any)?.data?.weekly_podcast_analysis ?? (envelope as any)?.data?.analysis ?? null;
+  if (!analysis || typeof analysis !== "object") {
+    return json({ ok: false, error: "Analysis missing from agent output", envelope, actor: { userId, role } }, { status: 502 });
+  }
+
+  const summaryMarkdown = typeof (analysis as any).summary_markdown === "string" ? (analysis as any).summary_markdown : "";
+  const topics = Array.isArray((analysis as any).topics) ? (analysis as any).topics.map((t: any) => String(t)) : [];
+  const verses = Array.isArray((analysis as any).verses) ? (analysis as any).verses.map((v: any) => String(v)) : [];
+  const model = typeof (analysis as any).model === "string" ? String((analysis as any).model) : null;
+  const source = typeof (analysis as any).source === "string" ? String((analysis as any).source) : "user_paste";
+
+  if (!summaryMarkdown.trim()) {
+    return json({ ok: false, error: "Agent returned empty summary", envelope, actor: { userId, role } }, { status: 502 });
+  }
+
+  const now = nowIso();
+  await env.churchcore
+    .prepare(
+      `INSERT INTO weekly_podcast_analysis (podcast_id, church_id, summary_markdown, topics_json, verses_json, model, source, created_at, updated_at)
+       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
+       ON CONFLICT(podcast_id) DO UPDATE
+         SET summary_markdown=excluded.summary_markdown,
+             topics_json=excluded.topics_json,
+             verses_json=excluded.verses_json,
+             model=excluded.model,
+             source=excluded.source,
+             updated_at=excluded.updated_at`,
+    )
+    .bind(podcastId, churchId, summaryMarkdown, JSON.stringify(topics), JSON.stringify(verses), model, source, now, now)
+    .run();
+  await env.churchcore.prepare(`UPDATE weekly_podcasts SET updated_at=?3 WHERE church_id=?1 AND id=?2`).bind(churchId, podcastId, now).run();
+
+  const out = await env.churchcore
+    .prepare(
+      `SELECT podcast_id AS podcastId, summary_markdown AS summaryMarkdown, topics_json AS topicsJson, verses_json AS versesJson, model, source, created_at AS createdAt, updated_at AS updatedAt
+       FROM weekly_podcast_analysis WHERE church_id=?1 AND podcast_id=?2`,
+    )
+    .bind(churchId, podcastId)
+    .first();
+  return json({ ok: true, podcast_id: podcastId, analysis: out, actor: { userId, role } });
+}
+
 async function handleCommunityCatalogList(req: Request, env: Env) {
   const parsed = CommunityCatalogListSchema.safeParse(await parseJson(req));
   if (!parsed.success) return json({ error: "Invalid body", issues: parsed.error.issues }, { status: 400 });
@@ -3122,6 +3289,12 @@ export default {
         return handleHouseholdRelationshipUpsert(req, env);
       case "/a2a/household.relationship.remove":
         return handleHouseholdRelationshipRemove(req, env);
+      case "/a2a/weekly_podcast.list":
+        return handleWeeklyPodcastList(req, env);
+      case "/a2a/weekly_podcast.get":
+        return handleWeeklyPodcastGet(req, env);
+      case "/a2a/weekly_podcast.analyze":
+        return handleWeeklyPodcastAnalyze(req, env);
       case "/a2a/community.catalog.list":
         return handleCommunityCatalogList(req, env);
       case "/a2a/community.my.list":
