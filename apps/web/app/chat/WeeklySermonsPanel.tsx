@@ -60,7 +60,7 @@ function campusLabel(campusId: string | null | undefined) {
   return campusId || "Unknown";
 }
 
-export function WeeklySermonsPanel(props: { identity: Identity; onClose: () => void }) {
+export function WeeklySermonsPanel(props: { identity: Identity; onClose: () => void; onCompare?: () => void }) {
   const identity = props.identity;
   const [loading, setLoading] = useState(false);
   const [uiError, setUiError] = useState<string | null>(null);
@@ -136,6 +136,12 @@ export function WeeklySermonsPanel(props: { identity: Identity; onClose: () => v
           <div style={{ fontSize: 12, color: "#64748b" }}>{selectedTitle || "Browse sermons by campus (summary + transcript indexed)"}</div>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
+          <button
+            onClick={() => props.onCompare?.()}
+            style={{ border: "1px solid #e2e8f0", background: "white", borderRadius: 10, padding: "6px 10px", cursor: "pointer", fontSize: 12 }}
+          >
+            Compare campuses
+          </button>
           <button onClick={() => void refreshList()} style={{ border: "1px solid #e2e8f0", background: "white", borderRadius: 10, padding: "6px 10px", cursor: "pointer", fontSize: 12 }}>
             Refresh
           </button>

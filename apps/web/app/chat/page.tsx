@@ -86,12 +86,51 @@ export default function ChatPage() {
   const [isMobile, setIsMobile] = useState(false);
   const [isThreadsOpenMobile, setIsThreadsOpenMobile] = useState(false);
   const [isToolsOpenMobile, setIsToolsOpenMobile] = useState(false);
+  const [sermonCompareOpen, setSermonCompareOpen] = useState(false);
+  const [sermonCompareLoading, setSermonCompareLoading] = useState(false);
+  const [sermonCompareError, setSermonCompareError] = useState<string | null>(null);
+  const [sermonCompareMarkdown, setSermonCompareMarkdown] = useState<string>("");
+  const [sermonCompareIncluded, setSermonCompareIncluded] = useState<any[]>([]);
 
   const closeTool = () => {
     setActiveUiToolId(null);
     setActiveUiToolArgs(null);
     setIsToolsOpenMobile(false);
   };
+
+  async function openSermonCompare() {
+    setSermonCompareOpen(true);
+    setSermonCompareLoading(true);
+    setSermonCompareError(null);
+    setSermonCompareMarkdown("");
+    setSermonCompareIncluded([]);
+    try {
+      const out = await postJson<any>("/api/a2a/sermon/compare", {
+        identity: {
+          tenant_id: identity.tenant_id,
+          user_id: identity.user_id,
+          role: identity.role,
+          campus_id: identity.campus_id ?? null,
+          timezone: identity.timezone ?? null,
+          persona_id: (identity as any).persona_id ?? null,
+        },
+        campuses: ["campus_boulder", "campus_erie", "campus_thornton"],
+      });
+      const cmp = (out as any)?.comparison ?? null;
+      const md =
+        typeof cmp?.comparison_markdown === "string"
+          ? cmp.comparison_markdown
+          : typeof cmp?.comparisonMarkdown === "string"
+            ? cmp.comparisonMarkdown
+            : "";
+      setSermonCompareMarkdown(md || "No comparison returned.");
+      setSermonCompareIncluded(Array.isArray((out as any)?.sermons) ? (out as any).sermons : []);
+    } catch (e: any) {
+      setSermonCompareError(String(e?.message ?? e ?? "Compare failed"));
+    } finally {
+      setSermonCompareLoading(false);
+    }
+  }
 
   function openTool(toolId: string, args?: Record<string, unknown> | null) {
     const nextToolId = toolId === "kids_safety" || toolId === "household_memory" ? "household_manager" : toolId;
@@ -614,7 +653,7 @@ export default function ChatPage() {
       className={styles.root}
       style={
         {
-          ["--left-width" as any]: effectiveLeftCollapsed ? "72px" : "320px",
+          ["--left-width" as any]: effectiveLeftCollapsed ? "72px" : "180px",
           ["--right-width" as any]: activeUiToolId ? "minmax(420px, 40%)" : "0px",
         } as any
       }
@@ -696,17 +735,65 @@ export default function ChatPage() {
                 const isActive = t.id === effectiveThreadId;
                 const isEditing = t.id === editingThreadId;
                 const collapsedLabel = String(t.title || "").trim().slice(0, 1).toUpperCase() || "•";
+
+                const IconButton = (props: { title: string; onClick: (e: React.MouseEvent) => void; disabled?: boolean; children: React.ReactNode }) => (
+                  <button
+                    type="button"
+                    onClick={props.onClick}
+                    disabled={Boolean(props.disabled)}
+                    title={props.title}
+                    aria-label={props.title}
+                    style={{
+                      border: "1px solid #e2e8f0",
+                      background: "white",
+                      borderRadius: 10,
+                      padding: "6px",
+                      cursor: props.disabled ? "not-allowed" : "pointer",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      opacity: props.disabled ? 0.6 : 1,
+                    }}
+                  >
+                    {props.children}
+                  </button>
+                );
+
+                const IconPencil = () => (
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <path d="M12 20h9" stroke="#0f172a" strokeWidth="2" strokeLinecap="round" />
+                    <path
+                      d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5Z"
+                      stroke="#0f172a"
+                      strokeWidth="2"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                );
+                const IconCheck = () => (
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <path d="M20 6 9 17l-5-5" stroke="#0f172a" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                );
+                const IconArchive = () => (
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <path d="M21 8v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8" stroke="#0f172a" strokeWidth="2" strokeLinejoin="round" />
+                    <path d="M22 4H2v4h20V4Z" stroke="#0f172a" strokeWidth="2" strokeLinejoin="round" />
+                    <path d="M10 12h4" stroke="#0f172a" strokeWidth="2" strokeLinecap="round" />
+                  </svg>
+                );
+
                 return (
                   <div
                     key={t.id}
                     style={{
                       border: isActive ? "1px solid #0f172a" : "1px solid #e2e8f0",
                       borderRadius: 12,
-                      padding: 10,
+                      padding: effectiveLeftCollapsed ? 10 : 8,
                       background: isActive ? "#f1f5f9" : "white",
                       cursor: "pointer",
                       display: "grid",
-                      gap: 8,
+                      gap: 6,
                     }}
                     onClick={() => {
                       setActiveUiToolId(null);
@@ -716,7 +803,7 @@ export default function ChatPage() {
                     }}
                     title={effectiveLeftCollapsed ? t.title : undefined}
                   >
-                    {isEditing ? (
+                    {isEditing && !effectiveLeftCollapsed ? (
                       <input
                         value={editingTitle}
                         autoFocus
@@ -735,68 +822,55 @@ export default function ChatPage() {
                         }}
                         style={{
                           width: "100%",
+                          boxSizing: "border-box",
                           border: "1px solid #cbd5e1",
                           borderRadius: 10,
                           padding: "8px 10px",
-                          fontWeight: 800,
+                          fontWeight: 500,
                         }}
                         placeholder="Topic name"
                       />
                     ) : (
-                      <div style={{ fontWeight: 800, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                      <div style={{ fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                         {effectiveLeftCollapsed ? collapsedLabel : t.title}
                       </div>
                     )}
-                    {!effectiveLeftCollapsed ? (
-                      <div style={{ display: "flex", gap: 10 }}>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setEditingThreadId(t.id);
-                          setEditingTitle(t.title);
-                        }}
-                        style={{
-                          border: "1px solid #e2e8f0",
-                          background: "white",
-                          borderRadius: 10,
-                          padding: "6px 8px",
-                          cursor: "pointer",
-                          fontSize: 12,
-                        }}
-                      >
-                        Rename
-                      </button>
 
-                      {isEditing ? (
-                        <button
-                          disabled={renaming}
+                    {!effectiveLeftCollapsed ? (
+                      <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
+                        <IconButton
+                          title="Rename"
                           onClick={(e) => {
                             e.stopPropagation();
-                            void renameThread(t.id, editingTitle);
-                          }}
-                          style={{
-                            border: "1px solid #0f172a",
-                            background: renaming ? "#334155" : "#0f172a",
-                            color: "white",
-                            borderRadius: 10,
-                            padding: "6px 8px",
-                            cursor: renaming ? "not-allowed" : "pointer",
-                            fontSize: 12,
+                            setEditingThreadId(t.id);
+                            setEditingTitle(t.title);
                           }}
                         >
-                          Save
-                        </button>
-                      ) : null}
+                          <IconPencil />
+                        </IconButton>
 
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          archiveThread(t.id);
-                        }}
-                        style={{ border: "1px solid #fee2e2", background: "#fff1f2", borderRadius: 10, padding: "6px 8px", cursor: "pointer", fontSize: 12 }}
-                      >
-                        Archive
-                      </button>
+                        {isEditing ? (
+                          <IconButton
+                            title="Save"
+                            disabled={renaming}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              void renameThread(t.id, editingTitle);
+                            }}
+                          >
+                            <IconCheck />
+                          </IconButton>
+                        ) : null}
+
+                        <IconButton
+                          title="Archive"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            archiveThread(t.id);
+                          }}
+                        >
+                          <IconArchive />
+                        </IconButton>
                       </div>
                     ) : null}
                   </div>
@@ -831,7 +905,7 @@ export default function ChatPage() {
           >
             ☰
           </button>
-          <div style={{ fontSize: 16, fontWeight: 900, minWidth: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+          <div style={{ fontSize: 16, fontWeight: 600, minWidth: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
             {threads.find((t) => t.id === effectiveThreadId)?.title ?? "Select a topic"}
           </div>
           {activeUiToolId ? (
@@ -926,6 +1000,7 @@ export default function ChatPage() {
                   timezone: identity.timezone ?? null,
                   persona_id: (identity as any).persona_id ?? null,
                 }}
+                onCompare={() => void openSermonCompare()}
                 onClose={closeTool}
               />
             ) : activeUiToolId === "weekly_podcasts" ? (
@@ -938,6 +1013,7 @@ export default function ChatPage() {
                   timezone: identity.timezone ?? null,
                   persona_id: (identity as any).persona_id ?? null,
                 }}
+                onCompare={() => void openSermonCompare()}
                 onClose={closeTool}
               />
             ) : activeUiToolId === "community_manager" ? (
@@ -1102,6 +1178,100 @@ export default function ChatPage() {
             ) : (
               <div style={{ padding: 14, color: "#64748b", background: "white", height: "100%" }}>Unknown tool: {activeUiToolId}</div>
             )}
+          </div>
+        </div>
+      ) : null}
+
+      {sermonCompareOpen ? (
+        <div
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setSermonCompareOpen(false)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 2000,
+            background: "rgba(15, 23, 42, 0.55)",
+            display: "grid",
+            placeItems: "center",
+            padding: 12,
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: "min(1100px, 98vw)",
+              height: "min(94vh, 1100px)",
+              background: "white",
+              borderRadius: 16,
+              border: "1px solid #e2e8f0",
+              overflow: "hidden",
+              display: "grid",
+              gridTemplateRows: "auto 1fr",
+              boxShadow: "0 30px 120px rgba(15, 23, 42, 0.38)",
+            }}
+          >
+            <div style={{ padding: 14, borderBottom: "1px solid #e2e8f0", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 14, fontWeight: 900 }}>Campus sermon comparison</div>
+                <div style={{ fontSize: 12, color: "#64748b", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                  Uses full transcripts + cached notes
+                </div>
+              </div>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button
+                  onClick={() => void openSermonCompare()}
+                  disabled={sermonCompareLoading}
+                  style={{
+                    border: "1px solid #e2e8f0",
+                    background: "white",
+                    borderRadius: 10,
+                    padding: "6px 10px",
+                    cursor: sermonCompareLoading ? "not-allowed" : "pointer",
+                    fontSize: 12,
+                    opacity: sermonCompareLoading ? 0.7 : 1,
+                  }}
+                >
+                  Refresh
+                </button>
+                <button
+                  onClick={() => setSermonCompareOpen(false)}
+                  style={{ border: "1px solid #e2e8f0", background: "white", borderRadius: 10, padding: "6px 10px", cursor: "pointer", fontSize: 12 }}
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+
+            <div style={{ padding: 14, overflow: "auto", display: "grid", gap: 12, alignContent: "start", background: "#f8fafc" }}>
+              {sermonCompareError ? <div style={{ color: "#b91c1c", fontSize: 12 }}>{sermonCompareError}</div> : null}
+              {sermonCompareLoading ? <div style={{ fontSize: 12, color: "#64748b" }}>Comparing sermons…</div> : null}
+
+              {sermonCompareIncluded.length ? (
+                <div style={{ display: "grid", gap: 8 }}>
+                  <div style={{ fontSize: 12, fontWeight: 900, color: "#0f172a" }}>Included sermons</div>
+                  <div style={{ display: "grid", gap: 6 }}>
+                    {sermonCompareIncluded.map((s: any) => (
+                      <div key={String(s?.id ?? crypto.randomUUID())} style={{ background: "white", border: "1px solid #e2e8f0", borderRadius: 12, padding: 10 }}>
+                        <div style={{ fontWeight: 700, fontSize: 13, color: "#0f172a" }}>{String(s?.title ?? "Sermon")}</div>
+                        <div style={{ fontSize: 12, color: "#64748b" }}>
+                          {String(s?.campusId ?? "")}
+                          {s?.preachedAt ? ` · ${String(s.preachedAt).slice(0, 10)}` : ""}
+                          {s?.speaker ? ` · ${String(s.speaker)}` : ""}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
+              {sermonCompareMarkdown ? (
+                <div style={{ background: "white", border: "1px solid #e2e8f0", borderRadius: 12, padding: 12 }}>
+                  <div style={{ fontSize: 12, fontWeight: 900, color: "#0f172a", marginBottom: 8 }}>Comparison</div>
+                  <div style={{ fontSize: 12, color: "#334155", whiteSpace: "pre-wrap" }}>{sermonCompareMarkdown}</div>
+                </div>
+              ) : null}
+            </div>
           </div>
         </div>
       ) : null}

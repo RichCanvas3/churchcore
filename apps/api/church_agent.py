@@ -1001,6 +1001,93 @@ async def handle_seeker_skill(
             },
         )
 
+    if skill == "sermon.compare":
+        model_name = os.environ.get("OPENAI_MODEL", "gpt-5.2")
+        model = ChatOpenAI(model=model_name)
+        sermons = args.get("sermons")
+        sermons_list = sermons if isinstance(sermons, list) else []
+        sermons_clean: list[dict[str, Any]] = []
+        for s in sermons_list:
+            if not isinstance(s, dict):
+                continue
+            transcript = s.get("transcript") if isinstance(s.get("transcript"), dict) else {}
+            analysis = s.get("analysis") if isinstance(s.get("analysis"), dict) else {}
+            sermons_clean.append(
+                {
+                    "id": s.get("id"),
+                    "campusId": s.get("campusId"),
+                    "title": s.get("title"),
+                    "speaker": s.get("speaker"),
+                    "preachedAt": s.get("preachedAt"),
+                    "passage": s.get("passage"),
+                    "seriesTitle": s.get("seriesTitle"),
+                    "notes": {
+                        "summaryMarkdown": analysis.get("summaryMarkdown"),
+                        "topics": analysis.get("topics"),
+                        "verses": analysis.get("verses"),
+                        "keyPoints": analysis.get("keyPoints"),
+                    },
+                    "transcriptText": transcript.get("transcriptText"),
+                }
+            )
+
+        if len(sermons_clean) < 2:
+            return OutputEnvelope(message="Not enough sermons to compare.", data={"skill": skill})
+
+        sys = (
+            "You compare 2-3 weekly sermons across campuses.\n"
+            "Use the full transcripts as the primary source of truth; the notes/summary are secondary.\n"
+            "Do not invent details not supported by the transcripts.\n"
+            "Return ONLY valid JSON with keys:\n"
+            '- "comparison_markdown": string (with headings and bullets)\n'
+            '- "commonalities": array of short strings\n'
+            '- "differences_by_campus": object mapping campusId -> array of short strings\n'
+            '- "discussion_questions": array of questions for group discussion\n'
+        )
+        user = json.dumps(
+            {
+                "instruction": "Compare what is similar and where they differ across campuses; focus on theology, application emphasis, illustrations, tone, and call-to-action. Cite specific transcript phrases sparingly (short quotes only).",
+                "sermons": sermons_clean,
+            }
+        )
+
+        raw = model.invoke([{"role": "system", "content": sys}, {"role": "user", "content": user}]).content
+        parsed = None
+        try:
+            parsed = json.loads(str(raw or "{}"))
+        except Exception:
+            parsed = None
+
+        if not isinstance(parsed, dict):
+            return OutputEnvelope(message="Could not parse comparison.", data={"skill": skill})
+
+        comparison_md = str(parsed.get("comparison_markdown") or "").strip()
+        common = parsed.get("commonalities") if isinstance(parsed.get("commonalities"), list) else []
+        diffs = parsed.get("differences_by_campus") if isinstance(parsed.get("differences_by_campus"), dict) else {}
+        questions = parsed.get("discussion_questions") if isinstance(parsed.get("discussion_questions"), list) else []
+
+        common_clean = [str(x).strip() for x in common if str(x).strip()][:40]
+        diffs_clean: dict[str, list[str]] = {}
+        for k, v in diffs.items():
+            if not isinstance(k, str):
+                continue
+            vv = v if isinstance(v, list) else []
+            diffs_clean[k] = [str(x).strip() for x in vv if str(x).strip()][:40]
+        questions_clean = [str(x).strip() for x in questions if str(x).strip()][:30]
+
+        return OutputEnvelope(
+            message="",
+            data={
+                "sermon_comparison": {
+                    "comparison_markdown": comparison_md,
+                    "commonalities": common_clean,
+                    "differences_by_campus": diffs_clean,
+                    "discussion_questions": questions_clean,
+                    "model": model_name,
+                }
+            },
+        )
+
     if skill in {"chat", "chat.stream"}:
         model = ChatOpenAI(model=os.environ.get("OPENAI_MODEL", "gpt-5.2"))
         user = (message or "").strip()

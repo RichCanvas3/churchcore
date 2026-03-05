@@ -155,6 +155,7 @@ function agentCard(req: Request, env: Env) {
         weekly_podcast_analyze: `${baseUrl}a2a/weekly_podcast.analyze`,
         sermon_list: `${baseUrl}a2a/sermon.list`,
         sermon_get: `${baseUrl}a2a/sermon.get`,
+        sermon_compare: `${baseUrl}a2a/sermon.compare`,
         community_catalog_list: `${baseUrl}a2a/community.catalog.list`,
         community_my_list: `${baseUrl}a2a/community.my.list`,
         community_join: `${baseUrl}a2a/community.join`,
@@ -1541,6 +1542,12 @@ const SermonListSchema = z.object({
 const SermonGetSchema = z.object({
   identity: IdentitySchema,
   message_id: z.string().min(1), // campus_messages.id (e.g. msg_2479)
+});
+
+const SermonCompareSchema = z.object({
+  identity: IdentitySchema,
+  campuses: z.array(z.string().min(1)).optional().nullable(), // default: boulder/erie/thornton
+  message_ids: z.array(z.string().min(1)).optional().nullable(), // optional explicit override (3 items)
 });
 
 // Community (catalog + per-person involvement)
@@ -3060,6 +3067,126 @@ async function handleSermonGet(req: Request, env: Env) {
   return json({ ok: true, sermon, analysis, transcript, actor: { userId, role } });
 }
 
+async function handleSermonCompare(req: Request, env: Env) {
+  const parsed = SermonCompareSchema.safeParse(await parseJson(req));
+  if (!parsed.success) return json({ error: "Invalid body", issues: parsed.error.issues }, { status: 400 });
+  const { identity } = parsed.data;
+  const churchId = identity.tenant_id;
+  const userId = identity.user_id;
+  const role = (identity.role ?? "seeker") as string;
+
+  const defaultCampuses = ["campus_boulder", "campus_erie", "campus_thornton"];
+  const campusesIn = Array.isArray(parsed.data.campuses) && parsed.data.campuses.length ? parsed.data.campuses.map((c) => String(c)).filter(Boolean) : defaultCampuses;
+  const campuses = [...new Set(campusesIn)].slice(0, 6);
+  const explicitIds = Array.isArray(parsed.data.message_ids) && parsed.data.message_ids.length ? parsed.data.message_ids.map((s) => String(s).trim()).filter(Boolean) : null;
+
+  const messageIds: Array<{ campusId: string | null; messageId: string }> = [];
+  if (explicitIds && explicitIds.length) {
+    for (const mid of explicitIds.slice(0, 6)) messageIds.push({ campusId: null, messageId: mid });
+  } else {
+    for (const campusId of campuses) {
+      const row = (await env.churchcore
+        .prepare(
+          `SELECT id
+           FROM campus_messages
+           WHERE church_id=?1 AND campus_id=?2
+           ORDER BY preached_at DESC, updated_at DESC
+           LIMIT 1`,
+        )
+        .bind(churchId, campusId)
+        .first()) as any;
+      if (row?.id) messageIds.push({ campusId, messageId: String(row.id) });
+    }
+  }
+
+  if (messageIds.length < 2) {
+    return json({ ok: false, error: "Not enough sermons to compare", messageIds, actor: { userId, role } }, { status: 400 });
+  }
+
+  const sermons: any[] = [];
+  for (const m of messageIds) {
+    const msgId = m.messageId;
+    const sermon = (await env.churchcore
+      .prepare(
+        `SELECT id, campus_id AS campusId, title, speaker, preached_at AS preachedAt, passage, series_title AS seriesTitle,
+                source_url AS sourceUrl, watch_url AS watchUrl, listen_url AS listenUrl, download_url AS downloadUrl
+         FROM campus_messages WHERE church_id=?1 AND id=?2`,
+      )
+      .bind(churchId, msgId)
+      .first()) as any;
+    if (!sermon) continue;
+
+    const a = (await env.churchcore
+      .prepare(
+        `SELECT summary_markdown AS summaryMarkdown, topics_json AS topicsJson, verses_json AS versesJson, key_points_json AS keyPointsJson,
+                model AS analysisModel, source AS analysisSource, updated_at AS analysisUpdatedAt
+         FROM campus_message_analysis WHERE church_id=?1 AND message_id=?2`,
+      )
+      .bind(churchId, msgId)
+      .first()) as any;
+    const topics = a?.topicsJson ? JSON.parse(String(a.topicsJson)) : null;
+    const verses = a?.versesJson ? JSON.parse(String(a.versesJson)) : null;
+    const keyPoints = a?.keyPointsJson ? JSON.parse(String(a.keyPointsJson)) : null;
+
+    const t = (await env.churchcore
+      .prepare(
+        `SELECT transcript_text AS transcriptText, source_url AS transcriptSourceUrl, model AS transcriptModel, updated_at AS transcriptUpdatedAt
+         FROM campus_message_transcripts WHERE church_id=?1 AND message_id=?2`,
+      )
+      .bind(churchId, msgId)
+      .first()) as any;
+
+    sermons.push({
+      id: String(sermon.id),
+      campusId: sermon.campusId ?? m.campusId ?? null,
+      title: sermon.title ?? null,
+      speaker: sermon.speaker ?? null,
+      preachedAt: sermon.preachedAt ?? null,
+      passage: sermon.passage ?? null,
+      seriesTitle: sermon.seriesTitle ?? null,
+      sourceUrl: sermon.sourceUrl ?? null,
+      watchUrl: sermon.watchUrl ?? null,
+      listenUrl: sermon.listenUrl ?? null,
+      downloadUrl: sermon.downloadUrl ?? null,
+      analysis: a
+        ? {
+            summaryMarkdown: a.summaryMarkdown ?? null,
+            topics: Array.isArray(topics) ? topics : [],
+            verses: Array.isArray(verses) ? verses : [],
+            keyPoints: Array.isArray(keyPoints) ? keyPoints : [],
+            model: a.analysisModel ?? null,
+            source: a.analysisSource ?? null,
+            updatedAt: a.analysisUpdatedAt ?? null,
+          }
+        : null,
+      transcript: t
+        ? {
+            transcriptText: typeof t.transcriptText === "string" ? t.transcriptText : "",
+            sourceUrl: t.transcriptSourceUrl ?? null,
+            model: t.transcriptModel ?? null,
+            updatedAt: t.transcriptUpdatedAt ?? null,
+          }
+        : null,
+    });
+  }
+
+  if (sermons.length < 2) return json({ ok: false, error: "No sermons found to compare", actor: { userId, role } }, { status: 404 });
+
+  const lgThreadId = crypto.randomUUID();
+  const envelope = await runAgent(env, {
+    threadId: lgThreadId,
+    inputPayload: {
+      session: { churchId, userId, role, threadId: `weekly_sermons_compare:${lgThreadId}` },
+      skill: "sermon.compare",
+      args: { sermons },
+      input: "Compare weekly sermons across campuses and summarize similarities and differences.",
+    },
+  });
+
+  const comparison = (envelope as any)?.data?.sermon_comparison ?? (envelope as any)?.data?.comparison ?? null;
+  return json({ ok: true, sermons, comparison, actor: { userId, role } });
+}
+
 async function handleCommunityCatalogList(req: Request, env: Env) {
   const parsed = CommunityCatalogListSchema.safeParse(await parseJson(req));
   if (!parsed.success) return json({ error: "Invalid body", issues: parsed.error.issues }, { status: 400 });
@@ -3483,6 +3610,8 @@ export default {
         return handleSermonList(req, env);
       case "/a2a/sermon.get":
         return handleSermonGet(req, env);
+      case "/a2a/sermon.compare":
+        return handleSermonCompare(req, env);
       case "/a2a/community.catalog.list":
         return handleCommunityCatalogList(req, env);
       case "/a2a/community.my.list":
