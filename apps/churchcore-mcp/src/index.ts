@@ -2938,6 +2938,45 @@ async function processAssemblyAiJobs(env: Env, args: { churchId: string; limit: 
   return { ok: true, processed: rows.length };
 }
 
+async function queueMissingAssemblyAiJobs(env: Env, args: { churchId: string; limit: number }) {
+  const now = nowIso();
+  const rows =
+    (
+      await env.churchcore
+        .prepare(
+          `SELECT m.id AS messageId,
+                  COALESCE(m.download_url, m.listen_url) AS audioUrl
+           FROM campus_messages m
+           LEFT JOIN campus_message_transcripts t
+             ON t.message_id = m.id AND t.church_id = m.church_id
+           WHERE m.church_id=?1
+             AND COALESCE(m.download_url, m.listen_url) IS NOT NULL
+             AND (t.message_id IS NULL OR length(t.transcript_text) = 0)
+             AND NOT EXISTS (
+               SELECT 1 FROM transcription_jobs j
+               WHERE j.church_id = m.church_id
+                 AND j.message_id = m.id
+                 AND j.provider = 'assemblyai'
+                 AND j.status IN ('queued','processing')
+             )
+           ORDER BY m.preached_at DESC
+           LIMIT ${args.limit}`,
+        )
+        .bind(args.churchId)
+        .all()
+    ).results ?? [];
+
+  let queued = 0;
+  for (const r of rows as any[]) {
+    const messageId = String(r.messageId);
+    const audioUrl = String(r.audioUrl ?? "").trim();
+    if (!audioUrl) continue;
+    await transcriptionJobCreate(env, { churchId: args.churchId, messageId, provider: "assemblyai", audioUrl, now });
+    queued += 1;
+  }
+  return { ok: true, queued, considered: rows.length };
+}
+
 function parseSitemapXml(xml: string) {
   const out: string[] = [];
   const re = /<loc>\s*([^<\s]+)\s*<\/loc>/gi;
@@ -3552,10 +3591,35 @@ export default {
         const audioUrl = String(row.downloadUrl || row.listenUrl || "").trim();
         if (!audioUrl) return Response.json({ ok: false, error: "missing_audio_url" }, { status: 400 });
 
+        const existing = (await env.churchcore
+          .prepare(
+            `SELECT id,status FROM transcription_jobs
+             WHERE church_id=?1 AND message_id=?2 AND provider='assemblyai' AND status IN ('queued','processing')
+             ORDER BY updated_at DESC LIMIT 1`,
+          )
+          .bind(churchId, messageId)
+          .first()) as any;
+        if (existing?.id) {
+          return Response.json({ ok: true, jobId: String(existing.id), messageId, provider: "assemblyai", status: String(existing.status) }, { status: 200 });
+        }
+
         const jobId = await transcriptionJobCreate(env, { churchId, messageId, provider: "assemblyai", audioUrl, now });
         return Response.json({ ok: true, jobId, messageId, provider: "assemblyai", status: "queued" }, { status: 200 });
       } catch (e: any) {
         return Response.json({ ok: false, error: String(e?.message ?? e ?? "queue_failed") }, { status: 500 });
+      }
+    }
+
+    // POST /admin/queue-assemblyai-transcription-missing  body: { limit?: number }
+    if (u.pathname === "/admin/queue-assemblyai-transcription-missing" && request.method.toUpperCase() === "POST") {
+      try {
+        const body = (await request.json().catch(() => ({}))) as any;
+        const churchId = (env.CRAWL_CHURCH_ID ?? "calvarybible").trim() || "calvarybible";
+        const limit = clampInt(body?.limit, 50, 1, 500);
+        const result = await queueMissingAssemblyAiJobs(env, { churchId, limit });
+        return Response.json(result, { status: 200 });
+      } catch (e: any) {
+        return Response.json({ ok: false, error: String(e?.message ?? e ?? "queue_missing_failed") }, { status: 500 });
       }
     }
 

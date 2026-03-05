@@ -2169,8 +2169,13 @@ async function handleChatStream(req: Request, env: Env) {
             if (mode === "messages-tuple") {
               const tup = Array.isArray(chunk) ? chunk : [];
               const messageChunk = tup[0] as any;
-              const token = typeof messageChunk?.content === "string" ? String(messageChunk.content) : "";
-              emitToken(token);
+              // LangGraph streams both human + ai messages; only emit AI tokens.
+              const msgType = String(messageChunk?.type ?? messageChunk?.role ?? "").toLowerCase();
+              const isAi = msgType === "ai" || msgType === "assistant";
+              if (isAi) {
+                const token = typeof messageChunk?.content === "string" ? String(messageChunk.content) : "";
+                emitToken(token);
+              }
               return;
             }
             if (mode === "values") {
@@ -2188,8 +2193,12 @@ async function handleChatStream(req: Request, env: Env) {
             // messages-tuple: [message_chunk, metadata]
             const tup = Array.isArray(data) ? data : [];
             const messageChunk = tup[0] as any;
-            const token = typeof messageChunk?.content === "string" ? String(messageChunk.content) : "";
-            emitToken(token);
+            const msgType = String(messageChunk?.type ?? messageChunk?.role ?? "").toLowerCase();
+            const isAi = msgType === "ai" || msgType === "assistant";
+            if (isAi) {
+              const token = typeof messageChunk?.content === "string" ? String(messageChunk.content) : "";
+              emitToken(token);
+            }
             return;
           }
           if (ev === "values" || ev === "updates") {
