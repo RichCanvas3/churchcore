@@ -9,9 +9,12 @@ export type Env = {
   CRAWL_CHURCH_ID?: string;
   CRAWL_BUDGET?: string;
   CRAWL_DOMAIN_ALLOWLIST?: string;
+  ASSEMBLYAI_API_KEY?: string;
   OPENAI_API_KEY?: string;
   OPENAI_EMBEDDINGS_MODEL?: string;
-  OPENAI_SUMMARY_MODEL?: string;
+  OPENAI_MESSAGE_MODEL?: string; // e.g. gpt-5.2
+  OPENAI_TRANSCRIBE_MODEL?: string; // e.g. gpt-4o-mini-transcribe|whisper-1
+  TRANSCRIBE_MAX_BYTES?: string; // default ~20MB
 };
 
 function nowIso() {
@@ -2190,6 +2193,159 @@ function decodeHtmlEntities(input: string) {
     .replace(/&#039;/g, "'");
 }
 
+function stripVtt(vtt: string) {
+  const lines = String(vtt || "")
+    .split("\n")
+    .map((l) => l.trim());
+  const out: string[] = [];
+  for (const l of lines) {
+    if (!l) continue;
+    if (l === "WEBVTT") continue;
+    if (/^\d+$/.test(l)) continue;
+    if (/^\d{2}:\d{2}:\d{2}\.\d{3}\s+-->\s+\d{2}:\d{2}:\d{2}\.\d{3}/.test(l)) continue;
+    if (l.startsWith("NOTE")) continue;
+    if (l.startsWith("STYLE")) continue;
+    out.push(l);
+  }
+  return out.join("\n").replace(/\n{3,}/g, "\n\n").trim();
+}
+
+function extractYoutubeVideoIds(html: string) {
+  const raw = String(html || "");
+  const ids = new Set<string>();
+  const patterns = [
+    /youtube\.com\/embed\/([a-zA-Z0-9_-]{11})/g,
+    /youtube\.com\/watch\?v=([a-zA-Z0-9_-]{11})/g,
+    /youtu\.be\/([a-zA-Z0-9_-]{11})/g,
+  ];
+  for (const re of patterns) {
+    for (;;) {
+      const m = re.exec(raw);
+      if (!m) break;
+      ids.add(String(m[1]));
+    }
+  }
+  return [...ids];
+}
+
+function extractJsonArrayAfterKey(raw: string, key: string) {
+  const i = raw.indexOf(key);
+  if (i < 0) return null;
+  const start = raw.indexOf("[", i);
+  if (start < 0) return null;
+  let depth = 0;
+  for (let j = start; j < raw.length; j++) {
+    const ch = raw[j];
+    if (ch === "[") depth++;
+    else if (ch === "]") {
+      depth--;
+      if (depth === 0) return raw.slice(start, j + 1);
+    }
+  }
+  return null;
+}
+
+async function fetchYouTubeTranscript(videoId: string) {
+  const id = String(videoId || "").trim();
+  if (!id) return null;
+  try {
+    const watchUrl = `https://www.youtube.com/watch?v=${encodeURIComponent(id)}`;
+    const res = await fetch(watchUrl, { headers: { "user-agent": "Mozilla/5.0 (compatible; churchcore-mcp/0.1)" } });
+    if (!res.ok) return null;
+    const html = await res.text();
+
+    const arrRaw = extractJsonArrayAfterKey(html, '"captionTracks":');
+    if (!arrRaw) return null;
+    const jsonText = arrRaw.replace(/\\u0026/g, "&");
+    let tracks: any[] = [];
+    try {
+      tracks = JSON.parse(jsonText);
+    } catch {
+      return null;
+    }
+    if (!Array.isArray(tracks) || !tracks.length) return null;
+
+    // Prefer English, else first.
+    const preferred =
+      tracks.find((t) => String(t?.languageCode ?? "").toLowerCase().startsWith("en") && typeof t?.baseUrl === "string") ??
+      tracks.find((t) => typeof t?.baseUrl === "string");
+    const baseUrl = typeof preferred?.baseUrl === "string" ? String(preferred.baseUrl) : null;
+    if (!baseUrl) return null;
+
+    const timed = baseUrl.includes("fmt=") ? baseUrl : `${baseUrl}&fmt=vtt`;
+    const r2 = await fetch(timed, { headers: { "user-agent": "Mozilla/5.0 (compatible; churchcore-mcp/0.1)" } });
+    if (!r2.ok) return null;
+    const vtt = (await r2.text()).trim();
+    if (!vtt) return null;
+    const text = vtt.startsWith("WEBVTT") ? stripVtt(vtt) : stripHtmlToText(vtt);
+    if (text.length < 200) return null;
+    return { text, source: "youtube_captions" as const };
+  } catch {
+    return null;
+  }
+}
+
+function guessExtFromUrl(url: string) {
+  const u = String(url || "").split("?")[0].toLowerCase();
+  const m = u.match(/\.([a-z0-9]{2,5})$/);
+  return m ? m[1] : null;
+}
+
+function guessMimeFromExt(ext: string | null) {
+  const e = String(ext || "").toLowerCase();
+  if (e === "m4a") return "audio/mp4";
+  if (e === "mp3") return "audio/mpeg";
+  if (e === "mp4") return "video/mp4";
+  if (e === "wav") return "audio/wav";
+  return "application/octet-stream";
+}
+
+async function openAiTranscribeUrl(env: Env, mediaUrl: string) {
+  const apiKey = (env.OPENAI_API_KEY ?? "").trim();
+  if (!apiKey) return null;
+
+  const maxBytes = clampInt(env.TRANSCRIBE_MAX_BYTES, 25 * 1024 * 1024, 1 * 1024 * 1024, 200 * 1024 * 1024);
+  const model = (env.OPENAI_TRANSCRIBE_MODEL ?? "gpt-4o-mini-transcribe").trim() || "gpt-4o-mini-transcribe";
+
+  // Try HEAD for content-length.
+  try {
+    const head = await fetch(mediaUrl, { method: "HEAD", headers: { "user-agent": "churchcore-mcp-crawler/0.1" }, redirect: "follow" });
+    const len = head.headers.get("content-length");
+    if (len) {
+      const n = parseInt(len, 10);
+      if (Number.isFinite(n) && n > maxBytes) return { error: `too_large:${n}>${maxBytes}` as const };
+    }
+  } catch {
+    // ignore
+  }
+
+  const res = await fetch(mediaUrl, { headers: { "user-agent": "churchcore-mcp-crawler/0.1" }, redirect: "follow" });
+  if (!res.ok) return { error: `download_failed:${res.status}` as const };
+
+  const buf = await res.arrayBuffer();
+  if (buf.byteLength > maxBytes) return { error: `too_large:${buf.byteLength}>${maxBytes}` as const };
+
+  const ext = guessExtFromUrl(mediaUrl);
+  const mime = res.headers.get("content-type")?.split(";")[0]?.trim() || guessMimeFromExt(ext);
+  const filename = `media.${ext ?? "bin"}`;
+
+  const fd = new FormData();
+  fd.append("model", model);
+  fd.append("response_format", "json");
+  fd.append("file", new Blob([buf], { type: mime }), filename);
+
+  const tr = await fetch("https://api.openai.com/v1/audio/transcriptions", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${apiKey}` },
+    body: fd,
+  });
+  const data = (await tr.json().catch(() => ({}))) as any;
+  if (!tr.ok) return { error: `openai:${tr.status}:${String(data?.error?.message ?? "transcribe_failed")}` as const };
+  const text = typeof data?.text === "string" ? data.text.trim() : "";
+  if (text.length < 200) return { error: "too_short" as const };
+  return { text, model, source: "asr" as const };
+}
+
 function normalizePassageKey(passage: string | null | undefined) {
   const s = String(passage ?? "").trim();
   if (!s) return null;
@@ -2459,11 +2615,21 @@ async function upsertCampusMessageDoc(
 
 async function openAiSummarizeMessage(
   env: Env,
-  args: { title: string; speaker: string | null; preachedAt: string | null; passage: string | null; seriesTitle: string | null; campusId: string | null; pageText: string },
+  args: {
+    title: string;
+    speaker: string | null;
+    preachedAt: string | null;
+    passage: string | null;
+    seriesTitle: string | null;
+    campusId: string | null;
+    pageText: string;
+    transcriptText: string | null;
+    transcriptSource: string | null;
+  },
 ) {
   const apiKey = (env.OPENAI_API_KEY ?? "").trim();
   if (!apiKey) return null;
-  const model = (env.OPENAI_SUMMARY_MODEL ?? "gpt-4o-mini").trim() || "gpt-4o-mini";
+  const model = (env.OPENAI_MESSAGE_MODEL ?? "gpt-5.2").trim() || "gpt-5.2";
 
   const prompt = {
     title: args.title,
@@ -2472,6 +2638,8 @@ async function openAiSummarizeMessage(
     passage: args.passage,
     seriesTitle: args.seriesTitle,
     campusId: args.campusId,
+    transcriptSource: args.transcriptSource,
+    transcriptText: args.transcriptText,
     pageText: args.pageText,
   };
 
@@ -2486,7 +2654,7 @@ async function openAiSummarizeMessage(
         {
           role: "system",
           content:
-            "You create a church knowledge-base entry for a weekly message. Use ONLY the provided pageText + metadata. Do not invent quotes, stories, or details not present. If something is missing, leave it null or an empty array. Output JSON with keys: summaryMarkdown (string), topics (string[]), verses (string[]), keyPoints (string[]), extractedContentMarkdown (string).",
+            "You create a church knowledge-base entry for a weekly message. Prefer transcriptText if present; otherwise use pageText. Do not invent quotes, stories, or details not present. If something is missing, leave it null or an empty array. Output JSON with keys: summaryMarkdown (string), topics (string[]), verses (string[]), keyPoints (string[]), extractedContentMarkdown (string). The extractedContentMarkdown should be detailed (outline + main points + applications) and may include short direct quotes ONLY if they appear in the provided text.",
         },
         { role: "user", content: JSON.stringify(prompt) },
       ],
@@ -2510,6 +2678,264 @@ async function openAiSummarizeMessage(
   } catch {
     return null;
   }
+}
+
+async function upsertCampusMessageTranscript(
+  env: Env,
+  args: { churchId: string; messageId: string; transcriptText: string; sourceUrl: string | null; model: string | null; now: string },
+) {
+  await env.churchcore
+    .prepare(
+      `INSERT INTO campus_message_transcripts (message_id, church_id, transcript_text, source_url, model, created_at, updated_at)
+       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+       ON CONFLICT(message_id) DO UPDATE SET
+         church_id=excluded.church_id,
+         transcript_text=excluded.transcript_text,
+         source_url=excluded.source_url,
+         model=excluded.model,
+         updated_at=excluded.updated_at`,
+    )
+    .bind(args.messageId, args.churchId, args.transcriptText, args.sourceUrl, args.model, args.now, args.now)
+    .run();
+}
+
+async function openAiTranscribeAudio(
+  env: Env,
+  args: { audioUrl: string; filename: string; mimeType: string | null; maxBytes: number },
+) {
+  const apiKey = (env.OPENAI_API_KEY ?? "").trim();
+  if (!apiKey) throw new Error("Missing OPENAI_API_KEY (required for transcription).");
+  const model = (env.OPENAI_TRANSCRIBE_MODEL ?? "gpt-4o-transcribe").trim() || "gpt-4o-transcribe";
+
+  const head = await fetch(args.audioUrl, { method: "HEAD", redirect: "follow" }).catch(() => null);
+  const len = head?.headers?.get("content-length");
+  const contentLength = len ? parseInt(len, 10) : NaN;
+  if (Number.isFinite(contentLength) && contentLength > args.maxBytes) {
+    throw new Error(`audio_too_large:${contentLength}`);
+  }
+
+  const res = await fetch(args.audioUrl, { redirect: "follow" });
+  if (!res.ok) throw new Error(`audio_fetch_failed:${res.status}`);
+  const buf = await res.arrayBuffer();
+  if (buf.byteLength > args.maxBytes) throw new Error(`audio_too_large:${buf.byteLength}`);
+
+  const blob = new Blob([buf], { type: args.mimeType ?? "application/octet-stream" });
+  const file = new File([blob], args.filename);
+  const form = new FormData();
+  form.append("file", file);
+  form.append("model", model);
+
+  const t = await fetch("https://api.openai.com/v1/audio/transcriptions", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${apiKey}` },
+    body: form as any,
+  });
+  const data = (await t.json().catch(() => ({}))) as any;
+  if (!t.ok) throw new Error(`openai_transcribe_error:${t.status}:${data?.error?.message ?? "unknown"}`);
+  const text = typeof data?.text === "string" ? data.text : "";
+  return { model, text };
+}
+
+async function assemblyAiRequest(env: Env, path: string, init: RequestInit) {
+  const apiKey = (env.ASSEMBLYAI_API_KEY ?? "").trim();
+  if (!apiKey) throw new Error("Missing ASSEMBLYAI_API_KEY (required for AssemblyAI transcription).");
+  const url = `https://api.assemblyai.com${path.startsWith("/") ? "" : "/"}${path}`;
+  const res = await fetch(url, {
+    ...init,
+    headers: {
+      authorization: apiKey,
+      "content-type": "application/json",
+      ...(init.headers ?? {}),
+    } as any,
+  });
+  const data = (await res.json().catch(() => ({}))) as any;
+  if (!res.ok) throw new Error(`assemblyai_error:${res.status}:${data?.error ?? data?.message ?? "unknown"}`);
+  return data;
+}
+
+async function assemblyAiSubmit(env: Env, args: { audioUrl: string }) {
+  const body = {
+    audio_url: args.audioUrl,
+    language_detection: true,
+    speech_models: ["universal-3-pro", "universal-2"],
+  };
+  const data = await assemblyAiRequest(env, "/v2/transcript", { method: "POST", body: JSON.stringify(body) });
+  const id = typeof data?.id === "string" ? data.id : null;
+  if (!id) throw new Error("assemblyai_missing_transcript_id");
+  return { id };
+}
+
+async function assemblyAiGet(env: Env, transcriptId: string) {
+  const data = await assemblyAiRequest(env, `/v2/transcript/${encodeURIComponent(transcriptId)}`, { method: "GET" });
+  const status = typeof data?.status === "string" ? data.status : "unknown";
+  const text = typeof data?.text === "string" ? data.text : null;
+  const error = typeof data?.error === "string" ? data.error : null;
+  return { status, text, error, raw: data };
+}
+
+async function applyTranscriptToMessage(
+  env: Env,
+  args: {
+    churchId: string;
+    messageId: string;
+    transcriptText: string;
+    transcriptSource: string | null;
+    transcriptModel: string | null;
+    analysisSource: string;
+    now: string;
+  },
+) {
+  const row = (await env.churchcore
+    .prepare(
+      `SELECT id, campus_id AS campusId, title, speaker, preached_at AS preachedAt, passage, series_title AS seriesTitle,
+              source_url AS sourceUrl, download_url AS downloadUrl, listen_url AS listenUrl, watch_url AS watchUrl,
+              guide_discussion_url AS guideDiscussionUrl, guide_leader_url AS guideLeaderUrl
+       FROM campus_messages WHERE church_id=?1 AND id=?2`,
+    )
+    .bind(args.churchId, args.messageId)
+    .first()) as any;
+  if (!row) throw new Error("unknown_messageId");
+
+  await upsertCampusMessageTranscript(env, {
+    churchId: args.churchId,
+    messageId: args.messageId,
+    transcriptText: args.transcriptText,
+    sourceUrl: args.transcriptSource,
+    model: args.transcriptModel,
+    now: args.now,
+  });
+
+  const llm = await openAiSummarizeMessage(env, {
+    title: String(row.title ?? "Message"),
+    speaker: row.speaker ?? null,
+    preachedAt: row.preachedAt ?? null,
+    passage: row.passage ?? null,
+    seriesTitle: row.seriesTitle ?? null,
+    campusId: row.campusId ?? null,
+    pageText: "",
+    transcriptText: args.transcriptText,
+    transcriptSource: args.transcriptSource,
+  });
+
+  if (llm) {
+    await upsertCampusMessageAnalysis(env, {
+      churchId: args.churchId,
+      messageId: args.messageId,
+      summaryMarkdown: llm.summaryMarkdown ?? null,
+      topics: llm.topics ?? [],
+      verses: llm.verses ?? [],
+      keyPoints: llm.keyPoints ?? [],
+      model: llm.model ?? null,
+      source: args.analysisSource,
+      now: args.now,
+    });
+  }
+
+  const md = [
+    row.sourceUrl ? `Source: ${row.sourceUrl}` : null,
+    row.campusId ? `Campus: ${row.campusId}` : null,
+    row.preachedAt ? `Date: ${String(row.preachedAt).slice(0, 10)}` : null,
+    row.speaker ? `Speaker: ${row.speaker}` : null,
+    row.passage ? `Passage: ${row.passage}` : null,
+    row.seriesTitle ? `Series: ${row.seriesTitle}` : null,
+    row.watchUrl ? `Watch: ${row.watchUrl}` : null,
+    row.listenUrl ? `Listen: ${row.listenUrl}` : null,
+    row.downloadUrl ? `Download: ${row.downloadUrl}` : null,
+    row.guideDiscussionUrl ? `Discussion Questions: ${row.guideDiscussionUrl}` : null,
+    row.guideLeaderUrl ? `Leader Guide: ${row.guideLeaderUrl}` : null,
+    args.transcriptSource ? `Transcript source: ${args.transcriptSource}` : null,
+    args.transcriptModel ? `Transcript model: ${args.transcriptModel}` : null,
+    llm?.summaryMarkdown ? `## Summary\n\n${llm.summaryMarkdown}` : null,
+    `## Transcript\n\n${args.transcriptText}`,
+    llm?.extractedContentMarkdown?.trim() ? `## Extracted Outline\n\n${llm.extractedContentMarkdown.trim()}` : null,
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+
+  const doc = await upsertCampusMessageDoc(env, { churchId: args.churchId, messageId: args.messageId, title: String(row.title ?? "Message"), bodyMarkdown: md, now: args.now });
+  await refreshKbForSource(env, { churchId: args.churchId, sourceId: doc.sourceId, docId: doc.docId, text: md, now: args.now });
+  return { summaryModel: llm?.model ?? null, summarized: Boolean(llm) };
+}
+
+async function transcriptionJobCreate(
+  env: Env,
+  args: { churchId: string; messageId: string; provider: string; audioUrl: string; now: string },
+) {
+  const id = crypto.randomUUID();
+  await env.churchcore
+    .prepare(
+      `INSERT INTO transcription_jobs (id, church_id, message_id, provider, audio_url, provider_job_id, status, error, created_at, updated_at, completed_at)
+       VALUES (?1, ?2, ?3, ?4, ?5, NULL, 'queued', NULL, ?6, ?7, NULL)`,
+    )
+    .bind(id, args.churchId, args.messageId, args.provider, args.audioUrl, args.now, args.now)
+    .run();
+  return id;
+}
+
+async function transcriptionJobUpdate(
+  env: Env,
+  args: { id: string; status: string; providerJobId?: string | null; error?: string | null; completedAt?: string | null; now: string },
+) {
+  await env.churchcore
+    .prepare(
+      `UPDATE transcription_jobs
+       SET status=?2, provider_job_id=COALESCE(?3, provider_job_id), error=?4, completed_at=?5, updated_at=?6
+       WHERE id=?1`,
+    )
+    .bind(args.id, args.status, args.providerJobId ?? null, args.error ?? null, args.completedAt ?? null, args.now)
+    .run();
+}
+
+async function processAssemblyAiJobs(env: Env, args: { churchId: string; limit: number }) {
+  const now = nowIso();
+  const rows =
+    (
+      await env.churchcore
+        .prepare(
+          `SELECT id, message_id AS messageId, audio_url AS audioUrl, provider_job_id AS providerJobId, status
+           FROM transcription_jobs
+           WHERE church_id=?1 AND provider='assemblyai' AND status IN ('queued','processing')
+           ORDER BY updated_at ASC
+           LIMIT ${args.limit}`,
+        )
+        .bind(args.churchId)
+        .all()
+    ).results ?? [];
+
+  for (const r of rows as any[]) {
+    const jobId = String(r.id);
+    const messageId = String(r.messageId);
+    const audioUrl = String(r.audioUrl);
+    const providerJobId = r.providerJobId ? String(r.providerJobId) : null;
+    try {
+      if (!providerJobId) {
+        const sub = await assemblyAiSubmit(env, { audioUrl });
+        await transcriptionJobUpdate(env, { id: jobId, status: "processing", providerJobId: sub.id, now });
+        continue;
+      }
+
+      const st = await assemblyAiGet(env, providerJobId);
+      if (st.status === "completed" && st.text) {
+        await applyTranscriptToMessage(env, {
+          churchId: args.churchId,
+          messageId,
+          transcriptText: st.text,
+          transcriptSource: "assemblyai",
+          transcriptModel: "universal-3-pro/universal-2",
+          analysisSource: "assemblyai_transcript",
+          now,
+        });
+        await transcriptionJobUpdate(env, { id: jobId, status: "completed", completedAt: now, now });
+      } else if (st.status === "error" || st.status === "failed") {
+        await transcriptionJobUpdate(env, { id: jobId, status: "failed", error: st.error ?? "assemblyai_failed", now });
+      } else {
+        await transcriptionJobUpdate(env, { id: jobId, status: "processing", now });
+      }
+    } catch (e: any) {
+      await transcriptionJobUpdate(env, { id: jobId, status: "failed", error: String(e?.message ?? e ?? "job_failed"), now });
+    }
+  }
+  return { ok: true, processed: rows.length };
 }
 
 function parseSitemapXml(xml: string) {
@@ -2624,7 +3050,7 @@ async function refreshKbForSource(env: Env, args: { churchId: string; sourceId: 
   await env.churchcore.batch(batch);
 }
 
-async function crawlOne(env: Env, args: { churchId: string; url: string; allowDomains: string[]; now: string }) {
+async function crawlOne(env: Env, args: { churchId: string; url: string; allowDomains: string[]; now: string; forceMessages?: boolean }) {
   const url = args.url;
   if (!isAllowedUrl(url, args.allowDomains)) return { url, skipped: true, reason: "disallowed_domain" };
 
@@ -2634,8 +3060,18 @@ async function crawlOne(env: Env, args: { churchId: string; url: string; allowDo
     .first()) as any;
 
   const headers: Record<string, string> = { "user-agent": "churchcore-mcp-crawler/0.1" };
-  if (typeof prev?.etag === "string" && prev.etag) headers["if-none-match"] = prev.etag;
-  if (typeof prev?.lastModified === "string" && prev.lastModified) headers["if-modified-since"] = prev.lastModified;
+  let isMessageDetailUrl = false;
+  try {
+    const u0 = new URL(url);
+    isMessageDetailUrl = Boolean(u0.searchParams.get("enmse_mid")) && u0.pathname.includes("/messages/");
+  } catch {
+    isMessageDetailUrl = false;
+  }
+  const forceMessages = Boolean(args.forceMessages) && isMessageDetailUrl;
+  if (!forceMessages) {
+    if (typeof prev?.etag === "string" && prev.etag) headers["if-none-match"] = prev.etag;
+    if (typeof prev?.lastModified === "string" && prev.lastModified) headers["if-modified-since"] = prev.lastModified;
+  }
 
   try {
     const res = await fetch(url, { headers, redirect: "follow" });
@@ -2667,6 +3103,7 @@ async function crawlOne(env: Env, args: { churchId: string; url: string; allowDo
     const bodyMarkdown = `Source: ${url}\n\n${text}`;
     const contentHash = await sha256Hex(bodyMarkdown);
     const changed = String(prev?.contentHash ?? "") !== contentHash;
+    const effectiveChanged = changed || forceMessages;
 
     const u = new URL(url);
     const mid = u.searchParams.get("enmse_mid");
@@ -2719,7 +3156,7 @@ async function crawlOne(env: Env, args: { churchId: string; url: string; allowDo
     let doc: { docId: string; sourceId: string } | null = null;
     let kbBody: string | null = null;
 
-    if (changed && text.trim()) {
+    if (effectiveChanged && text.trim()) {
       if (isMessageDetail && mid) {
         // Parse basic message metadata from the rendered text.
         const lines = text
@@ -2749,6 +3186,28 @@ async function crawlOne(env: Env, args: { churchId: string; url: string; allowDo
         const watchUrl = links.find((l) => l.includes("enmse_mid=" + mid) && l.includes("/messages/") && !l.includes("enmse_av=1")) ?? url;
         const listenUrl = links.find((l) => l.includes("enmse_mid=" + mid) && l.includes("enmse_av=1")) ?? null;
         const downloadUrl = links.find((l) => l.includes("calvarybible.s3.us-west-1.amazonaws.com") && /\.(m4a|mp3)(\?|$)/i.test(l)) ?? null;
+
+        // Transcript: YouTube captions if embedded, otherwise ASR from downloadable audio (best-effort).
+        let transcriptText: string | null = null;
+        let transcriptSource: string | null = null;
+        let transcriptError: string | null = null;
+        const yt = extractYoutubeVideoIds(raw);
+        if (yt.length) {
+          const t = await fetchYouTubeTranscript(yt[0]);
+          if (t?.text) {
+            transcriptText = t.text;
+            transcriptSource = t.source;
+          }
+        }
+        if (!transcriptText && downloadUrl) {
+          const t = await openAiTranscribeUrl(env, downloadUrl);
+          if ((t as any)?.text) {
+            transcriptText = t.text;
+            transcriptSource = `asr:${t.model ?? "unknown"}`;
+          } else if ((t as any)?.error) {
+            transcriptError = String((t as any).error);
+          }
+        }
 
         // Link to weekly guide PDFs by matching passage to the latest guide index.
         const guideSeriesSlug = inferGuideSeriesSlug(seriesTitle, passage);
@@ -2789,7 +3248,17 @@ async function crawlOne(env: Env, args: { churchId: string; url: string; allowDo
           now: args.now,
         });
 
-        const llm = await openAiSummarizeMessage(env, { title: msgTitle, speaker, preachedAt, passage, seriesTitle, campusId, pageText: text });
+        const llm = await openAiSummarizeMessage(env, {
+          title: msgTitle,
+          speaker,
+          preachedAt,
+          passage,
+          seriesTitle,
+          campusId,
+          pageText: text,
+          transcriptText,
+          transcriptSource,
+        });
         const summaryMarkdown = llm?.summaryMarkdown ?? null;
         const extracted = llm?.extractedContentMarkdown?.trim() || "";
         const topics = llm?.topics ?? [];
@@ -2820,10 +3289,13 @@ async function crawlOne(env: Env, args: { churchId: string; url: string; allowDo
           watchUrl ? `Watch: ${watchUrl}` : null,
           listenUrl ? `Listen: ${listenUrl}` : null,
           downloadUrl ? `Download: ${downloadUrl}` : null,
+          transcriptSource ? `Transcript source: ${transcriptSource}` : null,
+          transcriptError ? `Transcript error: ${transcriptError}` : null,
           guide?.discussionUrl ? `Discussion Questions: ${guide.discussionUrl}` : null,
           guide?.leaderUrl ? `Leader Guide: ${guide.leaderUrl}` : null,
           summaryMarkdown ? `## Summary\n\n${summaryMarkdown}` : null,
           `## Extracted Content\n\n${extracted || text}`,
+          transcriptText ? `## Transcript\n\n${transcriptText}` : null,
         ]
           .filter(Boolean)
           .join("\n\n");
@@ -2845,12 +3317,12 @@ async function crawlOne(env: Env, args: { churchId: string; url: string; allowDo
       title,
       statusCode: status,
       lastFetchedAt: args.now,
-      lastChangedAt: changed ? args.now : null,
+      lastChangedAt: effectiveChanged ? args.now : null,
       error: null,
       now: args.now,
     });
 
-    return { url, changed, status, doc, bodyMarkdown: kbBody ?? bodyMarkdown, discoveredUrls };
+    return { url, changed: effectiveChanged, status, doc, bodyMarkdown: kbBody ?? bodyMarkdown, discoveredUrls };
   } catch (e: any) {
     await upsertCrawlMeta(env, {
       churchId: args.churchId,
@@ -2869,14 +3341,16 @@ async function crawlOne(env: Env, args: { churchId: string; url: string; allowDo
   }
 }
 
-async function crawlBatch(env: Env, args: { churchId: string; urls: string[]; allowDomains: string[]; now: string }) {
+async function crawlBatch(env: Env, args: { churchId: string; urls: string[]; allowDomains: string[]; now: string; forceMessages?: boolean }) {
   const changedDocs: Array<{ docId: string; sourceId: string; bodyMarkdown: string }> = [];
   const discovered: string[] = [];
   const q = [...new Set(args.urls.map((u) => String(u).trim()).filter(Boolean))];
   const concurrency = 5;
   for (let i = 0; i < q.length; i += concurrency) {
     const slice = q.slice(i, i + concurrency);
-    const results = await Promise.all(slice.map((url) => crawlOne(env, { churchId: args.churchId, url, allowDomains: args.allowDomains, now: args.now })));
+    const results = await Promise.all(
+      slice.map((url) => crawlOne(env, { churchId: args.churchId, url, allowDomains: args.allowDomains, now: args.now, forceMessages: args.forceMessages })),
+    );
     for (const r of results as any[]) {
       if (r?.changed && r?.doc?.docId && typeof r?.bodyMarkdown === "string") {
         changedDocs.push({ docId: r.doc.docId, sourceId: r.doc.sourceId, bodyMarkdown: r.bodyMarkdown });
@@ -2918,7 +3392,7 @@ async function discoverDailyUrls(env: Env, args: { allowDomains: string[]; budge
   return filtered.slice(0, args.budget);
 }
 
-async function runScheduledCrawl(env: Env, cron: string) {
+async function runScheduledCrawl(env: Env, cron: string, opts?: { forceMessages?: boolean }) {
   const churchId = (env.CRAWL_CHURCH_ID ?? "calvarybible").trim() || "calvarybible";
   const budget = clampInt(env.CRAWL_BUDGET, 50, 10, 500);
   const allowDomains = parseDomainAllowlist(env);
@@ -2944,13 +3418,15 @@ async function runScheduledCrawl(env: Env, cron: string) {
   const seedLimit = Math.max(keyPages.length, budget - reserveForMessageDetails);
   const seedUrls = [...new Set([...keyPages, ...daily])].slice(0, seedLimit);
 
-  const first = await crawlBatch(env, { churchId, urls: seedUrls, allowDomains, now });
+  const first = await crawlBatch(env, { churchId, urls: seedUrls, allowDomains, now, forceMessages: opts?.forceMessages });
   const messageUrls = first.discoveredUrls
     .filter((u) => u.includes("/messages/") && u.includes("enmse_mid="))
     .filter((u) => !u.includes("enmse_o=")) // avoid paging controls
     .slice(0, Math.max(0, budget - seedUrls.length));
 
-  const second = messageUrls.length ? await crawlBatch(env, { churchId, urls: messageUrls, allowDomains, now }) : { changedDocs: [], discoveredUrls: [] as string[] };
+  const second = messageUrls.length
+    ? await crawlBatch(env, { churchId, urls: messageUrls, allowDomains, now, forceMessages: opts?.forceMessages })
+    : { changedDocs: [], discoveredUrls: [] as string[] };
   const changedDocs = [...first.changedDocs, ...second.changedDocs];
   if (!changedDocs.length) return { ok: true, changed: 0, urls: seedUrls.length + messageUrls.length };
 
@@ -2967,11 +3443,143 @@ export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext) {
     const auth = checkApiKey(request, env);
     if (auth) return auth;
+
+    // Manual trigger for live system (protected by x-api-key if MCP_API_KEY is set).
+    // POST /admin/run-crawl  body: { mode?: "key"|"daily", forceMessages?: boolean }
+    const u = new URL(request.url);
+
+    if (u.pathname === "/admin/run-crawl" && request.method.toUpperCase() === "POST") {
+      const body = (await request.json().catch(() => ({}))) as any;
+      const mode = String(body?.mode ?? "key").toLowerCase();
+      const forceMessages = Boolean(body?.forceMessages);
+      const cron = mode === "daily" ? "manual 15 3 * * *" : "manual 0 */6 * * *";
+      const result = await runScheduledCrawl(env, cron, { forceMessages });
+      return Response.json(result, { status: 200 });
+    }
+
+    if (u.pathname === "/admin/transcribe-message" && request.method.toUpperCase() === "POST") {
+      try {
+        const now = nowIso();
+        const body = (await request.json().catch(() => ({}))) as any;
+        const churchId = (env.CRAWL_CHURCH_ID ?? "calvarybible").trim() || "calvarybible";
+        const messageId = String(body?.messageId ?? "").trim();
+        if (!messageId) return Response.json({ ok: false, error: "missing_messageId" }, { status: 400 });
+
+        const row = (await env.churchcore
+          .prepare(
+            `SELECT id, campus_id AS campusId, title, speaker, preached_at AS preachedAt, passage, series_title AS seriesTitle,
+                    source_url AS sourceUrl, download_url AS downloadUrl, listen_url AS listenUrl, watch_url AS watchUrl,
+                    guide_discussion_url AS guideDiscussionUrl, guide_leader_url AS guideLeaderUrl
+             FROM campus_messages WHERE church_id=?1 AND id=?2`,
+          )
+          .bind(churchId, messageId)
+          .first()) as any;
+        if (!row) return Response.json({ ok: false, error: "unknown_messageId" }, { status: 404 });
+
+        const audioUrl = String(row.downloadUrl || row.listenUrl || "").trim();
+        if (!audioUrl) return Response.json({ ok: false, error: "missing_audio_url" }, { status: 400 });
+
+        const maxBytes = clampInt(env.TRANSCRIBE_MAX_BYTES, 24 * 1024 * 1024, 1024 * 1024, 100 * 1024 * 1024);
+        const ext = audioUrl.toLowerCase().includes(".m4a") ? "m4a" : audioUrl.toLowerCase().includes(".mp3") ? "mp3" : "audio";
+        const mimeType = ext === "m4a" ? "audio/mp4" : ext === "mp3" ? "audio/mpeg" : null;
+        const filename = `sermon.${ext}`;
+
+        const tr = await openAiTranscribeAudio(env, { audioUrl, filename, mimeType, maxBytes });
+        const transcriptText = tr.text.trim();
+        if (!transcriptText) return Response.json({ ok: false, error: "empty_transcript" }, { status: 502 });
+
+        const applied = await applyTranscriptToMessage(env, {
+          churchId,
+          messageId,
+          transcriptText,
+          transcriptSource: audioUrl,
+          transcriptModel: tr.model,
+          analysisSource: "audio_transcript",
+          now,
+        });
+
+        return Response.json({ ok: true, messageId, audioUrl, transcriptModel: tr.model, ...applied, kbRefreshed: true }, { status: 200 });
+      } catch (e: any) {
+        return Response.json({ ok: false, error: String(e?.message ?? e ?? "transcribe_failed") }, { status: 500 });
+      }
+    }
+
+    // POST /admin/upsert-message-transcript
+    // body: { messageId, transcriptText, transcriptSource?, transcriptModel? }
+    // Use this when audio/video is too large for the Worker to transcribe.
+    if (u.pathname === "/admin/upsert-message-transcript" && request.method.toUpperCase() === "POST") {
+      try {
+        const now = nowIso();
+        const body = (await request.json().catch(() => ({}))) as any;
+        const churchId = (env.CRAWL_CHURCH_ID ?? "calvarybible").trim() || "calvarybible";
+        const messageId = String(body?.messageId ?? "").trim();
+        const transcriptText = String(body?.transcriptText ?? "").trim();
+        const transcriptSource = body?.transcriptSource ? String(body.transcriptSource).trim() : null;
+        const transcriptModel = body?.transcriptModel ? String(body.transcriptModel).trim() : null;
+        if (!messageId) return Response.json({ ok: false, error: "missing_messageId" }, { status: 400 });
+        if (!transcriptText) return Response.json({ ok: false, error: "missing_transcriptText" }, { status: 400 });
+
+        const applied = await applyTranscriptToMessage(env, {
+          churchId,
+          messageId,
+          transcriptText,
+          transcriptSource,
+          transcriptModel,
+          analysisSource: "external_transcript",
+          now,
+        });
+
+        return Response.json({ ok: true, messageId, upsertedTranscript: true, ...applied, kbRefreshed: true }, { status: 200 });
+      } catch (e: any) {
+        return Response.json({ ok: false, error: String(e?.message ?? e ?? "upsert_transcript_failed") }, { status: 500 });
+      }
+    }
+
+    // POST /admin/queue-assemblyai-transcription  body: { messageId }
+    if (u.pathname === "/admin/queue-assemblyai-transcription" && request.method.toUpperCase() === "POST") {
+      try {
+        const now = nowIso();
+        const body = (await request.json().catch(() => ({}))) as any;
+        const churchId = (env.CRAWL_CHURCH_ID ?? "calvarybible").trim() || "calvarybible";
+        const messageId = String(body?.messageId ?? "").trim();
+        if (!messageId) return Response.json({ ok: false, error: "missing_messageId" }, { status: 400 });
+
+        const row = (await env.churchcore
+          .prepare(`SELECT download_url AS downloadUrl, listen_url AS listenUrl FROM campus_messages WHERE church_id=?1 AND id=?2`)
+          .bind(churchId, messageId)
+          .first()) as any;
+        if (!row) return Response.json({ ok: false, error: "unknown_messageId" }, { status: 404 });
+        const audioUrl = String(row.downloadUrl || row.listenUrl || "").trim();
+        if (!audioUrl) return Response.json({ ok: false, error: "missing_audio_url" }, { status: 400 });
+
+        const jobId = await transcriptionJobCreate(env, { churchId, messageId, provider: "assemblyai", audioUrl, now });
+        return Response.json({ ok: true, jobId, messageId, provider: "assemblyai", status: "queued" }, { status: 200 });
+      } catch (e: any) {
+        return Response.json({ ok: false, error: String(e?.message ?? e ?? "queue_failed") }, { status: 500 });
+      }
+    }
+
+    // POST /admin/process-transcription-jobs  body: { limit?: number }
+    if (u.pathname === "/admin/process-transcription-jobs" && request.method.toUpperCase() === "POST") {
+      try {
+        const body = (await request.json().catch(() => ({}))) as any;
+        const churchId = (env.CRAWL_CHURCH_ID ?? "calvarybible").trim() || "calvarybible";
+        const limit = clampInt(body?.limit, 3, 1, 25);
+        const result = await processAssemblyAiJobs(env, { churchId, limit });
+        return Response.json(result, { status: 200 });
+      } catch (e: any) {
+        return Response.json({ ok: false, error: String(e?.message ?? e ?? "process_failed") }, { status: 500 });
+      }
+    }
+
     const server = createServer(env);
     return createMcpHandler(server, { route: "/mcp" })(request, env, ctx);
   },
   async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
-    ctx.waitUntil(runScheduledCrawl(env, String((event as any).cron ?? "")));
+    const cron = String((event as any).cron ?? "");
+    const churchId = (env.CRAWL_CHURCH_ID ?? "calvarybible").trim() || "calvarybible";
+    ctx.waitUntil(runScheduledCrawl(env, cron));
+    ctx.waitUntil(processAssemblyAiJobs(env, { churchId, limit: 2 }));
   },
 };
 

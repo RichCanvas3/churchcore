@@ -590,6 +590,34 @@ CREATE TABLE IF NOT EXISTS campus_message_analysis (
 );
 CREATE INDEX IF NOT EXISTS idx_campus_message_analysis ON campus_message_analysis(church_id, updated_at);
 
+CREATE TABLE IF NOT EXISTS campus_message_transcripts (
+  message_id TEXT PRIMARY KEY,
+  church_id TEXT NOT NULL,
+  transcript_text TEXT NOT NULL,
+  source_url TEXT,
+  model TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  FOREIGN KEY (message_id) REFERENCES campus_messages(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_campus_message_transcripts ON campus_message_transcripts(church_id, updated_at);
+
+CREATE TABLE IF NOT EXISTS transcription_jobs (
+  id TEXT PRIMARY KEY,
+  church_id TEXT NOT NULL,
+  message_id TEXT NOT NULL,
+  provider TEXT NOT NULL, -- assemblyai|openai|other
+  audio_url TEXT NOT NULL,
+  provider_job_id TEXT,
+  status TEXT NOT NULL DEFAULT 'queued', -- queued|processing|completed|failed
+  error TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  completed_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_transcription_jobs ON transcription_jobs(church_id, status, updated_at);
+CREATE INDEX IF NOT EXISTS idx_transcription_jobs_message ON transcription_jobs(church_id, message_id, provider);
+
 -- Website crawl metadata (change detection for scheduled scraping)
 CREATE TABLE IF NOT EXISTS web_crawl_pages (
   url TEXT PRIMARY KEY,

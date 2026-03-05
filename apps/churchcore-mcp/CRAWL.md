@@ -32,7 +32,9 @@ Defined in `wrangler.jsonc`:
 
 - `OPENAI_API_KEY`
 - `OPENAI_EMBEDDINGS_MODEL` (optional, default `text-embedding-3-large`)
-- `OPENAI_SUMMARY_MODEL` (optional, default `gpt-4o-mini`) for message summaries/extraction
+- `OPENAI_MESSAGE_MODEL` (optional, default `gpt-5.2`) for message summaries/extraction
+- `OPENAI_TRANSCRIBE_MODEL` (optional, default `gpt-4o-mini-transcribe`) for audio transcription
+- `TRANSCRIBE_MAX_BYTES` (optional, default ~20MB) to skip huge audio downloads
 
 Set remote secrets:
 
@@ -40,7 +42,9 @@ Set remote secrets:
 cd apps/churchcore-mcp
 wrangler secret put OPENAI_API_KEY
 wrangler secret put OPENAI_EMBEDDINGS_MODEL
-wrangler secret put OPENAI_SUMMARY_MODEL
+wrangler secret put OPENAI_MESSAGE_MODEL
+wrangler secret put OPENAI_TRANSCRIBE_MODEL
+wrangler secret put TRANSCRIBE_MAX_BYTES
 ```
 
 #### Vars (optional)
