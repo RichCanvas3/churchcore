@@ -91,6 +91,8 @@ export default function ChatPage() {
   const [sermonCompareError, setSermonCompareError] = useState<string | null>(null);
   const [sermonCompareMarkdown, setSermonCompareMarkdown] = useState<string>("");
   const [sermonCompareIncluded, setSermonCompareIncluded] = useState<any[]>([]);
+  const [sermonCompareAnchorId, setSermonCompareAnchorId] = useState<string>("");
+  const [sermonCompareMatch, setSermonCompareMatch] = useState<any | null>(null);
 
   const closeTool = () => {
     setActiveUiToolId(null);
@@ -98,12 +100,15 @@ export default function ChatPage() {
     setIsToolsOpenMobile(false);
   };
 
-  async function openSermonCompare() {
+  async function openSermonCompare(anchorMessageId?: string) {
     setSermonCompareOpen(true);
     setSermonCompareLoading(true);
     setSermonCompareError(null);
     setSermonCompareMarkdown("");
     setSermonCompareIncluded([]);
+    setSermonCompareMatch(null);
+    const anchor = String(anchorMessageId ?? sermonCompareAnchorId ?? "").trim();
+    setSermonCompareAnchorId(anchor);
     try {
       const out = await postJson<any>("/api/a2a/sermon/compare", {
         identity: {
@@ -115,6 +120,7 @@ export default function ChatPage() {
           persona_id: (identity as any).persona_id ?? null,
         },
         campuses: ["campus_boulder", "campus_erie", "campus_thornton"],
+        anchor_message_id: anchor || null,
       });
       const cmp = (out as any)?.comparison ?? null;
       const md =
@@ -125,6 +131,7 @@ export default function ChatPage() {
             : "";
       setSermonCompareMarkdown(md || "No comparison returned.");
       setSermonCompareIncluded(Array.isArray((out as any)?.sermons) ? (out as any).sermons : []);
+      setSermonCompareMatch((out as any)?.match ?? null);
     } catch (e: any) {
       setSermonCompareError(String(e?.message ?? e ?? "Compare failed"));
     } finally {
@@ -1000,7 +1007,7 @@ export default function ChatPage() {
                   timezone: identity.timezone ?? null,
                   persona_id: (identity as any).persona_id ?? null,
                 }}
-                onCompare={() => void openSermonCompare()}
+                onCompare={(anchorId: string) => void openSermonCompare(anchorId)}
                 onClose={closeTool}
               />
             ) : activeUiToolId === "weekly_podcasts" ? (
@@ -1013,7 +1020,7 @@ export default function ChatPage() {
                   timezone: identity.timezone ?? null,
                   persona_id: (identity as any).persona_id ?? null,
                 }}
-                onCompare={() => void openSermonCompare()}
+                onCompare={(anchorId: string) => void openSermonCompare(anchorId)}
                 onClose={closeTool}
               />
             ) : activeUiToolId === "community_manager" ? (
@@ -1220,7 +1227,7 @@ export default function ChatPage() {
               </div>
               <div style={{ display: "flex", gap: 8 }}>
                 <button
-                  onClick={() => void openSermonCompare()}
+                  onClick={() => void openSermonCompare(sermonCompareAnchorId)}
                   disabled={sermonCompareLoading}
                   style={{
                     border: "1px solid #e2e8f0",
@@ -1246,6 +1253,11 @@ export default function ChatPage() {
             <div style={{ padding: 14, overflow: "auto", display: "grid", gap: 12, alignContent: "start", background: "#f8fafc" }}>
               {sermonCompareError ? <div style={{ color: "#b91c1c", fontSize: 12 }}>{sermonCompareError}</div> : null}
               {sermonCompareLoading ? <div style={{ fontSize: 12, color: "#64748b" }}>Comparing sermons…</div> : null}
+              {sermonCompareMatch ? (
+                <div style={{ fontSize: 12, color: "#334155" }}>
+                  <strong>Matched:</strong> {String(sermonCompareMatch?.preachedDate ?? "")} · {String(sermonCompareMatch?.titleDisplay ?? "")}
+                </div>
+              ) : null}
 
               {sermonCompareIncluded.length ? (
                 <div style={{ display: "grid", gap: 8 }}>

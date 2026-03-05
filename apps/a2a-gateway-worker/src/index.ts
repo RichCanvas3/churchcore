@@ -1548,6 +1548,7 @@ const SermonCompareSchema = z.object({
   identity: IdentitySchema,
   campuses: z.array(z.string().min(1)).optional().nullable(), // default: boulder/erie/thornton
   message_ids: z.array(z.string().min(1)).optional().nullable(), // optional explicit override (3 items)
+  anchor_message_id: z.string().min(1).optional().nullable(), // preferred: compare based on this sermon (date+title)
 });
 
 // Community (catalog + per-person involvement)
@@ -3079,6 +3080,7 @@ async function handleSermonCompare(req: Request, env: Env) {
   const campusesIn = Array.isArray(parsed.data.campuses) && parsed.data.campuses.length ? parsed.data.campuses.map((c) => String(c)).filter(Boolean) : defaultCampuses;
   const campuses = [...new Set(campusesIn)].slice(0, 6);
   const explicitIds = Array.isArray(parsed.data.message_ids) && parsed.data.message_ids.length ? parsed.data.message_ids.map((s) => String(s).trim()).filter(Boolean) : null;
+  const anchorMessageId = typeof (parsed.data as any).anchor_message_id === "string" ? String((parsed.data as any).anchor_message_id).trim() : "";
 
   const messageIds: Array<{ campusId: string | null; messageId: string }> = [];
   let match: { preachedDate: string; titleKey: string; titleDisplay: string; campusCount: number } | null = null;
@@ -3086,31 +3088,47 @@ async function handleSermonCompare(req: Request, env: Env) {
     for (const mid of explicitIds.slice(0, 6)) messageIds.push({ campusId: null, messageId: mid });
   } else {
     const placeholders = campuses.map((_, i) => `?${i + 2}`).join(",");
-    const groupRow = (await env.churchcore
-      .prepare(
-        `SELECT date(preached_at) AS preachedDate,
-                lower(trim(title)) AS titleKey,
-                max(preached_at) AS latestPreachedAt,
-                count(DISTINCT campus_id) AS campusCount
-         FROM campus_messages
-         WHERE church_id=?1
-           AND campus_id IN (${placeholders})
-           AND preached_at IS NOT NULL
-           AND title IS NOT NULL
-           AND length(trim(title)) > 0
-         GROUP BY preachedDate, titleKey
-         HAVING campusCount >= 2
-         ORDER BY latestPreachedAt DESC
-         LIMIT 1`,
-      )
-      .bind(churchId, ...campuses)
-      .first()) as any;
+    let preachedDate: string | null = null;
+    let titleKey: string | null = null;
 
-    const preachedDate = typeof groupRow?.preachedDate === "string" ? groupRow.preachedDate : null;
-    const titleKey = typeof groupRow?.titleKey === "string" ? groupRow.titleKey : null;
-    const campusCount = Number(groupRow?.campusCount ?? 0);
-    if (!preachedDate || !titleKey || campusCount < 2) {
-      return json({ ok: false, error: "No shared (date + title) found to compare.", campuses, actor: { userId, role } }, { status: 409 });
+    if (anchorMessageId) {
+      const anchor = (await env.churchcore
+        .prepare(`SELECT date(preached_at) AS preachedDate, lower(trim(title)) AS titleKey FROM campus_messages WHERE church_id=?1 AND id=?2`)
+        .bind(churchId, anchorMessageId)
+        .first()) as any;
+      preachedDate = typeof anchor?.preachedDate === "string" ? anchor.preachedDate : null;
+      titleKey = typeof anchor?.titleKey === "string" ? anchor.titleKey : null;
+      if (!preachedDate || !titleKey) {
+        return json({ ok: false, error: "anchor_message_id missing preached_at/title", anchor_message_id: anchorMessageId, actor: { userId, role } }, { status: 409 });
+      }
+    } else {
+      // Fallback: most recent shared (date+title) across campuses.
+      const groupRow = (await env.churchcore
+        .prepare(
+          `SELECT date(preached_at) AS preachedDate,
+                  lower(trim(title)) AS titleKey,
+                  max(preached_at) AS latestPreachedAt,
+                  count(DISTINCT campus_id) AS campusCount
+           FROM campus_messages
+           WHERE church_id=?1
+             AND campus_id IN (${placeholders})
+             AND preached_at IS NOT NULL
+             AND title IS NOT NULL
+             AND length(trim(title)) > 0
+           GROUP BY preachedDate, titleKey
+           HAVING campusCount >= 2
+           ORDER BY latestPreachedAt DESC
+           LIMIT 1`,
+        )
+        .bind(churchId, ...campuses)
+        .first()) as any;
+
+      preachedDate = typeof groupRow?.preachedDate === "string" ? groupRow.preachedDate : null;
+      titleKey = typeof groupRow?.titleKey === "string" ? groupRow.titleKey : null;
+      const campusCount = Number(groupRow?.campusCount ?? 0);
+      if (!preachedDate || !titleKey || campusCount < 2) {
+        return json({ ok: false, error: "No shared (date + title) found to compare.", campuses, actor: { userId, role } }, { status: 409 });
+      }
     }
 
     const rows =
