@@ -5,6 +5,13 @@ import { z } from "zod";
 export type Env = {
   MCP_API_KEY?: string;
   churchcore: D1Database;
+  // Crawl + KB refresh
+  CRAWL_CHURCH_ID?: string;
+  CRAWL_BUDGET?: string;
+  CRAWL_DOMAIN_ALLOWLIST?: string;
+  OPENAI_API_KEY?: string;
+  OPENAI_EMBEDDINGS_MODEL?: string;
+  OPENAI_SUMMARY_MODEL?: string;
 };
 
 function nowIso() {
@@ -2085,12 +2092,886 @@ function createServer(env: Env) {
   return server;
 }
 
+function clampInt(v: unknown, def: number, min: number, max: number) {
+  const n = typeof v === "string" ? parseInt(v, 10) : typeof v === "number" ? v : NaN;
+  if (!Number.isFinite(n)) return def;
+  return Math.max(min, Math.min(max, Math.trunc(n)));
+}
+
+function parseDomainAllowlist(env: Env): string[] {
+  const raw = (env.CRAWL_DOMAIN_ALLOWLIST ?? "calvarybible.com,calvarybible.s3.us-west-1.amazonaws.com").trim();
+  return raw
+    .split(",")
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+function isAllowedUrl(url: string, allowDomains: string[]) {
+  try {
+    const u = new URL(url);
+    const host = u.hostname.toLowerCase();
+    return allowDomains.some((d) => host === d || host.endsWith(`.${d}`));
+  } catch {
+    return false;
+  }
+}
+
+function stripHtmlToText(html: string) {
+  let s = String(html || "");
+  s = s.replace(/<script[\s\S]*?<\/script>/gi, "\n");
+  s = s.replace(/<style[\s\S]*?<\/style>/gi, "\n");
+  s = s.replace(/<\/(p|div|section|article|header|footer|li|h1|h2|h3|h4|h5|h6)>/gi, "\n");
+  s = s.replace(/<br\s*\/?>/gi, "\n");
+  s = s.replace(/<[^>]+>/g, " ");
+  s = s.replace(/&nbsp;/g, " ");
+  s = s.replace(/&amp;/g, "&");
+  s = s.replace(/&lt;/g, "<");
+  s = s.replace(/&gt;/g, ">");
+  s = s.replace(/&quot;/g, '"');
+  s = s.replace(/&#039;/g, "'");
+  s = s.replace(/\s+\n/g, "\n").replace(/\n\s+/g, "\n");
+  s = s.replace(/[ \t]{2,}/g, " ");
+  s = s.replace(/\n{3,}/g, "\n\n").trim();
+  return s;
+}
+
+function extractTitle(html: string) {
+  const m = String(html || "").match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+  if (!m) return null;
+  return stripHtmlToText(m[1] || "").slice(0, 200) || null;
+}
+
+async function sha256Hex(text: string) {
+  const enc = new TextEncoder().encode(text);
+  const digest = await crypto.subtle.digest("SHA-256", enc);
+  const bytes = new Uint8Array(digest);
+  let out = "";
+  for (const b of bytes) out += b.toString(16).padStart(2, "0");
+  return out;
+}
+
+function chunkText(text: string, chunkSize: number, overlap: number) {
+  const clean = String(text || "").replace(/\r\n/g, "\n").trim();
+  if (!clean) return [];
+  if (clean.length <= chunkSize) return [clean];
+  const out: string[] = [];
+  let i = 0;
+  while (i < clean.length) {
+    const end = Math.min(clean.length, i + chunkSize);
+    out.push(clean.slice(i, end));
+    if (end >= clean.length) break;
+    i = Math.max(0, end - overlap);
+  }
+  return out.filter((s) => s.trim());
+}
+
+async function openAiEmbed(env: Env, inputs: string[]) {
+  const apiKey = (env.OPENAI_API_KEY ?? "").trim();
+  if (!apiKey) throw new Error("Missing OPENAI_API_KEY (required for KB embeddings refresh).");
+  const model = (env.OPENAI_EMBEDDINGS_MODEL ?? "text-embedding-3-large").trim() || "text-embedding-3-large";
+
+  const res = await fetch("https://api.openai.com/v1/embeddings", {
+    method: "POST",
+    headers: { "content-type": "application/json", Authorization: `Bearer ${apiKey}` },
+    body: JSON.stringify({ model, input: inputs }),
+  });
+  const data = (await res.json().catch(() => ({}))) as any;
+  if (!res.ok) throw new Error(`OpenAI embeddings error (${res.status}): ${data?.error?.message ?? "unknown"}`);
+  const arr = Array.isArray(data?.data) ? data.data : [];
+  return arr.map((d: any) => (Array.isArray(d?.embedding) ? d.embedding : []));
+}
+
+function decodeHtmlEntities(input: string) {
+  return String(input || "")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#039;/g, "'");
+}
+
+function normalizePassageKey(passage: string | null | undefined) {
+  const s = String(passage ?? "").trim();
+  if (!s) return null;
+  return s
+    .toUpperCase()
+    .replace(/[–—]/g, "-")
+    .replace(/\s+/g, "")
+    .replace(/,/g, ";")
+    .replace(/[^A-Z0-9:;,\-]/g, "");
+}
+
+function extractLinksFromHtml(html: string, baseUrl: string) {
+  const out: string[] = [];
+  const raw = String(html || "");
+  const re = /\b(?:href|src)\s*=\s*["']([^"']+)["']/gi;
+  for (;;) {
+    const m = re.exec(raw);
+    if (!m) break;
+    const href = decodeHtmlEntities(String(m[1] ?? "").trim());
+    if (!href) continue;
+    if (href.startsWith("javascript:") || href.startsWith("mailto:") || href.startsWith("#")) continue;
+    try {
+      out.push(new URL(href, baseUrl).toString());
+    } catch {
+      // ignore
+    }
+  }
+  return out;
+}
+
+function inferCampusIdFromTid(tid: string | null) {
+  const t = String(tid ?? "").trim();
+  if (t === "156") return "campus_boulder";
+  if (t === "160") return "campus_erie";
+  if (t === "157") return "campus_thornton";
+  return null;
+}
+
+function inferGuideSeriesSlug(seriesTitle: string | null, passage: string | null) {
+  const s = String(seriesTitle ?? "").toLowerCase();
+  const p = String(passage ?? "").toLowerCase();
+  if (s.includes("gospel of john") || s.includes("the gospel of john") || p.startsWith("john")) return "john";
+  return null;
+}
+
+function parseWeekFromLabel(label: string) {
+  const m = String(label || "").match(/week\s*([0-9]{1,3})/i);
+  return m ? parseInt(m[1], 10) : null;
+}
+
+function parsePassageFromLabel(label: string) {
+  const m = String(label || "").match(/week\s*[0-9]{1,3}\s*:\s*(.+)$/i);
+  return m ? String(m[1]).trim() : null;
+}
+
+function extractAnchors(html: string, baseUrl: string) {
+  const out: Array<{ href: string; text: string }> = [];
+  const raw = String(html || "");
+  const re = /<a\b[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi;
+  for (;;) {
+    const m = re.exec(raw);
+    if (!m) break;
+    const hrefRaw = decodeHtmlEntities(String(m[1] ?? "").trim());
+    const text = stripHtmlToText(String(m[2] ?? "")).trim();
+    if (!hrefRaw || !text) continue;
+    try {
+      const href = new URL(hrefRaw, baseUrl).toString();
+      out.push({ href, text });
+    } catch {
+      // ignore
+    }
+  }
+  return out;
+}
+
+async function upsertWeeklyGuide(
+  env: Env,
+  args: {
+    churchId: string;
+    seriesSlug: string;
+    weekNumber: number;
+    passage: string | null;
+    discussionUrl: string | null;
+    leaderUrl: string | null;
+    now: string;
+  },
+) {
+  const id = `guide_${args.seriesSlug}_${args.weekNumber}`;
+  const passageKey = normalizePassageKey(args.passage);
+  await env.churchcore
+    .prepare(
+      `INSERT INTO weekly_guides (id, church_id, series_slug, week_number, passage, passage_key, discussion_url, leader_url, created_at, updated_at)
+       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
+       ON CONFLICT(id) DO UPDATE SET
+         church_id=excluded.church_id,
+         series_slug=excluded.series_slug,
+         week_number=excluded.week_number,
+         passage=excluded.passage,
+         passage_key=excluded.passage_key,
+         discussion_url=COALESCE(excluded.discussion_url, weekly_guides.discussion_url),
+         leader_url=COALESCE(excluded.leader_url, weekly_guides.leader_url),
+         updated_at=excluded.updated_at`,
+    )
+    .bind(
+      id,
+      args.churchId,
+      args.seriesSlug,
+      args.weekNumber,
+      args.passage ?? null,
+      passageKey,
+      args.discussionUrl,
+      args.leaderUrl,
+      args.now,
+      args.now,
+    )
+    .run();
+}
+
+async function upsertCampusMessage(
+  env: Env,
+  args: {
+    churchId: string;
+    messageId: string;
+    campusId: string | null;
+    title: string;
+    speaker: string | null;
+    preachedAt: string | null;
+    passage: string | null;
+    seriesTitle: string | null;
+    seriesId: string | null;
+    campusFeedId: string | null;
+    sourceUrl: string;
+    watchUrl: string | null;
+    listenUrl: string | null;
+    downloadUrl: string | null;
+    guide: { seriesSlug: string; weekNumber: number; discussionUrl: string | null; leaderUrl: string | null } | null;
+    now: string;
+  },
+) {
+  const passageKey = normalizePassageKey(args.passage);
+  await env.churchcore
+    .prepare(
+      `INSERT INTO campus_messages (
+         id, church_id, campus_id, title, speaker, preached_at, passage, passage_key,
+         series_title, series_id, campus_feed_id, source_url, watch_url, listen_url, download_url,
+         guide_series_slug, guide_week_number, guide_discussion_url, guide_leader_url,
+         created_at, updated_at
+       )
+       VALUES (
+         ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8,
+         ?9, ?10, ?11, ?12, ?13, ?14, ?15,
+         ?16, ?17, ?18, ?19,
+         ?20, ?21
+       )
+       ON CONFLICT(id) DO UPDATE SET
+         church_id=excluded.church_id,
+         campus_id=excluded.campus_id,
+         title=excluded.title,
+         speaker=excluded.speaker,
+         preached_at=excluded.preached_at,
+         passage=excluded.passage,
+         passage_key=excluded.passage_key,
+         series_title=excluded.series_title,
+         series_id=excluded.series_id,
+         campus_feed_id=excluded.campus_feed_id,
+         source_url=excluded.source_url,
+         watch_url=excluded.watch_url,
+         listen_url=excluded.listen_url,
+         download_url=excluded.download_url,
+         guide_series_slug=excluded.guide_series_slug,
+         guide_week_number=excluded.guide_week_number,
+         guide_discussion_url=excluded.guide_discussion_url,
+         guide_leader_url=excluded.guide_leader_url,
+         updated_at=excluded.updated_at`,
+    )
+    .bind(
+      args.messageId,
+      args.churchId,
+      args.campusId,
+      args.title,
+      args.speaker,
+      args.preachedAt,
+      args.passage,
+      passageKey,
+      args.seriesTitle,
+      args.seriesId,
+      args.campusFeedId,
+      args.sourceUrl,
+      args.watchUrl,
+      args.listenUrl,
+      args.downloadUrl,
+      args.guide?.seriesSlug ?? null,
+      args.guide?.weekNumber ?? null,
+      args.guide?.discussionUrl ?? null,
+      args.guide?.leaderUrl ?? null,
+      args.now,
+      args.now,
+    )
+    .run();
+}
+
+async function upsertCampusMessageAnalysis(
+  env: Env,
+  args: {
+    churchId: string;
+    messageId: string;
+    summaryMarkdown: string | null;
+    topics: string[];
+    verses: string[];
+    keyPoints: string[];
+    model: string | null;
+    source: string | null;
+    now: string;
+  },
+) {
+  await env.churchcore
+    .prepare(
+      `INSERT INTO campus_message_analysis (message_id, church_id, summary_markdown, topics_json, verses_json, key_points_json, model, source, created_at, updated_at)
+       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
+       ON CONFLICT(message_id) DO UPDATE SET
+         church_id=excluded.church_id,
+         summary_markdown=excluded.summary_markdown,
+         topics_json=excluded.topics_json,
+         verses_json=excluded.verses_json,
+         key_points_json=excluded.key_points_json,
+         model=excluded.model,
+         source=excluded.source,
+         updated_at=excluded.updated_at`,
+    )
+    .bind(
+      args.messageId,
+      args.churchId,
+      args.summaryMarkdown,
+      JSON.stringify(args.topics ?? []),
+      JSON.stringify(args.verses ?? []),
+      JSON.stringify(args.keyPoints ?? []),
+      args.model,
+      args.source,
+      args.now,
+      args.now,
+    )
+    .run();
+}
+
+async function upsertCampusMessageDoc(
+  env: Env,
+  args: { churchId: string; messageId: string; title: string | null; bodyMarkdown: string; now: string },
+) {
+  const docId = `msg_${(await sha256Hex(args.messageId)).slice(0, 24)}`;
+  await env.churchcore
+    .prepare(
+      `INSERT INTO content_docs (id, church_id, entity_type, entity_id, locale, title, body_markdown, created_at, updated_at)
+       VALUES (?1, ?2, 'campus_message', ?3, 'en', ?4, ?5, ?6, ?7)
+       ON CONFLICT(id) DO UPDATE SET
+         church_id=excluded.church_id,
+         entity_type=excluded.entity_type,
+         entity_id=excluded.entity_id,
+         locale=excluded.locale,
+         title=excluded.title,
+         body_markdown=excluded.body_markdown,
+         updated_at=excluded.updated_at`,
+    )
+    .bind(docId, args.churchId, args.messageId, args.title ?? null, args.bodyMarkdown, args.now, args.now)
+    .run();
+  return { docId, sourceId: `content/campus_message/${args.messageId}/en#${docId}` };
+}
+
+async function openAiSummarizeMessage(
+  env: Env,
+  args: { title: string; speaker: string | null; preachedAt: string | null; passage: string | null; seriesTitle: string | null; campusId: string | null; pageText: string },
+) {
+  const apiKey = (env.OPENAI_API_KEY ?? "").trim();
+  if (!apiKey) return null;
+  const model = (env.OPENAI_SUMMARY_MODEL ?? "gpt-4o-mini").trim() || "gpt-4o-mini";
+
+  const prompt = {
+    title: args.title,
+    speaker: args.speaker,
+    preachedAt: args.preachedAt,
+    passage: args.passage,
+    seriesTitle: args.seriesTitle,
+    campusId: args.campusId,
+    pageText: args.pageText,
+  };
+
+  const res = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: { "content-type": "application/json", Authorization: `Bearer ${apiKey}` },
+    body: JSON.stringify({
+      model,
+      temperature: 0.2,
+      response_format: { type: "json_object" },
+      messages: [
+        {
+          role: "system",
+          content:
+            "You create a church knowledge-base entry for a weekly message. Use ONLY the provided pageText + metadata. Do not invent quotes, stories, or details not present. If something is missing, leave it null or an empty array. Output JSON with keys: summaryMarkdown (string), topics (string[]), verses (string[]), keyPoints (string[]), extractedContentMarkdown (string).",
+        },
+        { role: "user", content: JSON.stringify(prompt) },
+      ],
+    }),
+  });
+
+  const data = (await res.json().catch(() => ({}))) as any;
+  if (!res.ok) return null;
+  const content = data?.choices?.[0]?.message?.content;
+  if (typeof content !== "string" || !content.trim()) return null;
+  try {
+    const obj = JSON.parse(content);
+    return {
+      model,
+      summaryMarkdown: typeof obj?.summaryMarkdown === "string" ? obj.summaryMarkdown : null,
+      topics: Array.isArray(obj?.topics) ? obj.topics.map((s: any) => String(s)).filter(Boolean).slice(0, 30) : [],
+      verses: Array.isArray(obj?.verses) ? obj.verses.map((s: any) => String(s)).filter(Boolean).slice(0, 50) : [],
+      keyPoints: Array.isArray(obj?.keyPoints) ? obj.keyPoints.map((s: any) => String(s)).filter(Boolean).slice(0, 30) : [],
+      extractedContentMarkdown: typeof obj?.extractedContentMarkdown === "string" ? obj.extractedContentMarkdown : "",
+    };
+  } catch {
+    return null;
+  }
+}
+
+function parseSitemapXml(xml: string) {
+  const out: string[] = [];
+  const re = /<loc>\s*([^<\s]+)\s*<\/loc>/gi;
+  for (;;) {
+    const m = re.exec(xml);
+    if (!m) break;
+    out.push(String(m[1]).trim());
+  }
+  return out;
+}
+
+async function upsertWebPageDoc(env: Env, args: { churchId: string; url: string; title: string | null; bodyMarkdown: string; now: string }) {
+  const url = args.url;
+  const docId = `web_${(await sha256Hex(url)).slice(0, 24)}`;
+  await env.churchcore
+    .prepare(
+      `INSERT INTO content_docs (id, church_id, entity_type, entity_id, locale, title, body_markdown, created_at, updated_at)
+       VALUES (?1, ?2, 'web_page', ?3, 'en', ?4, ?5, ?6, ?7)
+       ON CONFLICT(id) DO UPDATE SET
+         entity_type=excluded.entity_type,
+         entity_id=excluded.entity_id,
+         locale=excluded.locale,
+         title=excluded.title,
+         body_markdown=excluded.body_markdown,
+         updated_at=excluded.updated_at`,
+    )
+    .bind(docId, args.churchId, url, args.title ?? null, args.bodyMarkdown, args.now, args.now)
+    .run();
+  return { docId, sourceId: `content/web_page/${url}/en#${docId}` };
+}
+
+async function upsertCrawlMeta(
+  env: Env,
+  args: {
+    churchId: string;
+    url: string;
+    etag: string | null;
+    lastModified: string | null;
+    contentHash: string | null;
+    title: string | null;
+    statusCode: number | null;
+    lastFetchedAt: string;
+    lastChangedAt: string | null;
+    error: string | null;
+    now: string;
+  },
+) {
+  await env.churchcore
+    .prepare(
+      `INSERT INTO web_crawl_pages (url, church_id, etag, last_modified, content_hash, title, status_code, last_fetched_at, last_changed_at, error, updated_at)
+       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
+       ON CONFLICT(url) DO UPDATE SET
+         church_id=excluded.church_id,
+         etag=excluded.etag,
+         last_modified=excluded.last_modified,
+         content_hash=excluded.content_hash,
+         title=excluded.title,
+         status_code=excluded.status_code,
+         last_fetched_at=excluded.last_fetched_at,
+         last_changed_at=excluded.last_changed_at,
+         error=excluded.error,
+         updated_at=excluded.updated_at`,
+    )
+    .bind(
+      args.url,
+      args.churchId,
+      args.etag,
+      args.lastModified,
+      args.contentHash,
+      args.title,
+      args.statusCode,
+      args.lastFetchedAt,
+      args.lastChangedAt,
+      args.error,
+      args.now,
+    )
+    .run();
+}
+
+async function refreshKbForSource(env: Env, args: { churchId: string; sourceId: string; docId: string; text: string; now: string }) {
+  const chunks = chunkText(args.text, 900, 150);
+  if (!chunks.length) return;
+
+  // Replace all chunks for this sourceId (prevents stale retrieval).
+  await env.churchcore.prepare(`DELETE FROM kb_chunks WHERE church_id=?1 AND source_id=?2`).bind(args.churchId, args.sourceId).run();
+
+  // Embed in small batches.
+  const vectors: number[][] = [];
+  for (let i = 0; i < chunks.length; i += 64) {
+    const batch = chunks.slice(i, i + 64);
+    const emb = await openAiEmbed(env, batch);
+    for (const v of emb) vectors.push(v);
+  }
+
+  const stmt = env.churchcore.prepare(
+    `INSERT INTO kb_chunks (id, church_id, source_id, text, embedding_json, created_at, updated_at)
+     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+     ON CONFLICT(id) DO UPDATE SET
+       church_id=excluded.church_id,
+       source_id=excluded.source_id,
+       text=excluded.text,
+       embedding_json=excluded.embedding_json,
+       updated_at=excluded.updated_at`,
+  );
+  const batch: D1PreparedStatement[] = [];
+  for (let i = 0; i < chunks.length; i++) {
+    const chunkId = `${args.churchId}:${args.docId}#${i}`;
+    batch.push(stmt.bind(chunkId, args.churchId, args.sourceId, chunks[i], JSON.stringify(vectors[i] ?? []), args.now, args.now));
+  }
+  await env.churchcore.batch(batch);
+}
+
+async function crawlOne(env: Env, args: { churchId: string; url: string; allowDomains: string[]; now: string }) {
+  const url = args.url;
+  if (!isAllowedUrl(url, args.allowDomains)) return { url, skipped: true, reason: "disallowed_domain" };
+
+  const prev = (await env.churchcore
+    .prepare(`SELECT etag AS etag, last_modified AS lastModified, content_hash AS contentHash FROM web_crawl_pages WHERE url=?1 AND church_id=?2`)
+    .bind(url, args.churchId)
+    .first()) as any;
+
+  const headers: Record<string, string> = { "user-agent": "churchcore-mcp-crawler/0.1" };
+  if (typeof prev?.etag === "string" && prev.etag) headers["if-none-match"] = prev.etag;
+  if (typeof prev?.lastModified === "string" && prev.lastModified) headers["if-modified-since"] = prev.lastModified;
+
+  try {
+    const res = await fetch(url, { headers, redirect: "follow" });
+    const status = res.status;
+    const etag = res.headers.get("etag");
+    const lastModified = res.headers.get("last-modified");
+
+    if (status === 304) {
+      await upsertCrawlMeta(env, {
+        churchId: args.churchId,
+        url,
+        etag: etag ?? (prev?.etag ?? null),
+        lastModified: lastModified ?? (prev?.lastModified ?? null),
+        contentHash: prev?.contentHash ?? null,
+        title: null,
+        statusCode: 304,
+        lastFetchedAt: args.now,
+        lastChangedAt: null,
+        error: null,
+        now: args.now,
+      });
+      return { url, changed: false, status, discoveredUrls: [] as string[] };
+    }
+
+    const raw = await res.text();
+    const title = extractTitle(raw);
+    const links = extractLinksFromHtml(raw, url);
+    const text = stripHtmlToText(raw);
+    const bodyMarkdown = `Source: ${url}\n\n${text}`;
+    const contentHash = await sha256Hex(bodyMarkdown);
+    const changed = String(prev?.contentHash ?? "") !== contentHash;
+
+    const u = new URL(url);
+    const mid = u.searchParams.get("enmse_mid");
+    const tid = u.searchParams.get("enmse_tid");
+    const sid = u.searchParams.get("enmse_sid");
+    const isMessageDetail = Boolean(mid) && u.pathname.includes("/messages/");
+    const isCampusMessagesIndex = !mid && /^\/messages\/(boulder|erie|thornton)\/$/i.test(u.pathname);
+    const isDiscussionJohn = /^\/discussion\/john\/$/i.test(u.pathname);
+
+    // If this is the discussion guide page, upsert weekly guide links (best effort).
+    if (changed && isDiscussionJohn) {
+      const anchors = extractAnchors(raw, url);
+      const seriesSlug = "john";
+      const grouped = new Map<number, { passage: string | null; discussionUrl: string | null; leaderUrl: string | null }>();
+      for (const a of anchors) {
+        if (!/week\s*[0-9]{1,3}\s*:/i.test(a.text)) continue;
+        const week = parseWeekFromLabel(a.text);
+        if (!week) continue;
+        const passage = parsePassageFromLabel(a.text);
+        const href = a.href;
+        const isPdf = /\.pdf(\?|$)/i.test(href);
+        if (!isPdf) continue;
+        const isLeader = /leader/i.test(href) || /leader/i.test(a.text);
+        const isDiscussion = /dq/i.test(href) || /discussion/i.test(href) || /dq/i.test(a.text) || /discussion/i.test(a.text);
+        if (!isLeader && !isDiscussion) continue;
+        const cur = grouped.get(week) ?? { passage, discussionUrl: null, leaderUrl: null };
+        cur.passage = cur.passage ?? passage;
+        if (isLeader) cur.leaderUrl = href;
+        if (isDiscussion) cur.discussionUrl = href;
+        grouped.set(week, cur);
+      }
+      for (const [weekNumber, g] of grouped.entries()) {
+        await upsertWeeklyGuide(env, {
+          churchId: args.churchId,
+          seriesSlug,
+          weekNumber,
+          passage: g.passage,
+          discussionUrl: g.discussionUrl,
+          leaderUrl: g.leaderUrl,
+          now: args.now,
+        });
+      }
+    }
+
+    // Discover recent message detail URLs from campus index pages.
+    const discoveredUrls = isCampusMessagesIndex
+      ? Array.from(new Set(links.filter((l) => l.includes("enmse_mid=") && l.includes(u.pathname)))).slice(0, 20)
+      : ([] as string[]);
+
+    let doc: { docId: string; sourceId: string } | null = null;
+    let kbBody: string | null = null;
+
+    if (changed && text.trim()) {
+      if (isMessageDetail && mid) {
+        // Parse basic message metadata from the rendered text.
+        const lines = text
+          .split("\n")
+          .map((s) => s.trim())
+          .filter(Boolean);
+        const speakerDateIdx = lines.findIndex((ln) => / - [A-Za-z]+ \d{1,2}, \d{4}$/.test(ln));
+        const speakerDate = speakerDateIdx >= 0 ? lines[speakerDateIdx] : null;
+        const speaker = speakerDate ? speakerDate.split(" - ")[0].trim() : null;
+        const dateStr = speakerDate ? speakerDate.split(" - ")[1].trim() : null;
+        const preachedAt = dateStr ? new Date(dateStr).toISOString() : null;
+        const titleLine = speakerDateIdx >= 0 ? lines.slice(speakerDateIdx + 1).find((ln) => ln.length >= 4) : null;
+        const msgTitle = (titleLine ?? title ?? "Message").trim();
+
+        const passageLine =
+          lines.find((ln) => /Scripture References/i.test(ln))?.replace(/Scripture References:\s*/i, "").trim() ??
+          lines.find((ln) => /^[1-3]?\s?[A-Za-z]+\s+\d+:\d+/.test(ln)) ??
+          null;
+        const passage = passageLine ? passageLine.trim() : null;
+
+        const seriesLine = lines.find((ln) => /^From Series:/i.test(ln));
+        const seriesTitle = seriesLine ? seriesLine.replace(/^From Series:\s*/i, "").split("|")[0].trim() : null;
+
+        const campusId = inferCampusIdFromTid(tid);
+        const messageId = `msg_${mid}`;
+
+        const watchUrl = links.find((l) => l.includes("enmse_mid=" + mid) && l.includes("/messages/") && !l.includes("enmse_av=1")) ?? url;
+        const listenUrl = links.find((l) => l.includes("enmse_mid=" + mid) && l.includes("enmse_av=1")) ?? null;
+        const downloadUrl = links.find((l) => l.includes("calvarybible.s3.us-west-1.amazonaws.com") && /\.(m4a|mp3)(\?|$)/i.test(l)) ?? null;
+
+        // Link to weekly guide PDFs by matching passage to the latest guide index.
+        const guideSeriesSlug = inferGuideSeriesSlug(seriesTitle, passage);
+        let guide: { seriesSlug: string; weekNumber: number; discussionUrl: string | null; leaderUrl: string | null } | null = null;
+        if (guideSeriesSlug && passage) {
+          const passageKey = normalizePassageKey(passage);
+          if (passageKey) {
+            const row = (await env.churchcore
+              .prepare(
+                `SELECT series_slug AS seriesSlug, week_number AS weekNumber, discussion_url AS discussionUrl, leader_url AS leaderUrl
+                 FROM weekly_guides WHERE church_id=?1 AND passage_key=?2
+                 ORDER BY updated_at DESC LIMIT 1`,
+              )
+              .bind(args.churchId, passageKey)
+              .first()) as any;
+            if (row?.seriesSlug && row?.weekNumber) {
+              guide = { seriesSlug: String(row.seriesSlug), weekNumber: Number(row.weekNumber), discussionUrl: row.discussionUrl ?? null, leaderUrl: row.leaderUrl ?? null };
+            }
+          }
+        }
+
+        await upsertCampusMessage(env, {
+          churchId: args.churchId,
+          messageId,
+          campusId,
+          title: msgTitle,
+          speaker,
+          preachedAt,
+          passage,
+          seriesTitle,
+          seriesId: sid,
+          campusFeedId: tid,
+          sourceUrl: url,
+          watchUrl,
+          listenUrl,
+          downloadUrl,
+          guide,
+          now: args.now,
+        });
+
+        const llm = await openAiSummarizeMessage(env, { title: msgTitle, speaker, preachedAt, passage, seriesTitle, campusId, pageText: text });
+        const summaryMarkdown = llm?.summaryMarkdown ?? null;
+        const extracted = llm?.extractedContentMarkdown?.trim() || "";
+        const topics = llm?.topics ?? [];
+        const verses = llm?.verses ?? [];
+        const keyPoints = llm?.keyPoints ?? [];
+
+        if (llm) {
+          await upsertCampusMessageAnalysis(env, {
+            churchId: args.churchId,
+            messageId,
+            summaryMarkdown,
+            topics,
+            verses,
+            keyPoints,
+            model: llm.model ?? null,
+            source: "web_page_text",
+            now: args.now,
+          });
+        }
+
+        const md = [
+          `Source: ${url}`,
+          campusId ? `Campus: ${campusId}` : null,
+          preachedAt ? `Date: ${preachedAt.slice(0, 10)}` : null,
+          speaker ? `Speaker: ${speaker}` : null,
+          passage ? `Passage: ${passage}` : null,
+          seriesTitle ? `Series: ${seriesTitle}` : null,
+          watchUrl ? `Watch: ${watchUrl}` : null,
+          listenUrl ? `Listen: ${listenUrl}` : null,
+          downloadUrl ? `Download: ${downloadUrl}` : null,
+          guide?.discussionUrl ? `Discussion Questions: ${guide.discussionUrl}` : null,
+          guide?.leaderUrl ? `Leader Guide: ${guide.leaderUrl}` : null,
+          summaryMarkdown ? `## Summary\n\n${summaryMarkdown}` : null,
+          `## Extracted Content\n\n${extracted || text}`,
+        ]
+          .filter(Boolean)
+          .join("\n\n");
+
+        doc = await upsertCampusMessageDoc(env, { churchId: args.churchId, messageId, title: msgTitle, bodyMarkdown: md, now: args.now });
+        kbBody = md;
+      } else {
+        doc = await upsertWebPageDoc(env, { churchId: args.churchId, url, title, bodyMarkdown, now: args.now });
+        kbBody = bodyMarkdown;
+      }
+    }
+
+    await upsertCrawlMeta(env, {
+      churchId: args.churchId,
+      url,
+      etag: etag ?? null,
+      lastModified: lastModified ?? null,
+      contentHash,
+      title,
+      statusCode: status,
+      lastFetchedAt: args.now,
+      lastChangedAt: changed ? args.now : null,
+      error: null,
+      now: args.now,
+    });
+
+    return { url, changed, status, doc, bodyMarkdown: kbBody ?? bodyMarkdown, discoveredUrls };
+  } catch (e: any) {
+    await upsertCrawlMeta(env, {
+      churchId: args.churchId,
+      url,
+      etag: prev?.etag ?? null,
+      lastModified: prev?.lastModified ?? null,
+      contentHash: prev?.contentHash ?? null,
+      title: null,
+      statusCode: null,
+      lastFetchedAt: args.now,
+      lastChangedAt: null,
+      error: String(e?.message ?? e ?? "fetch_failed"),
+      now: args.now,
+    });
+    return { url, changed: false, error: String(e?.message ?? e ?? "fetch_failed"), discoveredUrls: [] as string[] };
+  }
+}
+
+async function crawlBatch(env: Env, args: { churchId: string; urls: string[]; allowDomains: string[]; now: string }) {
+  const changedDocs: Array<{ docId: string; sourceId: string; bodyMarkdown: string }> = [];
+  const discovered: string[] = [];
+  const q = [...new Set(args.urls.map((u) => String(u).trim()).filter(Boolean))];
+  const concurrency = 5;
+  for (let i = 0; i < q.length; i += concurrency) {
+    const slice = q.slice(i, i + concurrency);
+    const results = await Promise.all(slice.map((url) => crawlOne(env, { churchId: args.churchId, url, allowDomains: args.allowDomains, now: args.now })));
+    for (const r of results as any[]) {
+      if (r?.changed && r?.doc?.docId && typeof r?.bodyMarkdown === "string") {
+        changedDocs.push({ docId: r.doc.docId, sourceId: r.doc.sourceId, bodyMarkdown: r.bodyMarkdown });
+      }
+      if (Array.isArray(r?.discoveredUrls)) discovered.push(...r.discoveredUrls.map((u: any) => String(u)));
+    }
+  }
+  return { changedDocs, discoveredUrls: [...new Set(discovered)].filter(Boolean) };
+}
+
+async function discoverDailyUrls(env: Env, args: { allowDomains: string[]; budget: number }) {
+  const out: string[] = [];
+  const root = "https://calvarybible.com/sitemap.xml";
+  try {
+    const res = await fetch(root, { headers: { "user-agent": "churchcore-mcp-crawler/0.1" } });
+    const xml = await res.text();
+    const locs = parseSitemapXml(xml);
+    // If this is a sitemap index, pull a few nested maps.
+    const nested = locs.filter((u) => u.endsWith(".xml")).slice(0, 5);
+    if (nested.length) {
+      for (const sm of nested) {
+        const r = await fetch(sm, { headers: { "user-agent": "churchcore-mcp-crawler/0.1" } });
+        const x = await r.text();
+        out.push(...parseSitemapXml(x));
+        if (out.length >= args.budget * 3) break;
+      }
+    } else {
+      out.push(...locs);
+    }
+  } catch {
+    // ignore
+  }
+  const filtered = out
+    .map((u) => String(u).trim())
+    .filter(Boolean)
+    .filter((u) => !u.endsWith(".xml"))
+    .filter((u) => !/\.(jpg|jpeg|png|gif|webp|pdf|mp3|mp4)(\?|$)/i.test(u))
+    .filter((u) => isAllowedUrl(u, args.allowDomains));
+  return filtered.slice(0, args.budget);
+}
+
+async function runScheduledCrawl(env: Env, cron: string) {
+  const churchId = (env.CRAWL_CHURCH_ID ?? "calvarybible").trim() || "calvarybible";
+  const budget = clampInt(env.CRAWL_BUDGET, 50, 10, 500);
+  const allowDomains = parseDomainAllowlist(env);
+  const now = nowIso();
+
+  const keyPages = [
+    "https://calvarybible.com/theweekly/",
+    "https://calvarybible.com/messages/",
+    "https://calvarybible.com/messages/boulder/",
+    "https://calvarybible.com/messages/erie/",
+    "https://calvarybible.com/messages/thornton/",
+    "https://calvarybible.com/discussion/",
+    "https://calvarybible.com/discussion/john/",
+    "https://calvarybible.com/locations/",
+    "https://calvarybible.com/message-archive/",
+    "https://calvarybible.com/events/",
+    "https://calvarybible.com/mission-vision/",
+  ];
+
+  const isDaily = String(cron || "").includes("3 * * *");
+  const reserveForMessageDetails = isDaily ? 20 : 25;
+  const daily = isDaily ? await discoverDailyUrls(env, { allowDomains, budget }) : [];
+  const seedLimit = Math.max(keyPages.length, budget - reserveForMessageDetails);
+  const seedUrls = [...new Set([...keyPages, ...daily])].slice(0, seedLimit);
+
+  const first = await crawlBatch(env, { churchId, urls: seedUrls, allowDomains, now });
+  const messageUrls = first.discoveredUrls
+    .filter((u) => u.includes("/messages/") && u.includes("enmse_mid="))
+    .filter((u) => !u.includes("enmse_o=")) // avoid paging controls
+    .slice(0, Math.max(0, budget - seedUrls.length));
+
+  const second = messageUrls.length ? await crawlBatch(env, { churchId, urls: messageUrls, allowDomains, now }) : { changedDocs: [], discoveredUrls: [] as string[] };
+  const changedDocs = [...first.changedDocs, ...second.changedDocs];
+  if (!changedDocs.length) return { ok: true, changed: 0, urls: seedUrls.length + messageUrls.length };
+
+  // KB refresh for changed pages only.
+  for (const d of changedDocs) {
+    await refreshKbForSource(env, { churchId, sourceId: d.sourceId, docId: d.docId, text: d.bodyMarkdown, now });
+  }
+
+  await auditAppend(env, { churchId, actorUserId: null, action: "web.crawl.scheduled", entityType: "web_crawl_pages", entityId: null, payload: { cron, budget, changed: changedDocs.length } });
+  return { ok: true, changed: changedDocs.length, urls: seedUrls.length + messageUrls.length };
+}
+
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext) {
     const auth = checkApiKey(request, env);
     if (auth) return auth;
     const server = createServer(env);
     return createMcpHandler(server, { route: "/mcp" })(request, env, ctx);
+  },
+  async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
+    ctx.waitUntil(runScheduledCrawl(env, String((event as any).cron ?? "")));
   },
 };
 
