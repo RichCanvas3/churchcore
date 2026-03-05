@@ -653,7 +653,7 @@ export default function ChatPage() {
       className={styles.root}
       style={
         {
-          ["--left-width" as any]: effectiveLeftCollapsed ? "72px" : "180px",
+          ["--left-width" as any]: effectiveLeftCollapsed ? "72px" : "234px",
           ["--right-width" as any]: activeUiToolId ? "minmax(420px, 40%)" : "0px",
         } as any
       }

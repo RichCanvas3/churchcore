@@ -3081,22 +3081,69 @@ async function handleSermonCompare(req: Request, env: Env) {
   const explicitIds = Array.isArray(parsed.data.message_ids) && parsed.data.message_ids.length ? parsed.data.message_ids.map((s) => String(s).trim()).filter(Boolean) : null;
 
   const messageIds: Array<{ campusId: string | null; messageId: string }> = [];
+  let match: { preachedDate: string; titleKey: string; titleDisplay: string; campusCount: number } | null = null;
   if (explicitIds && explicitIds.length) {
     for (const mid of explicitIds.slice(0, 6)) messageIds.push({ campusId: null, messageId: mid });
   } else {
-    for (const campusId of campuses) {
-      const row = (await env.churchcore
-        .prepare(
-          `SELECT id
-           FROM campus_messages
-           WHERE church_id=?1 AND campus_id=?2
-           ORDER BY preached_at DESC, updated_at DESC
-           LIMIT 1`,
-        )
-        .bind(churchId, campusId)
-        .first()) as any;
-      if (row?.id) messageIds.push({ campusId, messageId: String(row.id) });
+    const placeholders = campuses.map((_, i) => `?${i + 2}`).join(",");
+    const groupRow = (await env.churchcore
+      .prepare(
+        `SELECT date(preached_at) AS preachedDate,
+                lower(trim(title)) AS titleKey,
+                max(preached_at) AS latestPreachedAt,
+                count(DISTINCT campus_id) AS campusCount
+         FROM campus_messages
+         WHERE church_id=?1
+           AND campus_id IN (${placeholders})
+           AND preached_at IS NOT NULL
+           AND title IS NOT NULL
+           AND length(trim(title)) > 0
+         GROUP BY preachedDate, titleKey
+         HAVING campusCount >= 2
+         ORDER BY latestPreachedAt DESC
+         LIMIT 1`,
+      )
+      .bind(churchId, ...campuses)
+      .first()) as any;
+
+    const preachedDate = typeof groupRow?.preachedDate === "string" ? groupRow.preachedDate : null;
+    const titleKey = typeof groupRow?.titleKey === "string" ? groupRow.titleKey : null;
+    const campusCount = Number(groupRow?.campusCount ?? 0);
+    if (!preachedDate || !titleKey || campusCount < 2) {
+      return json({ ok: false, error: "No shared (date + title) found to compare.", campuses, actor: { userId, role } }, { status: 409 });
     }
+
+    const rows =
+      (
+        await env.churchcore
+          .prepare(
+            `SELECT id, campus_id AS campusId, title
+             FROM campus_messages
+             WHERE church_id=?1
+               AND campus_id IN (${placeholders})
+               AND date(preached_at)=?${campuses.length + 2}
+               AND lower(trim(title))=?${campuses.length + 3}
+             ORDER BY preached_at DESC, updated_at DESC
+             LIMIT 20`,
+          )
+          .bind(churchId, ...campuses, preachedDate, titleKey)
+          .all()
+      ).results ?? [];
+
+    const picked = new Map<string, { id: string; title: string }>();
+    for (const r of rows as any[]) {
+      const c = String(r?.campusId ?? "").trim();
+      const id = String(r?.id ?? "").trim();
+      const title = String(r?.title ?? "").trim();
+      if (!c || !id) continue;
+      if (!picked.has(c)) picked.set(c, { id, title });
+    }
+    for (const campusId of campuses) {
+      const p = picked.get(campusId);
+      if (p?.id) messageIds.push({ campusId, messageId: p.id });
+    }
+    const titleDisplay = [...picked.values()][0]?.title ?? "";
+    match = { preachedDate, titleKey, titleDisplay, campusCount: messageIds.length };
   }
 
   if (messageIds.length < 2) {
@@ -3172,6 +3219,23 @@ async function handleSermonCompare(req: Request, env: Env) {
 
   if (sermons.length < 2) return json({ ok: false, error: "No sermons found to compare", actor: { userId, role } }, { status: 404 });
 
+  // Enforce same date + title across compared sermons.
+  const baseDate = sermons[0]?.preachedAt ? String(sermons[0].preachedAt).slice(0, 10) : "";
+  const baseTitleKey = sermons[0]?.title ? String(sermons[0].title).trim().toLowerCase() : "";
+  const mismatch = sermons.find((s) => (s?.preachedAt ? String(s.preachedAt).slice(0, 10) : "") !== baseDate || (s?.title ? String(s.title).trim().toLowerCase() : "") !== baseTitleKey);
+  if (mismatch) {
+    return json(
+      {
+        ok: false,
+        error: "Sermons must match on preached date + title to compare.",
+        expected: { preachedDate: baseDate, title: String(sermons[0]?.title ?? "") },
+        got: sermons.map((s) => ({ id: s?.id, campusId: s?.campusId ?? null, preachedDate: String(s?.preachedAt ?? "").slice(0, 10), title: s?.title ?? null })),
+        actor: { userId, role },
+      },
+      { status: 409 },
+    );
+  }
+
   const lgThreadId = crypto.randomUUID();
   const envelope = await runAgent(env, {
     threadId: lgThreadId,
@@ -3184,7 +3248,8 @@ async function handleSermonCompare(req: Request, env: Env) {
   });
 
   const comparison = (envelope as any)?.data?.sermon_comparison ?? (envelope as any)?.data?.comparison ?? null;
-  return json({ ok: true, sermons, comparison, actor: { userId, role } });
+  const effectiveMatch = match ?? { preachedDate: baseDate, titleKey: baseTitleKey, titleDisplay: String(sermons[0]?.title ?? ""), campusCount: sermons.length };
+  return json({ ok: true, sermons, comparison, match: effectiveMatch, actor: { userId, role } });
 }
 
 async function handleCommunityCatalogList(req: Request, env: Env) {
