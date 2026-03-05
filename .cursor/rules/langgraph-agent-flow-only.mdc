@@ -1,0 +1,18 @@
+---
+description: Enforce LangGraph agent flow (no gateway/UI shortcuts)
+alwaysApply: true
+---
+
+# LangGraph agent flow only
+
+## Rule
+
+- **All user questions must go through the LangGraph agent flow** (the “langserver” / hosted LangGraph assistant) via the A2A gateway.
+- **Do not add keyword/heuristic routing or “shortcuts”** in `apps/a2a-gateway-worker/`, `apps/web/`, or API proxies that bypass the agent.
+- **Actions/handoffs must come from the agent output envelope** (e.g. `handoff` UI tools, suggested actions), not from gateway/UI word matching.
+
+## Allowed
+
+- **Transport fixes** (SSE parsing, streaming token filtering, error propagation, auth) as long as they don’t change routing semantics.
+- **Observability** (logging, metrics) that helps debug the agent flow.
+

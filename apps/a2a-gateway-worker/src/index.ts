@@ -153,6 +153,8 @@ function agentCard(req: Request, env: Env) {
         weekly_podcast_list: `${baseUrl}a2a/weekly_podcast.list`,
         weekly_podcast_get: `${baseUrl}a2a/weekly_podcast.get`,
         weekly_podcast_analyze: `${baseUrl}a2a/weekly_podcast.analyze`,
+        sermon_list: `${baseUrl}a2a/sermon.list`,
+        sermon_get: `${baseUrl}a2a/sermon.get`,
         community_catalog_list: `${baseUrl}a2a/community.catalog.list`,
         community_my_list: `${baseUrl}a2a/community.my.list`,
         community_join: `${baseUrl}a2a/community.join`,
@@ -1527,6 +1529,20 @@ const WeeklyPodcastAnalyzeSchema = z
     path: ["source_text"],
   });
 
+// Weekly Sermons (campus messages)
+const SermonListSchema = z.object({
+  identity: IdentitySchema,
+  campus_id: z.string().min(1).optional().nullable(),
+  search: z.string().min(1).optional().nullable(), // title/speaker/passage
+  limit: z.number().int().min(1).max(200).optional().nullable(),
+  offset: z.number().int().min(0).max(500000).optional().nullable(),
+});
+
+const SermonGetSchema = z.object({
+  identity: IdentitySchema,
+  message_id: z.string().min(1), // campus_messages.id (e.g. msg_2479)
+});
+
 // Community (catalog + per-person involvement)
 const CommunityCatalogListSchema = z.object({
   identity: IdentitySchema,
@@ -2241,6 +2257,10 @@ async function handleChatStream(req: Request, env: Env) {
           envelope = maybeEnvelope && typeof maybeEnvelope === "object" ? maybeEnvelope : null;
         }
         if (!envelope) throw new Error("LangGraph stream did not produce final state (values).");
+        // If the agent errored, surface it (don't return stale output).
+        if ((envelope as any)?.__error__) {
+          throw new Error(String((envelope as any)?.__error__?.message ?? "Agent error"));
+        }
 
         // Apply MemoryOps proposed by the agent (gateway enforces policy).
         if (personId) {
@@ -2932,6 +2952,114 @@ async function handleWeeklyPodcastAnalyze(req: Request, env: Env) {
   return json({ ok: true, podcast_id: podcastId, analysis: out, actor: { userId, role } });
 }
 
+async function handleSermonList(req: Request, env: Env) {
+  const parsed = SermonListSchema.safeParse(await parseJson(req));
+  if (!parsed.success) return json({ error: "Invalid body", issues: parsed.error.issues }, { status: 400 });
+  const { identity } = parsed.data;
+  const churchId = identity.tenant_id;
+  const userId = identity.user_id;
+  const role = (identity.role ?? "seeker") as string;
+
+  const campusId = (parsed.data.campus_id ?? identity.campus_id ?? "").trim() || null;
+  const search = (parsed.data.search ?? "").trim().toLowerCase();
+  const limit = parsed.data.limit ?? 50;
+  const offset = parsed.data.offset ?? 0;
+
+  let sql = `SELECT m.id, m.campus_id AS campusId, m.title, m.speaker, m.preached_at AS preachedAt, m.passage,
+                    m.series_title AS seriesTitle,
+                    m.source_url AS sourceUrl, m.watch_url AS watchUrl, m.listen_url AS listenUrl, m.download_url AS downloadUrl,
+                    m.guide_discussion_url AS guideDiscussionUrl, m.guide_leader_url AS guideLeaderUrl,
+                    a.updated_at AS analysisUpdatedAt,
+                    t.updated_at AS transcriptUpdatedAt
+             FROM campus_messages m
+             LEFT JOIN campus_message_analysis a ON a.message_id = m.id
+             LEFT JOIN campus_message_transcripts t ON t.message_id = m.id
+             WHERE m.church_id=?1`;
+  const binds: any[] = [churchId];
+
+  if (campusId) {
+    sql += ` AND m.campus_id=?${binds.length + 1}`;
+    binds.push(campusId);
+  }
+  if (search) {
+    sql += ` AND (lower(m.title) LIKE ?${binds.length + 1} OR lower(m.speaker) LIKE ?${binds.length + 1} OR lower(m.passage) LIKE ?${binds.length + 1})`;
+    binds.push(`%${search}%`);
+  }
+  sql += ` ORDER BY m.preached_at DESC, m.updated_at DESC LIMIT ${limit} OFFSET ${offset}`;
+
+  const rows = (await env.churchcore.prepare(sql).bind(...binds).all()).results ?? [];
+  return json({ ok: true, sermons: rows, actor: { userId, role } });
+}
+
+async function handleSermonGet(req: Request, env: Env) {
+  const parsed = SermonGetSchema.safeParse(await parseJson(req));
+  if (!parsed.success) return json({ error: "Invalid body", issues: parsed.error.issues }, { status: 400 });
+  const { identity } = parsed.data;
+  const churchId = identity.tenant_id;
+  const userId = identity.user_id;
+  const role = (identity.role ?? "seeker") as string;
+  const messageId = parsed.data.message_id.trim();
+
+  const sermon = (await env.churchcore
+    .prepare(
+      `SELECT id, campus_id AS campusId, title, speaker, preached_at AS preachedAt, passage, series_title AS seriesTitle,
+              source_url AS sourceUrl, watch_url AS watchUrl, listen_url AS listenUrl, download_url AS downloadUrl,
+              guide_series_slug AS guideSeriesSlug, guide_week_number AS guideWeekNumber,
+              guide_discussion_url AS guideDiscussionUrl, guide_leader_url AS guideLeaderUrl,
+              created_at AS createdAt, updated_at AS updatedAt
+       FROM campus_messages WHERE church_id=?1 AND id=?2`,
+    )
+    .bind(churchId, messageId)
+    .first()) as any;
+  if (!sermon) return json({ ok: true, sermon: null, analysis: null, transcript: null, actor: { userId, role } });
+
+  const analysisRow = (await env.churchcore
+    .prepare(
+      `SELECT message_id AS messageId, summary_markdown AS summaryMarkdown, topics_json AS topicsJson, verses_json AS versesJson, key_points_json AS keyPointsJson,
+              model, source, created_at AS createdAt, updated_at AS updatedAt
+       FROM campus_message_analysis WHERE church_id=?1 AND message_id=?2`,
+    )
+    .bind(churchId, messageId)
+    .first()) as any;
+  const topics = analysisRow?.topicsJson ? JSON.parse(String(analysisRow.topicsJson)) : null;
+  const verses = analysisRow?.versesJson ? JSON.parse(String(analysisRow.versesJson)) : null;
+  const keyPoints = analysisRow?.keyPointsJson ? JSON.parse(String(analysisRow.keyPointsJson)) : null;
+  const analysis = analysisRow
+    ? {
+        messageId: analysisRow.messageId,
+        summaryMarkdown: analysisRow.summaryMarkdown ?? null,
+        topics: Array.isArray(topics) ? topics : [],
+        verses: Array.isArray(verses) ? verses : [],
+        keyPoints: Array.isArray(keyPoints) ? keyPoints : [],
+        model: analysisRow.model ?? null,
+        source: analysisRow.source ?? null,
+        createdAt: analysisRow.createdAt,
+        updatedAt: analysisRow.updatedAt,
+      }
+    : null;
+
+  const transcriptRow = (await env.churchcore
+    .prepare(
+      `SELECT message_id AS messageId, source_url AS sourceUrl, model, created_at AS createdAt, updated_at AS updatedAt,
+              length(transcript_text) AS charCount
+       FROM campus_message_transcripts WHERE church_id=?1 AND message_id=?2`,
+    )
+    .bind(churchId, messageId)
+    .first()) as any;
+  const transcript = transcriptRow
+    ? {
+        messageId: transcriptRow.messageId,
+        sourceUrl: transcriptRow.sourceUrl ?? null,
+        model: transcriptRow.model ?? null,
+        charCount: typeof transcriptRow.charCount === "number" ? transcriptRow.charCount : Number(transcriptRow.charCount ?? 0),
+        createdAt: transcriptRow.createdAt,
+        updatedAt: transcriptRow.updatedAt,
+      }
+    : null;
+
+  return json({ ok: true, sermon, analysis, transcript, actor: { userId, role } });
+}
+
 async function handleCommunityCatalogList(req: Request, env: Env) {
   const parsed = CommunityCatalogListSchema.safeParse(await parseJson(req));
   if (!parsed.success) return json({ error: "Invalid body", issues: parsed.error.issues }, { status: 400 });
@@ -3351,6 +3479,10 @@ export default {
         return handleWeeklyPodcastGet(req, env);
       case "/a2a/weekly_podcast.analyze":
         return handleWeeklyPodcastAnalyze(req, env);
+      case "/a2a/sermon.list":
+        return handleSermonList(req, env);
+      case "/a2a/sermon.get":
+        return handleSermonGet(req, env);
       case "/a2a/community.catalog.list":
         return handleCommunityCatalogList(req, env);
       case "/a2a/community.my.list":

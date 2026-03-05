@@ -2831,6 +2831,10 @@ async function applyTranscriptToMessage(
     });
   }
 
+  const topics = llm?.topics ?? [];
+  const verses = llm?.verses ?? [];
+  const keyPoints = llm?.keyPoints ?? [];
+
   const md = [
     row.sourceUrl ? `Source: ${row.sourceUrl}` : null,
     row.campusId ? `Campus: ${row.campusId}` : null,
@@ -2846,6 +2850,9 @@ async function applyTranscriptToMessage(
     args.transcriptSource ? `Transcript source: ${args.transcriptSource}` : null,
     args.transcriptModel ? `Transcript model: ${args.transcriptModel}` : null,
     llm?.summaryMarkdown ? `## Summary\n\n${llm.summaryMarkdown}` : null,
+    topics.length ? `## Topics\n\n${topics.map((t: string) => `- ${t}`).join("\n")}` : null,
+    verses.length ? `## Verses\n\n${verses.map((v: string) => `- ${v}`).join("\n")}` : null,
+    keyPoints.length ? `## Key Points\n\n${keyPoints.map((p: string) => `- ${p}`).join("\n")}` : null,
     `## Transcript\n\n${args.transcriptText}`,
     llm?.extractedContentMarkdown?.trim() ? `## Extracted Outline\n\n${llm.extractedContentMarkdown.trim()}` : null,
   ]
@@ -3240,9 +3247,9 @@ async function crawlOne(env: Env, args: { churchId: string; url: string; allowDo
         }
         if (!transcriptText && downloadUrl) {
           const t = await openAiTranscribeUrl(env, downloadUrl);
-          if ((t as any)?.text) {
-            transcriptText = t.text;
-            transcriptSource = `asr:${t.model ?? "unknown"}`;
+          if (t && (t as any)?.text) {
+            transcriptText = (t as any).text;
+            transcriptSource = `asr:${(t as any).model ?? "unknown"}`;
           } else if ((t as any)?.error) {
             transcriptError = String((t as any).error);
           }
@@ -3333,6 +3340,9 @@ async function crawlOne(env: Env, args: { churchId: string; url: string; allowDo
           guide?.discussionUrl ? `Discussion Questions: ${guide.discussionUrl}` : null,
           guide?.leaderUrl ? `Leader Guide: ${guide.leaderUrl}` : null,
           summaryMarkdown ? `## Summary\n\n${summaryMarkdown}` : null,
+          topics.length ? `## Topics\n\n${topics.map((t: string) => `- ${t}`).join("\n")}` : null,
+          verses.length ? `## Verses\n\n${verses.map((v: string) => `- ${v}`).join("\n")}` : null,
+          keyPoints.length ? `## Key Points\n\n${keyPoints.map((p: string) => `- ${p}`).join("\n")}` : null,
           `## Extracted Content\n\n${extracted || text}`,
           transcriptText ? `## Transcript\n\n${transcriptText}` : null,
         ]

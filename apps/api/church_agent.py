@@ -290,14 +290,14 @@ def _ui_handoff_for_user_text(user_text: str) -> list[dict[str, Any]]:
             }
         ]
 
-    podcastish = any(k in u for k in ["the weekly", "weekly podcast", "podcast", "episode 19", "episode 18", "sermon of the day"])
-    if podcastish:
+    sermonish = any(k in u for k in ["sermon", "message this week", "this week's message", "messages", "weekly sermons", "the weekly", "weekly podcast", "podcast"])
+    if sermonish:
         return [
             {
                 "type": "ui_tool",
-                "tool_id": "weekly_podcasts",
-                "title": "Weekly podcast",
-                "instructions": "Open Weekly Podcast episodes and analysis.",
+                "tool_id": "weekly_sermons",
+                "title": "Weekly sermons",
+                "instructions": "Open the Weekly Sermons panel (browse by campus; cached summary + transcript).",
             }
         ]
 
@@ -1078,7 +1078,7 @@ async def handle_seeker_skill(
             "- calendar: show events calendar (week view, with outdoor weather).\n"
             "- bible_reader: read Bible passages (WEB text in-panel, NIV link).\n"
             "- household_manager: manage household (kids, custody notes, allergies; authorized pickup + extended family).\n"
-            "- weekly_podcasts: browse Weekly Podcast episodes; cache summary/topics/verses.\n"
+            "- weekly_sermons: browse sermons by campus; view cached summary/topics/verses/transcript.\n"
             "- kids_checkin: run kids check-in flow (find family, preview rooms, commit check-in).\n"
             "- guide: show journey position + next steps + resources.\n"
             "- memory_manager: manage person memory areas (hub).\n"
