@@ -1873,6 +1873,22 @@ async function handleChat(req: Request, env: Env) {
     ? await Promise.all([getPersonMemory(env, { churchId, personId }), getHouseholdSummary(env, { churchId, personId })])
     : [{ memory: null, updatedAt: null }, { householdId: null, summary: "" }];
 
+  const memCampusIdRaw = (personMemory as any)?.memory?.identity?.campusId;
+  const memCampusId = typeof memCampusIdRaw === "string" && /^campus_[a-z0-9_]+$/i.test(memCampusIdRaw.trim()) ? memCampusIdRaw.trim() : null;
+  const effectiveCampusId = memCampusId ?? identity.campus_id ?? "campus_boulder";
+  const memPreferredNameRaw = (personMemory as any)?.memory?.identity?.preferredName;
+  const memPreferredName = typeof memPreferredNameRaw === "string" ? memPreferredNameRaw.trim() : "";
+  const memEmailRaw = (personMemory as any)?.memory?.contact?.email;
+  const memPhoneRaw = (personMemory as any)?.memory?.contact?.phone;
+  let email = typeof memEmailRaw === "string" ? memEmailRaw.trim() : "";
+  let phone = typeof memPhoneRaw === "string" ? memPhoneRaw.trim() : "";
+  if (personId && (!email || !phone)) {
+    const row = (await env.churchcore.prepare(`SELECT email, phone FROM people WHERE church_id=?1 AND id=?2 LIMIT 1`).bind(churchId, personId).first()) as any;
+    if (!email && typeof row?.email === "string") email = String(row.email).trim();
+    if (!phone && typeof row?.phone === "string") phone = String(row.phone).trim();
+  }
+  const identityContact = { churchId, campusId: effectiveCampusId, preferredName: memPreferredName || null, email: email || null, phone: phone || null };
+
   const redactedMemory = redactMemoryForRole(role, (personMemory as any).memory);
   const journeyState = personId
     ? await ensurePersonJourneyState(env, { churchId, personId, personMemory: (personMemory as any).memory ?? {} })
@@ -1884,7 +1900,7 @@ async function handleChat(req: Request, env: Env) {
   const inputArgs = parsed.data.args && typeof parsed.data.args === "object" ? (parsed.data.args as Record<string, unknown>) : {};
   const session = {
     churchId,
-    campusId: identity.campus_id ?? "campus_boulder",
+    campusId: effectiveCampusId,
     timezone: identity.timezone ?? "UTC",
     userId,
     personId,
@@ -1903,6 +1919,7 @@ async function handleChat(req: Request, env: Env) {
         __context: {
           person_memory: redactedMemory,
           person_memory_updated_at: personMemory.updatedAt,
+          identity_contact: identityContact,
           household: { household_id: hh.householdId, summary: hh.summary },
           journey: { current_stage: journeyCurrentStage, next_steps: journeyNextSteps },
           policy: { role },
@@ -2114,6 +2131,22 @@ async function handleChatStream(req: Request, env: Env) {
           ? await Promise.all([getPersonMemory(env, { churchId, personId }), getHouseholdSummary(env, { churchId, personId })])
           : [{ memory: null, updatedAt: null }, { householdId: null, summary: "" }];
 
+        const memCampusIdRaw = (personMemory as any)?.memory?.identity?.campusId;
+        const memCampusId = typeof memCampusIdRaw === "string" && /^campus_[a-z0-9_]+$/i.test(memCampusIdRaw.trim()) ? memCampusIdRaw.trim() : null;
+        const effectiveCampusId = memCampusId ?? identity.campus_id ?? "campus_boulder";
+        const memPreferredNameRaw = (personMemory as any)?.memory?.identity?.preferredName;
+        const memPreferredName = typeof memPreferredNameRaw === "string" ? memPreferredNameRaw.trim() : "";
+        const memEmailRaw = (personMemory as any)?.memory?.contact?.email;
+        const memPhoneRaw = (personMemory as any)?.memory?.contact?.phone;
+        let email = typeof memEmailRaw === "string" ? memEmailRaw.trim() : "";
+        let phone = typeof memPhoneRaw === "string" ? memPhoneRaw.trim() : "";
+        if (personId && (!email || !phone)) {
+          const row = (await env.churchcore.prepare(`SELECT email, phone FROM people WHERE church_id=?1 AND id=?2 LIMIT 1`).bind(churchId, personId).first()) as any;
+          if (!email && typeof row?.email === "string") email = String(row.email).trim();
+          if (!phone && typeof row?.phone === "string") phone = String(row.phone).trim();
+        }
+        const identityContact = { churchId, campusId: effectiveCampusId, preferredName: memPreferredName || null, email: email || null, phone: phone || null };
+
         const redactedMemory = redactMemoryForRole(role, (personMemory as any).memory);
         const journeyState = personId
           ? await ensurePersonJourneyState(env, { churchId, personId, personMemory: (personMemory as any).memory ?? {} })
@@ -2128,7 +2161,7 @@ async function handleChatStream(req: Request, env: Env) {
 
         const session = {
           churchId,
-          campusId: identity.campus_id ?? "campus_boulder",
+          campusId: effectiveCampusId,
           timezone: identity.timezone ?? "UTC",
           userId,
           personId,
@@ -2145,6 +2178,7 @@ async function handleChatStream(req: Request, env: Env) {
             __context: {
               person_memory: redactedMemory,
               person_memory_updated_at: (personMemory as any).updatedAt,
+              identity_contact: identityContact,
               household: { household_id: (hh as any).householdId, summary: (hh as any).summary },
               journey: { current_stage: journeyCurrentStage, next_steps: journeyNextSteps },
               policy: { role },

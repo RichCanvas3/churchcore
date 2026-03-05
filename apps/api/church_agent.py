@@ -648,6 +648,32 @@ def _journey_context_from_args(args: dict[str, Any]) -> tuple[dict[str, Any] | N
     return j, ("; ".join(summary_bits)).strip()
 
 
+def _identity_contact_context_from_args(args: dict[str, Any]) -> str:
+    ctx = args.get("__context")
+    if not isinstance(ctx, dict):
+        return ""
+    ic = ctx.get("identity_contact")
+    if not isinstance(ic, dict):
+        return ""
+    bits: list[str] = []
+    church_id = ic.get("churchId")
+    campus_id = ic.get("campusId")
+    preferred = ic.get("preferredName")
+    email = ic.get("email")
+    phone = ic.get("phone")
+    if isinstance(church_id, str) and church_id.strip():
+        bits.append(f"churchId={church_id.strip()}")
+    if isinstance(campus_id, str) and campus_id.strip():
+        bits.append(f"campusId={campus_id.strip()}")
+    if isinstance(preferred, str) and preferred.strip():
+        bits.append(f"preferredName={preferred.strip()}")
+    if isinstance(email, str) and email.strip():
+        bits.append(f"email={email.strip()}")
+    if isinstance(phone, str) and phone.strip():
+        bits.append(f"phone={phone.strip()}")
+    return "; ".join(bits).strip()
+
+
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
@@ -1038,6 +1064,14 @@ async def handle_seeker_skill(
             "You compare 2-3 weekly sermons across campuses.\n"
             "Use the full transcripts as the primary source of truth; the notes/summary are secondary.\n"
             "Do not invent details not supported by the transcripts.\n"
+            "At the END of comparison_markdown, include a section titled exactly:\n"
+            '"## Theology / Interpretation Differences"\n'
+            "- If you detect differences in theological interpretation, doctrine, or meaning, list them as bullets with short evidence.\n"
+            '- If none are present, say "No theological/interpretation differences detected.".\n'
+            "Then include a section titled exactly:\n"
+            '"## Material Differences in What Was Said"\n'
+            "- List concrete differences in claims/emphases/stated applications/illustrations as bullets.\n"
+            '- If none are present, say "No material differences detected.".\n'
             "Return ONLY valid JSON with keys:\n"
             '- "comparison_markdown": string (with headings and bullets)\n'
             '- "commonalities": array of short strings\n'
@@ -1046,7 +1080,7 @@ async def handle_seeker_skill(
         )
         user = json.dumps(
             {
-                "instruction": "Compare what is similar and where they differ across campuses; focus on theology, application emphasis, illustrations, tone, and call-to-action. Cite specific transcript phrases sparingly (short quotes only).",
+                "instruction": "Compare what is similar and where they differ across campuses; focus on theology, application emphasis, illustrations, tone, and call-to-action. Cite specific transcript phrases sparingly (short quotes only). Always end with the required Theology/Interpretation Differences + Material Differences sections.",
                 "sermons": sermons_clean,
             }
         )
@@ -1094,6 +1128,7 @@ async def handle_seeker_skill(
         mem, mem_summary = _memory_context_from_args(args)
         hh_summary = _household_context_from_args(args)
         journey, journey_summary = _journey_context_from_args(args)
+        identity_contact_summary = _identity_contact_context_from_args(args)
 
         # Deterministic: if the user asks for weather, use weather MCP directly.
         u = user.lower()
@@ -1175,6 +1210,7 @@ async def handle_seeker_skill(
             "- care_pastoral: manage prayer requests (and staff-only care notes).\n"
             "- teams_skills: staff-only serving teams/skills.\n"
             'If a UI tool should open, include a handoff item like: {"type":"ui_tool","tool_id":"identity_contact"}.\n\n'
+            + (("Identity/contact context (authoritative):\n" + identity_contact_summary + "\n\n") if identity_contact_summary else "")
             + (("Faith journey context:\n" + journey_summary + "\n\n") if journey_summary else "")
             + (("Known person memory (shared across topics):\n" + mem_summary + "\n\n") if mem_summary else "")
             + (("Household context:\n" + hh_summary + "\n\n") if hh_summary else "")

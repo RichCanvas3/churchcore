@@ -60,8 +60,9 @@ function campusLabel(campusId: string | null | undefined) {
   return campusId || "Unknown";
 }
 
-export function WeeklySermonsPanel(props: { identity: Identity; onClose: () => void; onCompare?: (anchorMessageId: string) => void }) {
+export function WeeklySermonsPanel(props: { identity: Identity; onClose: () => void; onCompare?: (anchorMessageId: string) => void; initialMessageId?: string | null }) {
   const identity = props.identity;
+  const initialMessageId = typeof props.initialMessageId === "string" ? props.initialMessageId.trim() : "";
   const [loading, setLoading] = useState(false);
   const [uiError, setUiError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
@@ -84,7 +85,14 @@ export function WeeklySermonsPanel(props: { identity: Identity; onClose: () => v
         search: search.trim() || null,
         limit: 50,
       });
-      setSermons(Array.isArray(out?.sermons) ? out.sermons : []);
+      const next = Array.isArray(out?.sermons) ? out.sermons : [];
+      setSermons(next);
+      // Default selection: latest sermon (first item) unless already selected.
+      setSelectedId((prev) => {
+        if (prev) return prev;
+        if (initialMessageId && next.some((s) => s.id === initialMessageId)) return initialMessageId;
+        return next[0]?.id ?? "";
+      });
     } catch (e: any) {
       setUiError(String(e?.message ?? e ?? "Failed to load sermons"));
     } finally {
@@ -121,6 +129,13 @@ export function WeeklySermonsPanel(props: { identity: Identity; onClose: () => v
     void refreshList(identity.campus_id ?? "campus_boulder");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [identity.tenant_id, identity.user_id]);
+
+  // If opened with an explicit sermon id, select it (only if nothing selected yet).
+  useEffect(() => {
+    if (!initialMessageId) return;
+    setSelectedId((prev) => prev || initialMessageId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialMessageId]);
 
   useEffect(() => {
     if (!selectedId) return;
@@ -202,6 +217,75 @@ export function WeeklySermonsPanel(props: { identity: Identity; onClose: () => v
             </select>
           </div>
         </div>
+
+        {sermons.length ? (
+          <div style={{ border: "1px solid #e2e8f0", borderRadius: 12, padding: 12, background: "#f8fafc", display: "grid", gap: 8 }}>
+            <div style={{ fontSize: 12, fontWeight: 900, color: "#0f172a" }}>Recent weeks</div>
+            <div style={{ display: "grid", gap: 6 }}>
+              {sermons.slice(0, 4).map((s, idx) => {
+                const active = s.id === selectedId;
+                return (
+                  <button
+                    key={s.id}
+                    type="button"
+                    onClick={() => setSelectedId(s.id)}
+                    style={{
+                      textAlign: "left",
+                      border: active ? "1px solid #0f172a" : "1px solid #e2e8f0",
+                      background: active ? "#ffffff" : "#ffffff",
+                      borderRadius: 12,
+                      padding: 10,
+                      cursor: "pointer",
+                      display: "grid",
+                      gap: 4,
+                    }}
+                    title={idx === 0 ? "Latest sermon" : undefined}
+                  >
+                    <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "baseline" }}>
+                      <div style={{ fontSize: 12, fontWeight: 800, color: "#0f172a", minWidth: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                        {idx === 0 ? "Latest: " : ""}
+                        {s.title}
+                      </div>
+                      <div style={{ fontSize: 12, color: "#64748b" }}>{s.preachedAt ? String(s.preachedAt).slice(0, 10) : ""}</div>
+                    </div>
+                    <div style={{ fontSize: 12, color: "#64748b" }}>
+                      {s.passage ? s.passage : ""}
+                      {s.speaker ? ` · ${s.speaker}` : ""}
+                    </div>
+                    {s.guideDiscussionUrl || s.guideLeaderUrl ? (
+                      <div style={{ display: "flex", gap: 10, fontSize: 12 }}>
+                        {s.guideDiscussionUrl ? (
+                          <a
+                            href={s.guideDiscussionUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            style={{ color: "#2563eb", textDecoration: "underline" }}
+                          >
+                            Discussion guide
+                          </a>
+                        ) : null}
+                        {s.guideLeaderUrl ? (
+                          <a
+                            href={s.guideLeaderUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            style={{ color: "#2563eb", textDecoration: "underline" }}
+                          >
+                            Leader guide
+                          </a>
+                        ) : null}
+                      </div>
+                    ) : (
+                      <div style={{ fontSize: 12, color: "#94a3b8" }}>No guide links cached for this week yet.</div>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ) : null}
 
         {selected ? (
           <div style={{ border: "1px solid #e2e8f0", borderRadius: 12, padding: 12, background: "#f8fafc", display: "grid", gap: 8 }}>

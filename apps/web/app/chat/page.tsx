@@ -927,9 +927,7 @@ export default function ChatPage() {
               </button>
             </>
           ) : null}
-          <div className={styles.desktopOnly} style={{ color: "#64748b", fontSize: 12 }}>
-            A2A threads/messages in D1; streaming tokens.
-          </div>
+
         </div>
 
         {effectiveThreadId ? (
@@ -1008,6 +1006,13 @@ export default function ChatPage() {
                   persona_id: (identity as any).persona_id ?? null,
                 }}
                 onCompare={(anchorId: string) => void openSermonCompare(anchorId)}
+                initialMessageId={
+                  typeof (activeUiToolArgs as any)?.message_id === "string"
+                    ? String((activeUiToolArgs as any).message_id)
+                    : typeof (activeUiToolArgs as any)?.sermon_id === "string"
+                      ? String((activeUiToolArgs as any).sermon_id)
+                      : null
+                }
                 onClose={closeTool}
               />
             ) : activeUiToolId === "weekly_podcasts" ? (
@@ -1021,6 +1026,13 @@ export default function ChatPage() {
                   persona_id: (identity as any).persona_id ?? null,
                 }}
                 onCompare={(anchorId: string) => void openSermonCompare(anchorId)}
+                initialMessageId={
+                  typeof (activeUiToolArgs as any)?.message_id === "string"
+                    ? String((activeUiToolArgs as any).message_id)
+                    : typeof (activeUiToolArgs as any)?.sermon_id === "string"
+                      ? String((activeUiToolArgs as any).sermon_id)
+                      : null
+                }
                 onClose={closeTool}
               />
             ) : activeUiToolId === "community_manager" ? (
