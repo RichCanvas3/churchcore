@@ -46,7 +46,6 @@ export function AppHeader(props: { height?: number }) {
     >
       <div style={{ display: "flex", gap: 10, alignItems: "baseline" }}>
         <div style={{ fontWeight: 900 }}>Church Agent</div>
-        <div style={{ fontSize: 12, color: "#64748b" }}>A2A + LangGraph</div>
       </div>
 
       <details>

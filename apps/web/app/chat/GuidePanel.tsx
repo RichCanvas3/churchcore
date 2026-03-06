@@ -101,6 +101,29 @@ export function GuidePanel(props: { identity: Identity; onClose: () => void; onO
   const [planErr, setPlanErr] = useState<string | null>(null);
   const [plan, setPlan] = useState<any | null>(null);
 
+  const todayISO = useMemo(() => new Date().toISOString().slice(0, 10), []);
+  const completedIds = useMemo(() => {
+    const s = new Set<string>();
+    for (const p of (plan?.progress ?? []) as any[]) {
+      if (p?.itemId && String(p?.status ?? "").toLowerCase() === "completed") s.add(String(p.itemId));
+    }
+    return s;
+  }, [plan?.progress]);
+
+  const todaysPlanItems = useMemo(() => {
+    const items = Array.isArray(plan?.items) ? (plan.items as any[]) : [];
+    return items.filter((it) => String(it?.dayDate ?? "") === todayISO);
+  }, [plan?.items, todayISO]);
+
+  const dailyPick = useMemo(() => {
+    const items = todaysPlanItems;
+    if (!items.length) return null;
+    const preferKinds = ["reading", "daily_verse"];
+    const sorted = items.slice().sort((a, b) => preferKinds.indexOf(String(a?.kind ?? "")) - preferKinds.indexOf(String(b?.kind ?? "")));
+    const firstIncomplete = sorted.find((it) => it?.id && !completedIds.has(String(it.id)));
+    return firstIncomplete ?? sorted[0] ?? null;
+  }, [completedIds, todaysPlanItems]);
+
   const btn = useMemo(
     () => ({
       border: "1px solid #0f172a",
@@ -166,6 +189,20 @@ export function GuidePanel(props: { identity: Identity; onClose: () => void; onO
       setPlan(null);
     } finally {
       setPlanLoading(false);
+    }
+  }
+
+  async function markPlanItemComplete(itemId: string) {
+    if (!itemId) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await postJson("/api/a2a/bible/plan/item/complete", { identity, item_id: itemId });
+      await refreshPlan();
+    } catch (e: any) {
+      setError(String(e?.message ?? e ?? "Failed to mark complete"));
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -308,6 +345,33 @@ export function GuidePanel(props: { identity: Identity; onClose: () => void; onO
         {error ? <div style={{ color: "#dc2626", fontSize: 13 }}>{error}</div> : null}
         {planErr ? <div style={{ color: "#dc2626", fontSize: 13 }}>{planErr}</div> : null}
         {loading ? <div style={{ color: "#64748b" }}>Loading…</div> : null}
+
+        <section style={{ background: "white", border: "1px solid #e2e8f0", borderRadius: 14, padding: 12, display: "grid", gap: 10 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "baseline", flexWrap: "wrap" }}>
+            <div style={{ fontSize: 12, fontWeight: 900, color: "#0f172a" }}>Daily Scripture reading</div>
+            <div style={{ fontSize: 12, color: "#64748b" }}>{todayISO}</div>
+          </div>
+          {dailyPick?.ref ? (
+            <div style={{ display: "grid", gap: 8 }}>
+              <div style={{ fontSize: 13, fontWeight: 900, color: "#0f172a" }}>{String(dailyPick.label ?? "Today")}</div>
+              <button
+                type="button"
+                onClick={() => (onOpenTool ? onOpenTool("bible_reader", { ref: String(dailyPick.ref) }) : undefined)}
+                style={{ textAlign: "left", border: "1px solid #cbd5e1", background: "#eef2ff", color: "#1e3a8a", borderRadius: 12, padding: 10, cursor: onOpenTool ? "pointer" : "default", fontWeight: 900 }}
+                title="Open in Bible hub"
+              >
+                {String(dailyPick.ref)}
+              </button>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <button type="button" disabled={saving || completedIds.has(String(dailyPick.id))} onClick={() => void markPlanItemComplete(String(dailyPick.id ?? ""))} style={btn}>
+                  {completedIds.has(String(dailyPick.id)) ? "Done" : "Mark complete"}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div style={{ fontSize: 12, color: "#64748b" }}>{planLoading ? "Loading plan…" : "No plan reading scheduled for today yet."}</div>
+          )}
+        </section>
 
         {plan ? (
           plan?.week ? (

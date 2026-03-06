@@ -19,7 +19,7 @@ import { ChurchOverviewPanel } from "./ChurchOverviewPanel";
 import { StrategicIntentPanel } from "./StrategicIntentPanel";
 import { CalendarPanel } from "./CalendarPanel";
 import { WeeklySermonsPanel } from "./WeeklySermonsPanel";
-import { BibleReaderPanel } from "./BibleReaderPanel";
+import { BibleHubModal } from "./BibleHubModal";
 import styles from "./ChatLayout.module.css";
 
 type ThreadMeta = { id: string; title: string; status: string; updatedAt?: string; createdAt?: string };
@@ -93,6 +93,8 @@ export default function ChatPage() {
   const [sermonCompareIncluded, setSermonCompareIncluded] = useState<any[]>([]);
   const [sermonCompareAnchorId, setSermonCompareAnchorId] = useState<string>("");
   const [sermonCompareMatch, setSermonCompareMatch] = useState<any | null>(null);
+  const [bibleHubOpen, setBibleHubOpen] = useState(false);
+  const [bibleHubRef, setBibleHubRef] = useState<string | null>(null);
 
   const closeTool = () => {
     setActiveUiToolId(null);
@@ -141,6 +143,13 @@ export default function ChatPage() {
 
   function openTool(toolId: string, args?: Record<string, unknown> | null) {
     const nextToolId = toolId === "kids_safety" || toolId === "household_memory" ? "household_manager" : toolId;
+    if (nextToolId === "bible_reader") {
+      const r = args && typeof (args as any)?.ref === "string" ? String((args as any).ref) : null;
+      setBibleHubRef(r);
+      setBibleHubOpen(true);
+      setIsToolsOpenMobile(false);
+      return;
+    }
     setActiveUiToolId(nextToolId);
     setActiveUiToolArgs(args ?? null);
   }
@@ -1182,18 +1191,9 @@ export default function ChatPage() {
                 onClose={closeTool}
               />
             ) : activeUiToolId === "bible_reader" ? (
-              <BibleReaderPanel
-                identity={{
-                  tenant_id: identity.tenant_id,
-                  user_id: identity.user_id,
-                  role: identity.role,
-                  campus_id: identity.campus_id ?? null,
-                  timezone: identity.timezone ?? null,
-                  persona_id: (identity as any).persona_id ?? null,
-                }}
-                initialRef={typeof (activeUiToolArgs as any)?.ref === "string" ? String((activeUiToolArgs as any).ref) : null}
-                onClose={closeTool}
-              />
+              <div style={{ padding: 14, color: "#64748b", background: "white", height: "100%" }}>
+                Bible opens in a full-screen popup now.
+              </div>
             ) : (
               <div style={{ padding: 14, color: "#64748b", background: "white", height: "100%" }}>Unknown tool: {activeUiToolId}</div>
             )}
@@ -1298,6 +1298,21 @@ export default function ChatPage() {
             </div>
           </div>
         </div>
+      ) : null}
+
+      {bibleHubOpen ? (
+        <BibleHubModal
+          identity={{
+            tenant_id: identity.tenant_id,
+            user_id: identity.user_id,
+            role: identity.role,
+            campus_id: identity.campus_id ?? null,
+            timezone: identity.timezone ?? null,
+            persona_id: (identity as any).persona_id ?? null,
+          }}
+          initialRef={bibleHubRef}
+          onClose={() => setBibleHubOpen(false)}
+        />
       ) : null}
     </div>
   );
