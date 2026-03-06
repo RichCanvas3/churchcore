@@ -23,6 +23,7 @@
     "@ffprobe-installer/ffprobe": "^2.1.2",
     "fflate": "^0.8.2",
     "openai": "^5.0.0",
+    "pdfjs-dist": "^5.4.149",
     "zod": "^4.3.6"
   },
   "devDependencies": {

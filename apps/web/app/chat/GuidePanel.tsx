@@ -90,13 +90,16 @@ function LinkifiedText(props: { text: string }) {
   );
 }
 
-export function GuidePanel(props: { identity: Identity; onClose: () => void; onOpenTool?: (toolId: string) => void }) {
+export function GuidePanel(props: { identity: Identity; onClose: () => void; onOpenTool?: (toolId: string, args?: Record<string, unknown> | null) => void }) {
   const { identity, onClose, onOpenTool } = props;
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [state, setState] = useState<JourneyGetStateResponse | null>(null);
   const [next, setNext] = useState<JourneyNextStepsResponse | null>(null);
+  const [planLoading, setPlanLoading] = useState(false);
+  const [planErr, setPlanErr] = useState<string | null>(null);
+  const [plan, setPlan] = useState<any | null>(null);
 
   const btn = useMemo(
     () => ({
@@ -138,11 +141,11 @@ export function GuidePanel(props: { identity: Identity; onClose: () => void; onO
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [identity.tenant_id, identity.user_id, identity.persona_id, identity.role, identity.campus_id]);
 
-  async function markComplete(nodeId: string) {
+  async function markStep(nodeId: string, eventType: "COMPLETED" | "STARTED" = "COMPLETED") {
     setSaving(true);
     setError(null);
     try {
-      await postJson("/api/a2a/journey/complete_step", { identity, node_id: nodeId, event_type: "COMPLETED", value: { via: "guide_panel" }, access_level: "self" });
+      await postJson("/api/a2a/journey/complete_step", { identity, node_id: nodeId, event_type: eventType, value: { via: "guide_panel" }, access_level: "self" });
       await refresh();
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Failed to save");
@@ -150,6 +153,26 @@ export function GuidePanel(props: { identity: Identity; onClose: () => void; onO
       setSaving(false);
     }
   }
+
+  async function refreshPlan() {
+    setPlanLoading(true);
+    setPlanErr(null);
+    try {
+      const out = await postJson<any>("/api/a2a/bible/plan/week/get", { identity });
+      if (!out?.ok) throw new Error(String(out?.error ?? "Failed to load plan"));
+      setPlan(out);
+    } catch (e: any) {
+      setPlanErr(String(e?.message ?? e ?? "Failed to load plan"));
+      setPlan(null);
+    } finally {
+      setPlanLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    void refreshPlan();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [identity.tenant_id, identity.user_id, identity.persona_id, identity.role, identity.campus_id]);
 
   const current = state?.current_stage ?? null;
   const stageDocs = Array.isArray(state?.current_stage_docs) ? state!.current_stage_docs! : [];
@@ -163,7 +186,7 @@ export function GuidePanel(props: { identity: Identity; onClose: () => void; onO
   function ToolCtaButton(props: { toolId: string; label?: string }) {
     if (!onOpenTool) return null;
     return (
-      <button type="button" onClick={() => onOpenTool(props.toolId)} style={{ ...btn, background: "#334155" }}>
+      <button type="button" onClick={() => onOpenTool(props.toolId, null)} style={{ ...btn, background: "#334155" }}>
         {props.label ?? `Open ${props.toolId}`}
       </button>
     );
@@ -192,6 +215,8 @@ export function GuidePanel(props: { identity: Identity; onClose: () => void; onO
       "household_manager",
     ]);
     const toolId = supportedToolIds.has(toolFromMeta) ? toolFromMeta : "";
+    const markLabel = nodeId === "step_start_bible_plan" ? "Mark as started" : nodeId === "step_join_group" ? "Mark as started" : "Mark complete";
+    const markType: "COMPLETED" | "STARTED" = nodeId === "step_start_bible_plan" || nodeId === "step_join_group" ? "STARTED" : "COMPLETED";
 
     return (
       <div style={{ border: "1px solid #e2e8f0", borderRadius: 12, padding: 12, background: "#f8fafc" }}>
@@ -240,8 +265,20 @@ export function GuidePanel(props: { identity: Identity; onClose: () => void; onO
         ) : null}
 
         <div style={{ marginTop: 10, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-          <button type="button" disabled={saving || !nodeId} onClick={() => void markComplete(nodeId)} style={{ ...btn, opacity: saving ? 0.7 : 1 }}>
-            Mark complete
+          <button
+            type="button"
+            disabled={saving || !nodeId}
+            onClick={() => void markStep(nodeId, markType)}
+            style={{ ...btn, opacity: saving ? 0.7 : 1 }}
+            title={
+              nodeId === "step_start_bible_plan"
+                ? "Use this once you've begun the plan for this week."
+                : nodeId === "step_join_group"
+                  ? "Use this once you've taken your first step toward joining a group."
+                  : undefined
+            }
+          >
+            {markLabel}
           </button>
           {toolId ? <ToolCtaButton toolId={toolId} label={`Open ${toolId.replace(/_/g, " ")}`} /> : null}
           <span style={{ fontSize: 12, color: "#94a3b8" }}>{nodeId}</span>
@@ -258,6 +295,9 @@ export function GuidePanel(props: { identity: Identity; onClose: () => void; onO
           <button type="button" onClick={() => void refresh()} disabled={loading} style={secondaryBtn}>
             Refresh
           </button>
+          <button type="button" onClick={() => void refreshPlan()} disabled={planLoading} style={secondaryBtn}>
+            {planLoading ? "Plan…" : "Plan"}
+          </button>
           <button type="button" onClick={onClose} style={secondaryBtn}>
             Close
           </button>
@@ -266,7 +306,55 @@ export function GuidePanel(props: { identity: Identity; onClose: () => void; onO
 
       <div style={{ padding: 14, overflow: "auto", minHeight: 0, display: "grid", gap: 14, alignContent: "start", background: "#f8fafc" }}>
         {error ? <div style={{ color: "#dc2626", fontSize: 13 }}>{error}</div> : null}
+        {planErr ? <div style={{ color: "#dc2626", fontSize: 13 }}>{planErr}</div> : null}
         {loading ? <div style={{ color: "#64748b" }}>Loading…</div> : null}
+
+        {plan ? (
+          plan?.week ? (
+            <section style={{ background: "white", border: "1px solid #e2e8f0", borderRadius: 14, padding: 12, display: "grid", gap: 10 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "baseline", flexWrap: "wrap" }}>
+                <div style={{ fontSize: 12, fontWeight: 900, color: "#0f172a" }}>This week’s Bible Reading Plan</div>
+                <div style={{ fontSize: 12, color: "#64748b" }}>
+                  {String(plan.week.weekStartDate ?? "")} → {String(plan.week.weekEndDate ?? "")}
+                </div>
+              </div>
+              <div style={{ fontSize: 12, color: "#64748b" }}>
+                {plan.week.title ? <strong>{String(plan.week.title)}</strong> : null}
+                {plan.week.passage ? ` · ${String(plan.week.passage)}` : ""}
+              </div>
+              <div style={{ display: "grid", gap: 6 }}>
+                {(Array.isArray(plan.items) ? plan.items : [])
+                  .filter((it: any) => String(it?.dayDate ?? "") === new Date().toISOString().slice(0, 10))
+                  .slice(0, 2)
+                  .map((it: any) => (
+                    <button
+                      key={String(it?.id)}
+                      type="button"
+                      onClick={() => (onOpenTool ? onOpenTool("bible_reader", { ref: String(it?.ref ?? plan.week.passage ?? "") }) : undefined)}
+                      style={{ textAlign: "left", border: "1px solid #e2e8f0", background: "#f8fafc", borderRadius: 12, padding: 10, cursor: onOpenTool ? "pointer" : "default" }}
+                      title={onOpenTool ? "Open in Bible reader" : undefined}
+                    >
+                      <div style={{ fontSize: 12, fontWeight: 900, color: "#0f172a" }}>{String(it?.label ?? "Today")}</div>
+                      <div style={{ fontSize: 12, color: "#64748b" }}>{String(it?.ref ?? "")}</div>
+                    </button>
+                  ))}
+                {!Array.isArray(plan.items) || !plan.items.some((it: any) => String(it?.dayDate ?? "") === new Date().toISOString().slice(0, 10)) ? (
+                  <div style={{ fontSize: 12, color: "#64748b" }}>No plan items scheduled for today.</div>
+                ) : null}
+              </div>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <button type="button" onClick={() => (onOpenTool ? onOpenTool("bible_reader", { ref: String(plan.week.passage ?? "") }) : undefined)} style={{ ...btn, background: "#334155" }}>
+                  Open Bible tool
+                </button>
+              </div>
+            </section>
+          ) : (
+            <section style={{ background: "white", border: "1px solid #e2e8f0", borderRadius: 14, padding: 12, display: "grid", gap: 8 }}>
+              <div style={{ fontSize: 12, fontWeight: 900, color: "#0f172a" }}>This week’s Bible Reading Plan</div>
+              <div style={{ fontSize: 12, color: "#64748b" }}>No plan available yet.</div>
+            </section>
+          )
+        ) : null}
 
         <section style={{ background: "white", border: "1px solid #e2e8f0", borderRadius: 14, padding: 12, display: "grid", gap: 8 }}>
           <div style={{ fontSize: 12, fontWeight: 900, color: "#0f172a" }}>Where you are</div>

@@ -156,6 +156,9 @@ function agentCard(req: Request, env: Env) {
         sermon_list: `${baseUrl}a2a/sermon.list`,
         sermon_get: `${baseUrl}a2a/sermon.get`,
         sermon_compare: `${baseUrl}a2a/sermon.compare`,
+        bible_plan_week_get: `${baseUrl}a2a/bible.plan.week.get`,
+        bible_plan_item_complete: `${baseUrl}a2a/bible.plan.item.complete`,
+        bible_plan_checkin_create: `${baseUrl}a2a/bible.plan.checkin.create`,
         community_catalog_list: `${baseUrl}a2a/community.catalog.list`,
         community_my_list: `${baseUrl}a2a/community.my.list`,
         community_join: `${baseUrl}a2a/community.join`,
@@ -1551,6 +1554,26 @@ const SermonCompareSchema = z.object({
   anchor_message_id: z.string().min(1).optional().nullable(), // preferred: compare based on this sermon (date+title)
 });
 
+// Bible reading plan (sermon-anchored, week + daily items)
+const BiblePlanWeekGetSchema = z.object({
+  identity: IdentitySchema,
+  campus_id: z.string().min(1).optional().nullable(),
+  week_start_date: z.string().min(10).optional().nullable(), // YYYY-MM-DD (optional override)
+});
+
+const BiblePlanItemCompleteSchema = z.object({
+  identity: IdentitySchema,
+  item_id: z.string().min(1),
+});
+
+const BiblePlanCheckinCreateSchema = z.object({
+  identity: IdentitySchema,
+  week_id: z.string().min(1),
+  person_id: z.string().min(1),
+  day_date: z.string().min(10).optional().nullable(), // YYYY-MM-DD optional
+  message: z.string().min(1).max(5000),
+});
+
 // Community (catalog + per-person involvement)
 const CommunityCatalogListSchema = z.object({
   identity: IdentitySchema,
@@ -1909,6 +1932,8 @@ async function handleChat(req: Request, env: Env) {
     threadId,
   };
 
+  const weekly = personId ? await getWeeklySermonPlanContext(env, { churchId, campusId: effectiveCampusId, personId }) : null;
+
   const envelope = await runAgent(env, {
     threadId: langgraphThreadId,
     inputPayload: {
@@ -1922,6 +1947,7 @@ async function handleChat(req: Request, env: Env) {
           identity_contact: identityContact,
           household: { household_id: hh.householdId, summary: hh.summary },
           journey: { current_stage: journeyCurrentStage, next_steps: journeyNextSteps },
+          weekly,
           policy: { role },
         },
       },
@@ -2170,6 +2196,8 @@ async function handleChatStream(req: Request, env: Env) {
           threadId,
         };
 
+        const weekly = personId ? await getWeeklySermonPlanContext(env, { churchId, campusId: effectiveCampusId, personId }) : null;
+
         const inputPayload = {
           skill,
           message,
@@ -2181,6 +2209,7 @@ async function handleChatStream(req: Request, env: Env) {
               identity_contact: identityContact,
               household: { household_id: (hh as any).householdId, summary: (hh as any).summary },
               journey: { current_stage: journeyCurrentStage, next_steps: journeyNextSteps },
+              weekly,
               policy: { role },
             },
           },
@@ -3304,6 +3333,231 @@ async function handleSermonCompare(req: Request, env: Env) {
   return json({ ok: true, sermons, comparison, match: effectiveMatch, actor: { userId, role } });
 }
 
+async function resolveEffectiveCampusIdFromMemory(env: Env, identity: any, fallbackCampusId: string | null) {
+  const churchId = String(identity?.tenant_id ?? "").trim();
+  const { personId } = await resolvePerson(env, identity);
+  if (!personId) return { campusId: fallbackCampusId, personId: null };
+  const mem = await getPersonMemory(env, { churchId, personId });
+  const memCampusRaw = (mem as any)?.memory?.identity?.campusId;
+  const memCampus = typeof memCampusRaw === "string" && memCampusRaw.trim() ? memCampusRaw.trim() : null;
+  return { campusId: memCampus ?? fallbackCampusId, personId };
+}
+
+async function getWeeklySermonPlanContext(env: Env, args: { churchId: string; campusId: string; personId: string }) {
+  const today = new Date().toISOString().slice(0, 10);
+  try {
+    const weekRow = (await env.churchcore
+      .prepare(
+        `SELECT id, campus_id AS campusId, anchor_message_id AS anchorMessageId, preached_date AS preachedDate, week_start_date AS weekStartDate, week_end_date AS weekEndDate,
+                title, passage, created_at AS createdAt, updated_at AS updatedAt
+         FROM bible_reading_weeks
+         WHERE church_id=?1 AND campus_id=?2 AND week_start_date<=?3 AND week_end_date>=?3
+         ORDER BY week_start_date DESC
+         LIMIT 1`,
+      )
+      .bind(args.churchId, args.campusId, today)
+      .first()) as any;
+    if (!weekRow?.id) return null;
+
+    const weekId = String(weekRow.id);
+    const items = (
+      (await env.churchcore
+        .prepare(
+          `SELECT id, day_date AS dayDate, kind, ref, label, notes_markdown AS notesMarkdown
+           FROM bible_reading_items
+           WHERE church_id=?1 AND week_id=?2
+           ORDER BY day_date ASC, kind ASC`,
+        )
+        .bind(args.churchId, weekId)
+        .all()).results ?? []
+    ) as any[];
+
+    const progress = (
+      (await env.churchcore
+        .prepare(
+          `SELECT item_id AS itemId, status, completed_at AS completedAt
+           FROM bible_reading_progress
+           WHERE church_id=?1 AND person_id=?2 AND item_id IN (SELECT id FROM bible_reading_items WHERE church_id=?1 AND week_id=?3)`,
+        )
+        .bind(args.churchId, args.personId, weekId)
+        .all()).results ?? []
+    ) as any[];
+
+    const completed = new Set<string>();
+    for (const p of progress) if (p?.itemId && String(p?.status ?? "").toLowerCase() === "completed") completed.add(String(p.itemId));
+    const todayItems = items.filter((it) => String(it?.dayDate ?? "") === today).slice(0, 3);
+    const sermon =
+      weekRow?.anchorMessageId
+        ? ((await env.churchcore
+            .prepare(
+              `SELECT id, campus_id AS campusId, title, speaker, preached_at AS preachedAt, passage, series_title AS seriesTitle,
+                      source_url AS sourceUrl, watch_url AS watchUrl, listen_url AS listenUrl, download_url AS downloadUrl,
+                      guide_discussion_url AS guideDiscussionUrl, guide_leader_url AS guideLeaderUrl
+               FROM campus_messages
+               WHERE church_id=?1 AND id=?2
+               LIMIT 1`,
+            )
+            .bind(args.churchId, String(weekRow.anchorMessageId))
+            .first()) as any)
+        : null;
+
+    return {
+      campusId: args.campusId,
+      today,
+      sermon: sermon ?? {
+        id: weekRow.anchorMessageId ?? null,
+        campusId: weekRow.campusId ?? args.campusId,
+        preachedAt: weekRow.preachedDate ?? null,
+        title: weekRow.title ?? null,
+        passage: weekRow.passage ?? null,
+      },
+      plan: {
+        week: weekRow,
+        today_items: todayItems.map((it) => ({ ...it, completed: completed.has(String(it?.id ?? "")) })),
+        counts: { total: items.length, completed: completed.size },
+      },
+    };
+  } catch {
+    // Best-effort: if the schema isn't deployed yet, don't break chat.
+    return null;
+  }
+}
+
+async function handleBiblePlanWeekGet(req: Request, env: Env) {
+  const parsed = BiblePlanWeekGetSchema.safeParse(await parseJson(req));
+  if (!parsed.success) return json({ error: "Invalid body", issues: parsed.error.issues }, { status: 400 });
+  const { identity } = parsed.data;
+  const churchId = identity.tenant_id;
+  const userId = identity.user_id;
+  const role = (identity.role ?? "seeker") as string;
+
+  const fallbackCampusId = (parsed.data.campus_id ?? identity.campus_id ?? "").trim() || null;
+  const { campusId, personId } = await resolveEffectiveCampusIdFromMemory(env, identity, fallbackCampusId);
+  if (!campusId) return json({ ok: false, error: "Missing campusId" }, { status: 400 });
+  if (!personId) return json({ ok: false, error: "No personId" }, { status: 400 });
+
+  const weekStartOverride = typeof parsed.data.week_start_date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(parsed.data.week_start_date.trim()) ? parsed.data.week_start_date.trim() : null;
+  const today = new Date().toISOString().slice(0, 10);
+
+  const weekRow = (await env.churchcore
+    .prepare(
+      `SELECT id, campus_id AS campusId, anchor_message_id AS anchorMessageId, preached_date AS preachedDate, week_start_date AS weekStartDate, week_end_date AS weekEndDate,
+              title, passage, created_at AS createdAt, updated_at AS updatedAt
+       FROM bible_reading_weeks
+       WHERE church_id=?1 AND campus_id=?2
+         AND (?3 IS NULL OR week_start_date=?3)
+         AND (?3 IS NOT NULL OR (week_start_date<=?4 AND week_end_date>=?4))
+       ORDER BY week_start_date DESC
+       LIMIT 1`,
+    )
+    .bind(churchId, campusId, weekStartOverride, today)
+    .first()) as any;
+
+  if (!weekRow?.id) return json({ ok: true, week: null, items: [], progress: [], checkins: [], actor: { userId, role } });
+  const weekId = String(weekRow.id);
+
+  const items = (
+    (await env.churchcore
+      .prepare(
+        `SELECT id, day_date AS dayDate, kind, ref, label, notes_markdown AS notesMarkdown, created_at AS createdAt, updated_at AS updatedAt
+         FROM bible_reading_items
+         WHERE church_id=?1 AND week_id=?2
+         ORDER BY day_date ASC, kind ASC`,
+      )
+      .bind(churchId, weekId)
+      .all()).results ?? []
+  ) as any[];
+
+  const progress = (
+    (await env.churchcore
+      .prepare(
+        `SELECT item_id AS itemId, status, completed_at AS completedAt, notes_markdown AS notesMarkdown, updated_at AS updatedAt
+         FROM bible_reading_progress
+         WHERE church_id=?1 AND person_id=?2 AND item_id IN (SELECT id FROM bible_reading_items WHERE church_id=?1 AND week_id=?3)`,
+      )
+      .bind(churchId, personId, weekId)
+      .all()).results ?? []
+  ) as any[];
+
+  const checkins = (
+    (await env.churchcore
+      .prepare(
+        `SELECT id, day_date AS dayDate, guide_user_id AS guideUserId, message, created_at AS createdAt
+         FROM bible_reading_checkins
+         WHERE church_id=?1 AND week_id=?2 AND person_id=?3
+         ORDER BY created_at ASC`,
+      )
+      .bind(churchId, weekId, personId)
+      .all()).results ?? []
+  ) as any[];
+
+  return json({ ok: true, week: weekRow, items, progress, checkins, actor: { userId, role, personId, campusId } });
+}
+
+async function handleBiblePlanItemComplete(req: Request, env: Env) {
+  const parsed = BiblePlanItemCompleteSchema.safeParse(await parseJson(req));
+  if (!parsed.success) return json({ error: "Invalid body", issues: parsed.error.issues }, { status: 400 });
+  const { identity } = parsed.data;
+  const churchId = identity.tenant_id;
+  const userId = identity.user_id;
+  const role = (identity.role ?? "seeker") as string;
+  const itemId = parsed.data.item_id.trim();
+
+  const { personId } = await resolvePerson(env, identity);
+  if (!personId) return json({ ok: false, error: "No personId" }, { status: 400 });
+
+  const exists = (await env.churchcore.prepare(`SELECT 1 FROM bible_reading_items WHERE church_id=?1 AND id=?2`).bind(churchId, itemId).first()) as any;
+  if (!exists) return json({ ok: false, error: "Unknown item_id" }, { status: 404 });
+
+  const now = nowIso();
+  await env.churchcore
+    .prepare(
+      `INSERT INTO bible_reading_progress (church_id, person_id, item_id, status, completed_at, notes_markdown, updated_at)
+       VALUES (?1, ?2, ?3, 'completed', ?4, NULL, ?5)
+       ON CONFLICT(church_id, person_id, item_id) DO UPDATE SET
+         status='completed',
+         completed_at=excluded.completed_at,
+         updated_at=excluded.updated_at`,
+    )
+    .bind(churchId, personId, itemId, now, now)
+    .run();
+
+  return json({ ok: true, item_id: itemId, status: "completed", completed_at: now, actor: { userId, role, personId } });
+}
+
+async function handleBiblePlanCheckinCreate(req: Request, env: Env) {
+  const parsed = BiblePlanCheckinCreateSchema.safeParse(await parseJson(req));
+  if (!parsed.success) return json({ error: "Invalid body", issues: parsed.error.issues }, { status: 400 });
+  const { identity } = parsed.data;
+  const churchId = identity.tenant_id;
+  const userId = identity.user_id;
+  const role = (identity.role ?? "seeker") as string;
+
+  const roles = await getUserRoles(env, { churchId, userId });
+  const isGuide = String(role).toLowerCase() === "guide" || roles.has("staff");
+  if (!isGuide) return json({ ok: false, error: "Forbidden" }, { status: 403 });
+
+  const weekId = parsed.data.week_id.trim();
+  const personId = parsed.data.person_id.trim();
+  const dayDate = typeof parsed.data.day_date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(parsed.data.day_date.trim()) ? parsed.data.day_date.trim() : null;
+  const message = parsed.data.message.trim();
+
+  const weekExists = (await env.churchcore.prepare(`SELECT 1 FROM bible_reading_weeks WHERE church_id=?1 AND id=?2`).bind(churchId, weekId).first()) as any;
+  if (!weekExists) return json({ ok: false, error: "Unknown week_id" }, { status: 404 });
+
+  const id = crypto.randomUUID();
+  const now = nowIso();
+  await env.churchcore
+    .prepare(
+      `INSERT INTO bible_reading_checkins (id, church_id, week_id, person_id, guide_user_id, day_date, message, created_at)
+       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)`,
+    )
+    .bind(id, churchId, weekId, personId, userId, dayDate, message, now)
+    .run();
+
+  return json({ ok: true, id, week_id: weekId, person_id: personId, day_date: dayDate, message, created_at: now, actor: { userId, role } });
+}
+
 async function handleCommunityCatalogList(req: Request, env: Env) {
   const parsed = CommunityCatalogListSchema.safeParse(await parseJson(req));
   if (!parsed.success) return json({ error: "Invalid body", issues: parsed.error.issues }, { status: 400 });
@@ -3729,6 +3983,12 @@ export default {
         return handleSermonGet(req, env);
       case "/a2a/sermon.compare":
         return handleSermonCompare(req, env);
+      case "/a2a/bible.plan.week.get":
+        return handleBiblePlanWeekGet(req, env);
+      case "/a2a/bible.plan.item.complete":
+        return handleBiblePlanItemComplete(req, env);
+      case "/a2a/bible.plan.checkin.create":
+        return handleBiblePlanCheckinCreate(req, env);
       case "/a2a/community.catalog.list":
         return handleCommunityCatalogList(req, env);
       case "/a2a/community.my.list":

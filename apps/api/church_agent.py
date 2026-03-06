@@ -80,6 +80,23 @@ def _ui_handoff_for_user_text(user_text: str) -> list[dict[str, Any]]:
     u = (user_text or "").strip().lower()
     if not u:
         return []
+
+    planish = any(k in u for k in ["reading plan", "bible plan", "devotional plan", "this week's reading", "this weeks reading", "weekly plan"])
+    if planish:
+        return [
+            {
+                "type": "ui_tool",
+                "tool_id": "guide",
+                "title": "Guide",
+                "instructions": "Open the guide panel (includes this week’s sermon + Bible reading plan).",
+            },
+            {
+                "type": "ui_tool",
+                "tool_id": "bible_reader",
+                "title": "Bible",
+                "instructions": "Open the Bible reader (includes the reading plan section).",
+            },
+        ]
     checkinish = any(k in u for k in ["checkin", "check-in", "check in", "drop off", "pickup", "pick up"])
     if checkinish:
         return [
@@ -377,8 +394,30 @@ def _should_search_kb(user_text: str) -> bool:
     u = (user_text or "").strip().lower()
     if not u:
         return False
-    # KB search can be expensive. Only do it for Scripture/resources style queries.
-    return any(k in u for k in ["bible", "scripture", "verse", "passage", "john", "romans", "ephesians", "psalm", "proverbs", "matthew"])
+    # KB search can be expensive. Only do it for Scripture/resources + sermon/guide queries.
+    return any(
+        k in u
+        for k in [
+            "bible",
+            "scripture",
+            "verse",
+            "passage",
+            "reading plan",
+            "bible plan",
+            "devotional",
+            "sermon",
+            "message",
+            "discussion guide",
+            "leader guide",
+            "study questions",
+            "john",
+            "romans",
+            "ephesians",
+            "psalm",
+            "proverbs",
+            "matthew",
+        ]
+    )
 
 
 def _should_propose_memory_ops(user_text: str) -> bool:
@@ -672,6 +711,59 @@ def _identity_contact_context_from_args(args: dict[str, Any]) -> str:
     if isinstance(phone, str) and phone.strip():
         bits.append(f"phone={phone.strip()}")
     return "; ".join(bits).strip()
+
+
+def _weekly_context_from_args(args: dict[str, Any]) -> tuple[dict[str, Any] | None, str]:
+    """
+    A2A gateway may inject week-scoped sermon + plan data into args.__context.weekly.
+    Treat as a read-only snapshot to ground Bible-study style answers.
+    """
+    ctx = args.get("__context")
+    if not isinstance(ctx, dict):
+        return None, ""
+    weekly = ctx.get("weekly")
+    if not isinstance(weekly, dict):
+        return None, ""
+
+    plan = weekly.get("plan") if isinstance(weekly.get("plan"), dict) else {}
+    week = plan.get("week") if isinstance(plan.get("week"), dict) else {}
+    sermon = weekly.get("sermon") if isinstance(weekly.get("sermon"), dict) else {}
+    today = str(weekly.get("today") or "").strip()
+
+    title = str(sermon.get("title") or week.get("title") or "").strip()
+    passage = str(sermon.get("passage") or week.get("passage") or "").strip()
+    week_start = str(week.get("weekStartDate") or "").strip()
+    week_end = str(week.get("weekEndDate") or "").strip()
+
+    today_items = plan.get("today_items") if isinstance(plan.get("today_items"), list) else []
+    today_lines: list[str] = []
+    for it in today_items[:4]:
+        if not isinstance(it, dict):
+            continue
+        lab = str(it.get("label") or "").strip()
+        ref = str(it.get("ref") or "").strip()
+        done = bool(it.get("completed"))
+        if lab or ref:
+            today_lines.append(f"- {'[done] ' if done else ''}{lab or 'Reading'}{(' — ' + ref) if ref else ''}".strip())
+
+    guide_discussion_url = str(sermon.get("guideDiscussionUrl") or "").strip()
+    guide_leader_url = str(sermon.get("guideLeaderUrl") or "").strip()
+
+    bits: list[str] = []
+    if week_start or week_end:
+        bits.append(f"Week: {week_start or '?'} → {week_end or '?'}")
+    if title or passage:
+        bits.append(f"Sermon: {title or 'This week'}{(' (' + passage + ')') if passage else ''}")
+    if today:
+        bits.append(f"Today: {today}")
+    if today_lines:
+        bits.append("Today's plan items:\n" + "\n".join(today_lines))
+    if guide_discussion_url or guide_leader_url:
+        bits.append(
+            "Guides:\n"
+            + ("\n".join([f"- Discussion: {guide_discussion_url}" if guide_discussion_url else "", f"- Leader: {guide_leader_url}" if guide_leader_url else ""]).strip())
+        )
+    return weekly, ("\n".join([b for b in bits if b.strip()])).strip()
 
 
 def _now_iso() -> str:
@@ -1129,6 +1221,7 @@ async def handle_seeker_skill(
         hh_summary = _household_context_from_args(args)
         journey, journey_summary = _journey_context_from_args(args)
         identity_contact_summary = _identity_contact_context_from_args(args)
+        weekly, weekly_summary = _weekly_context_from_args(args)
 
         # Deterministic: if the user asks for weather, use weather MCP directly.
         u = user.lower()
@@ -1186,7 +1279,15 @@ async def handle_seeker_skill(
             try:
                 kb_ttl = int(float(os.environ.get("KB_INDEX_TTL_SECONDS", "300") or "300"))
                 kb_index = await ensure_index_with_mcp(church_id=session.churchId, ttl_seconds=max(30, kb_ttl))
-                kb_text, kb_hits = search_kb(kb_index, user, k=4) if user and kb_index else ("", [])
+                boosted_query = user
+                try:
+                    week = (weekly or {}).get("plan", {}).get("week", {}) if isinstance((weekly or {}).get("plan"), dict) else {}
+                    week_start = str(week.get("weekStartDate") or "").strip()
+                    if week_start:
+                        boosted_query = f"{session.campusId} {week_start} {user}".strip()
+                except Exception:
+                    boosted_query = user
+                kb_text, kb_hits = search_kb(kb_index, boosted_query, k=4) if user and kb_index else ("", [])
             except Exception:
                 kb_text, kb_hits = ("", [])
 
@@ -1194,6 +1295,8 @@ async def handle_seeker_skill(
             "You are Church Agent in seeker role. Help the person explore faith and take next steps.\n"
             "Do not invent service times, events, groups, or volunteer opportunities. Use ONLY the provided church data excerpt.\n"
             "Always be warm, concise, and propose 1-3 next actions.\n\n"
+            "If week-scoped sermon/plan context is provided, prefer it for: verse-of-the-day, Bible study prompts, and discussion questions.\n"
+            "When the user says 'this week', interpret it as the provided weekly context.\n\n"
             "Client UI tools available (use handoff items when helpful):\n"
             "- church_overview: show church overview (logo, campuses, service times).\n"
             "- strategic_intent: show purpose/vision/mission/strategy (church strategic intent).\n"
@@ -1212,6 +1315,7 @@ async def handle_seeker_skill(
             'If a UI tool should open, include a handoff item like: {"type":"ui_tool","tool_id":"identity_contact"}.\n\n'
             + (("Identity/contact context (authoritative):\n" + identity_contact_summary + "\n\n") if identity_contact_summary else "")
             + (("Faith journey context:\n" + journey_summary + "\n\n") if journey_summary else "")
+            + (("This week context:\n" + weekly_summary + "\n\n") if weekly_summary else "")
             + (("Known person memory (shared across topics):\n" + mem_summary + "\n\n") if mem_summary else "")
             + (("Household context:\n" + hh_summary + "\n\n") if hh_summary else "")
             + (("Authoritative church data excerpt:\n" + church_context + "\n\n") if church_context else "")

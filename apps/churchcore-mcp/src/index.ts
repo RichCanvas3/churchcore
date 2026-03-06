@@ -2357,6 +2357,28 @@ function normalizePassageKey(passage: string | null | undefined) {
     .replace(/[^A-Z0-9:;,\-]/g, "");
 }
 
+function addDaysDate(isoDate: string, days: number) {
+  const s = String(isoDate || "").trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return null;
+  const d = new Date(`${s}T00:00:00.000Z`);
+  if (Number.isNaN(d.getTime())) return null;
+  d.setUTCDate(d.getUTCDate() + (Number.isFinite(days) ? days : 0));
+  return d.toISOString().slice(0, 10);
+}
+
+// Given a preached_date (YYYY-MM-DD), return the next Monday (strictly after).
+function nextMondayDate(preachedDate: string) {
+  const s = String(preachedDate || "").trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return null;
+  const d = new Date(`${s}T00:00:00.000Z`);
+  if (Number.isNaN(d.getTime())) return null;
+  const day = d.getUTCDay(); // 0=Sun..6=Sat
+  let delta = (1 - day + 7) % 7; // days until Monday
+  if (delta === 0) delta = 7; // strictly after
+  d.setUTCDate(d.getUTCDate() + delta);
+  return d.toISOString().slice(0, 10);
+}
+
 function extractLinksFromHtml(html: string, baseUrl: string) {
   const out: string[] = [];
   const raw = String(html || "");
@@ -2464,6 +2486,160 @@ async function upsertWeeklyGuide(
     .run();
 }
 
+async function upsertWeeklyGuideDoc(
+  env: Env,
+  args: {
+    churchId: string;
+    seriesSlug: string;
+    weekNumber: number;
+    kind: "discussion" | "leader";
+    weekStartDate: string | null;
+    title: string;
+    bodyMarkdown: string;
+    now: string;
+  },
+) {
+  const entityId = `guide:${args.seriesSlug}:${args.weekNumber}:${args.kind}${args.weekStartDate ? `:${args.weekStartDate}` : ""}`;
+  const docId = `wg_${(await sha256Hex(entityId)).slice(0, 24)}`;
+  await env.churchcore
+    .prepare(
+      `INSERT INTO content_docs (id, church_id, entity_type, entity_id, locale, title, body_markdown, created_at, updated_at)
+       VALUES (?1, ?2, 'weekly_guide', ?3, 'en', ?4, ?5, ?6, ?7)
+       ON CONFLICT(id) DO UPDATE SET
+         church_id=excluded.church_id,
+         entity_type=excluded.entity_type,
+         entity_id=excluded.entity_id,
+         locale=excluded.locale,
+         title=excluded.title,
+         body_markdown=excluded.body_markdown,
+         updated_at=excluded.updated_at`,
+    )
+    .bind(docId, args.churchId, entityId, args.title, args.bodyMarkdown, args.now, args.now)
+    .run();
+  return { docId, sourceId: `content/weekly_guide/${args.seriesSlug}/${args.weekNumber}/${args.kind}/${args.weekStartDate ?? "unknown"}/en#${docId}` };
+}
+
+async function extractPdfText(buf: ArrayBuffer) {
+  // Lazy import to keep startup light.
+  const pdfjs: any = await import("pdfjs-dist/legacy/build/pdf.mjs");
+  const data = new Uint8Array(buf);
+  const task = pdfjs.getDocument({ data, disableWorker: true });
+  const pdf = await task.promise;
+  const parts: string[] = [];
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page = await pdf.getPage(i);
+    const content = await page.getTextContent();
+    const line = (content?.items ?? [])
+      .map((it: any) => (typeof it?.str === "string" ? it.str : ""))
+      .join(" ")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (line) parts.push(line);
+  }
+  return parts.join("\n").trim();
+}
+
+async function fetchGuideAsMarkdown(env: Env, url: string) {
+  const res = await fetch(url, { redirect: "follow", headers: { "user-agent": "churchcore-mcp-crawler/0.1" } });
+  if (!res.ok) throw new Error(`guide_fetch_failed:${res.status}`);
+  const ct = (res.headers.get("content-type") ?? "").toLowerCase();
+  const finalUrl = res.url || url;
+  const isPdf = ct.includes("application/pdf") || /\.pdf(\?|$)/i.test(finalUrl);
+  if (isPdf) {
+    const buf = await res.arrayBuffer();
+    const text = await extractPdfText(buf);
+    return { kind: "pdf" as const, finalUrl, text: text || "" };
+  }
+  const html = await res.text();
+  const text = stripHtmlToText(html);
+  return { kind: "html" as const, finalUrl, text: text || "" };
+}
+
+async function ingestWeeklyGuidesToKb(env: Env, args: { churchId: string; now: string; limit: number }) {
+  const rows =
+    (
+      await env.churchcore
+        .prepare(
+          `SELECT series_slug AS seriesSlug, week_number AS weekNumber, passage, discussion_url AS discussionUrl, leader_url AS leaderUrl
+           FROM weekly_guides
+           WHERE church_id=?1
+           ORDER BY updated_at DESC
+           LIMIT ${args.limit}`,
+        )
+        .bind(args.churchId)
+        .all()
+    ).results ?? [];
+
+  for (const r of rows as any[]) {
+    const seriesSlug = String(r?.seriesSlug ?? "").trim();
+    const weekNumber = Number(r?.weekNumber ?? 0);
+    if (!seriesSlug || !Number.isFinite(weekNumber) || weekNumber <= 0) continue;
+
+    const matchRow = (await env.churchcore
+      .prepare(
+        `SELECT week_start_date AS weekStartDate
+         FROM campus_messages
+         WHERE church_id=?1 AND guide_series_slug=?2 AND guide_week_number=?3 AND week_start_date IS NOT NULL
+         ORDER BY preached_at DESC, updated_at DESC
+         LIMIT 1`,
+      )
+      .bind(args.churchId, seriesSlug, weekNumber)
+      .first()) as any;
+    const weekStartDate = typeof matchRow?.weekStartDate === "string" && matchRow.weekStartDate.trim() ? String(matchRow.weekStartDate).trim() : null;
+
+    const baseHeader = [
+      `Series: ${seriesSlug}`,
+      `Week: ${weekNumber}`,
+      weekStartDate ? `Week start: ${weekStartDate}` : null,
+      r?.passage ? `Passage: ${String(r.passage)}` : null,
+    ]
+      .filter(Boolean)
+      .join("\n");
+
+    const discussionUrl = typeof r?.discussionUrl === "string" ? String(r.discussionUrl).trim() : "";
+    if (discussionUrl) {
+      try {
+        const fetched = await fetchGuideAsMarkdown(env, discussionUrl);
+        const md = `${baseHeader}\n\nSource: ${fetched.finalUrl}\n\n## Discussion Guide\n\n${fetched.text}`;
+        const doc = await upsertWeeklyGuideDoc(env, {
+          churchId: args.churchId,
+          seriesSlug,
+          weekNumber,
+          kind: "discussion",
+          weekStartDate,
+          title: `Discussion Guide — ${seriesSlug} Week ${weekNumber}`,
+          bodyMarkdown: md,
+          now: args.now,
+        });
+        await refreshKbForSource(env, { churchId: args.churchId, sourceId: doc.sourceId, docId: doc.docId, text: md, now: args.now });
+      } catch {
+        // best effort
+      }
+    }
+
+    const leaderUrl = typeof r?.leaderUrl === "string" ? String(r.leaderUrl).trim() : "";
+    if (leaderUrl) {
+      try {
+        const fetched = await fetchGuideAsMarkdown(env, leaderUrl);
+        const md = `${baseHeader}\n\nSource: ${fetched.finalUrl}\n\n## Leader Guide\n\n${fetched.text}`;
+        const doc = await upsertWeeklyGuideDoc(env, {
+          churchId: args.churchId,
+          seriesSlug,
+          weekNumber,
+          kind: "leader",
+          weekStartDate,
+          title: `Leader Guide — ${seriesSlug} Week ${weekNumber}`,
+          bodyMarkdown: md,
+          now: args.now,
+        });
+        await refreshKbForSource(env, { churchId: args.churchId, sourceId: doc.sourceId, docId: doc.docId, text: md, now: args.now });
+      } catch {
+        // best effort
+      }
+    }
+  }
+}
+
 async function upsertCampusMessage(
   env: Env,
   args: {
@@ -2486,19 +2662,22 @@ async function upsertCampusMessage(
   },
 ) {
   const passageKey = normalizePassageKey(args.passage);
+  const preachedDate = args.preachedAt ? String(args.preachedAt).slice(0, 10) : null;
+  const weekStartDate = preachedDate ? nextMondayDate(preachedDate) : null;
+  const weekEndDate = weekStartDate ? addDaysDate(weekStartDate, 6) : null;
   await env.churchcore
     .prepare(
       `INSERT INTO campus_messages (
-         id, church_id, campus_id, title, speaker, preached_at, passage, passage_key,
+         id, church_id, campus_id, title, speaker, preached_at, preached_date, week_start_date, week_end_date, passage, passage_key,
          series_title, series_id, campus_feed_id, source_url, watch_url, listen_url, download_url,
          guide_series_slug, guide_week_number, guide_discussion_url, guide_leader_url,
          created_at, updated_at
        )
        VALUES (
-         ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8,
-         ?9, ?10, ?11, ?12, ?13, ?14, ?15,
-         ?16, ?17, ?18, ?19,
-         ?20, ?21
+         ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11,
+         ?12, ?13, ?14, ?15, ?16, ?17, ?18,
+         ?19, ?20, ?21, ?22,
+         ?23, ?24
        )
        ON CONFLICT(id) DO UPDATE SET
          church_id=excluded.church_id,
@@ -2506,6 +2685,9 @@ async function upsertCampusMessage(
          title=excluded.title,
          speaker=excluded.speaker,
          preached_at=excluded.preached_at,
+         preached_date=excluded.preached_date,
+         week_start_date=excluded.week_start_date,
+         week_end_date=excluded.week_end_date,
          passage=excluded.passage,
          passage_key=excluded.passage_key,
          series_title=excluded.series_title,
@@ -2528,6 +2710,9 @@ async function upsertCampusMessage(
       args.title,
       args.speaker,
       args.preachedAt,
+      preachedDate,
+      weekStartDate,
+      weekEndDate,
       args.passage,
       passageKey,
       args.seriesTitle,
@@ -3410,6 +3595,240 @@ async function crawlBatch(env: Env, args: { churchId: string; urls: string[]; al
   return { changedDocs, discoveredUrls: [...new Set(discovered)].filter(Boolean) };
 }
 
+function parseBookChapterRef(passage: string | null) {
+  const p = String(passage ?? "").trim();
+  if (!p) return null;
+  // e.g. "John 14:1-14" -> "John 14"
+  const m = p.match(/^((?:[1-3]\s*)?[A-Za-z]+(?:\s+[A-Za-z]+)*)\s+(\d{1,3})\s*:/);
+  if (!m) return null;
+  const book = String(m[1]).trim().replace(/\s+/g, " ");
+  const ch = String(m[2]).trim();
+  return `${book} ${ch}`;
+}
+
+async function upsertBibleReadingWeek(
+  env: Env,
+  args: {
+    churchId: string;
+    campusId: string;
+    anchorMessageId: string;
+    preachedDate: string;
+    weekStartDate: string;
+    weekEndDate: string;
+    title: string | null;
+    passage: string | null;
+    now: string;
+  },
+) {
+  const id = `brw_${(await sha256Hex(`${args.churchId}:${args.campusId}:${args.weekStartDate}`)).slice(0, 24)}`;
+  await env.churchcore
+    .prepare(
+      `INSERT INTO bible_reading_weeks (id, church_id, campus_id, anchor_message_id, preached_date, week_start_date, week_end_date, title, passage, created_at, updated_at)
+       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
+       ON CONFLICT(church_id, campus_id, week_start_date) DO UPDATE SET
+         anchor_message_id=excluded.anchor_message_id,
+         preached_date=excluded.preached_date,
+         week_end_date=excluded.week_end_date,
+         title=excluded.title,
+         passage=excluded.passage,
+         updated_at=excluded.updated_at`,
+    )
+    .bind(id, args.churchId, args.campusId, args.anchorMessageId, args.preachedDate, args.weekStartDate, args.weekEndDate, args.title, args.passage, args.now, args.now)
+    .run();
+  return id;
+}
+
+async function upsertBibleReadingItem(
+  env: Env,
+  args: {
+    churchId: string;
+    weekId: string;
+    dayDate: string;
+    kind: "reading" | "daily_verse" | "reflection";
+    ref: string | null;
+    label: string;
+    notesMarkdown: string | null;
+    now: string;
+  },
+) {
+  const refKey = (args.ref ?? "").trim().toLowerCase();
+  const id = `bri_${(await sha256Hex(`${args.churchId}:${args.weekId}:${args.dayDate}:${args.kind}:${refKey || "none"}`)).slice(0, 24)}`;
+  await env.churchcore
+    .prepare(
+      `INSERT INTO bible_reading_items (id, church_id, week_id, day_date, kind, ref, label, notes_markdown, created_at, updated_at)
+       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
+       ON CONFLICT(id) DO UPDATE SET
+         label=excluded.label,
+         ref=excluded.ref,
+         notes_markdown=excluded.notes_markdown,
+         updated_at=excluded.updated_at`,
+    )
+    .bind(id, args.churchId, args.weekId, args.dayDate, args.kind, args.ref ?? null, args.label, args.notesMarkdown ?? null, args.now, args.now)
+    .run();
+  return id;
+}
+
+async function generateBibleReadingPlanForCampus(env: Env, args: { churchId: string; campusId: string; now: string }) {
+  const row = (await env.churchcore
+    .prepare(
+      `SELECT m.id AS messageId, m.title, m.passage, m.preached_at AS preachedAt, m.preached_date AS preachedDate, m.week_start_date AS weekStartDate, m.week_end_date AS weekEndDate,
+              m.guide_discussion_url AS guideDiscussionUrl, m.guide_leader_url AS guideLeaderUrl,
+              a.verses_json AS versesJson
+       FROM campus_messages m
+       LEFT JOIN campus_message_analysis a ON a.message_id = m.id
+       WHERE m.church_id=?1 AND m.campus_id=?2 AND m.preached_at IS NOT NULL
+       ORDER BY m.preached_at DESC, m.updated_at DESC
+       LIMIT 1`,
+    )
+    .bind(args.churchId, args.campusId)
+    .first()) as any;
+  if (!row?.messageId) return { ok: false, reason: "no_sermon" as const };
+
+  const preachedDate = (typeof row.preachedDate === "string" && row.preachedDate.trim()) || (typeof row.preachedAt === "string" ? String(row.preachedAt).slice(0, 10) : "");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(preachedDate)) return { ok: false, reason: "missing_preached_date" as const };
+  const weekStartDate = (typeof row.weekStartDate === "string" && row.weekStartDate.trim()) || nextMondayDate(preachedDate);
+  if (!weekStartDate) return { ok: false, reason: "missing_week_start" as const };
+  const weekEndDate = (typeof row.weekEndDate === "string" && row.weekEndDate.trim()) || addDaysDate(weekStartDate, 6);
+  if (!weekEndDate) return { ok: false, reason: "missing_week_end" as const };
+
+  const title = typeof row.title === "string" ? row.title : null;
+  const passage = typeof row.passage === "string" ? row.passage : null;
+  const chapterRef = parseBookChapterRef(passage) ?? passage;
+
+  let verses: string[] = [];
+  try {
+    const raw = typeof row.versesJson === "string" ? JSON.parse(row.versesJson) : null;
+    if (Array.isArray(raw)) verses = raw.map((v: any) => String(v)).map((s) => s.trim()).filter(Boolean);
+  } catch {
+    verses = [];
+  }
+  const dedup = new Set<string>();
+  const versesClean: string[] = [];
+  for (const v of verses) {
+    const k = v.toLowerCase();
+    if (dedup.has(k)) continue;
+    if (passage && k === passage.toLowerCase()) continue;
+    dedup.add(k);
+    versesClean.push(v);
+    if (versesClean.length >= 5) break;
+  }
+
+  const weekId = await upsertBibleReadingWeek(env, {
+    churchId: args.churchId,
+    campusId: args.campusId,
+    anchorMessageId: String(row.messageId),
+    preachedDate,
+    weekStartDate,
+    weekEndDate,
+    title,
+    passage,
+    now: args.now,
+  });
+
+  const guideDiscussionUrl = typeof row.guideDiscussionUrl === "string" ? row.guideDiscussionUrl.trim() : "";
+  const guideLeaderUrl = typeof row.guideLeaderUrl === "string" ? row.guideLeaderUrl.trim() : "";
+
+  const day = (n: number) => addDaysDate(weekStartDate, n) as string;
+  await upsertBibleReadingItem(env, {
+    churchId: args.churchId,
+    weekId,
+    dayDate: day(0),
+    kind: "reading",
+    ref: passage,
+    label: "Day 1: Re-read Sunday's passage",
+    notesMarkdown: "Ask: What does this show me about Jesus? What response is Jesus inviting?",
+    now: args.now,
+  });
+  await upsertBibleReadingItem(env, {
+    churchId: args.churchId,
+    weekId,
+    dayDate: day(1),
+    kind: "reading",
+    ref: chapterRef,
+    label: "Day 2: Read the surrounding chapter",
+    notesMarkdown: "Note repeated words, commands, and promises. Write one takeaway.",
+    now: args.now,
+  });
+  const v1 = versesClean[0] ?? passage;
+  const v2 = versesClean[1] ?? versesClean[0] ?? null;
+  const v3 = versesClean[2] ?? versesClean[1] ?? null;
+  await upsertBibleReadingItem(env, {
+    churchId: args.churchId,
+    weekId,
+    dayDate: day(2),
+    kind: "daily_verse",
+    ref: v1,
+    label: "Day 3: Verse of the day",
+    notesMarkdown: "Memorize or rewrite in your own words. Pray it back to God.",
+    now: args.now,
+  });
+  if (v2) {
+    await upsertBibleReadingItem(env, {
+      churchId: args.churchId,
+      weekId,
+      dayDate: day(3),
+      kind: "daily_verse",
+      ref: v2,
+      label: "Day 4: Verse of the day",
+      notesMarkdown: "What difference would believing this make today?",
+      now: args.now,
+    });
+  }
+  if (v3) {
+    await upsertBibleReadingItem(env, {
+      churchId: args.churchId,
+      weekId,
+      dayDate: day(4),
+      kind: "daily_verse",
+      ref: v3,
+      label: "Day 5: Verse of the day",
+      notesMarkdown: "Share one line with your guide or a friend.",
+      now: args.now,
+    });
+  }
+  await upsertBibleReadingItem(env, {
+    churchId: args.churchId,
+    weekId,
+    dayDate: day(5),
+    kind: "reflection",
+    ref: "Psalm 23",
+    label: "Day 6: Prayer day",
+    notesMarkdown: "Pray slowly. Where do you need God's comfort this week?",
+    now: args.now,
+  });
+  const guideLinks = [
+    guideDiscussionUrl ? `Discussion guide: ${guideDiscussionUrl}` : null,
+    guideLeaderUrl ? `Leader guide: ${guideLeaderUrl}` : null,
+  ]
+    .filter(Boolean)
+    .join("\n");
+  await upsertBibleReadingItem(env, {
+    churchId: args.churchId,
+    weekId,
+    dayDate: day(6),
+    kind: "reflection",
+    ref: passage,
+    label: "Day 7: Recap + discussion",
+    notesMarkdown: ["Review the sermon and write one next step.", guideLinks || null].filter(Boolean).join("\n\n"),
+    now: args.now,
+  });
+
+  return { ok: true, weekId, weekStartDate, anchorMessageId: String(row.messageId) };
+}
+
+async function generateBibleReadingPlans(env: Env, args: { churchId: string; now: string }) {
+  const campuses = ["campus_boulder", "campus_erie", "campus_thornton"];
+  const out: any[] = [];
+  for (const campusId of campuses) {
+    try {
+      out.push(await generateBibleReadingPlanForCampus(env, { churchId: args.churchId, campusId, now: args.now }));
+    } catch (e: any) {
+      out.push({ ok: false, campusId, error: String(e?.message ?? e ?? "plan_failed") });
+    }
+  }
+  return out;
+}
+
 async function discoverDailyUrls(env: Env, args: { allowDomains: string[]; budget: number }) {
   const out: string[] = [];
   const root = "https://calvarybible.com/sitemap.xml";
@@ -3477,14 +3896,26 @@ async function runScheduledCrawl(env: Env, cron: string, opts?: { forceMessages?
     ? await crawlBatch(env, { churchId, urls: messageUrls, allowDomains, now, forceMessages: opts?.forceMessages })
     : { changedDocs: [], discoveredUrls: [] as string[] };
   const changedDocs = [...first.changedDocs, ...second.changedDocs];
-  if (!changedDocs.length) return { ok: true, changed: 0, urls: seedUrls.length + messageUrls.length };
 
   // KB refresh for changed pages only.
   for (const d of changedDocs) {
     await refreshKbForSource(env, { churchId, sourceId: d.sourceId, docId: d.docId, text: d.bodyMarkdown, now });
   }
 
-  await auditAppend(env, { churchId, actorUserId: null, action: "web.crawl.scheduled", entityType: "web_crawl_pages", entityId: null, payload: { cron, budget, changed: changedDocs.length } });
+  // Generate/update weekly Bible reading plans anchored to the latest sermon per campus.
+  await generateBibleReadingPlans(env, { churchId, now });
+
+  // Best-effort: ingest weekly discussion/leader guides into KB for grounding.
+  await ingestWeeklyGuidesToKb(env, { churchId, now, limit: 12 });
+
+  await auditAppend(env, {
+    churchId,
+    actorUserId: null,
+    action: "web.crawl.scheduled",
+    entityType: "web_crawl_pages",
+    entityId: null,
+    payload: { cron, budget, changed: changedDocs.length, urls: seedUrls.length + messageUrls.length },
+  });
   return { ok: true, changed: changedDocs.length, urls: seedUrls.length + messageUrls.length };
 }
 

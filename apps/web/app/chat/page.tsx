@@ -1142,7 +1142,7 @@ export default function ChatPage() {
                   persona_id: (identity as any).persona_id ?? null,
                 }}
                 onClose={closeTool}
-                onOpenTool={(toolId: string) => openTool(toolId)}
+                onOpenTool={(toolId: string, args?: any) => openTool(toolId, args ?? null)}
               />
             ) : activeUiToolId === "church_overview" ? (
               <ChurchOverviewPanel
