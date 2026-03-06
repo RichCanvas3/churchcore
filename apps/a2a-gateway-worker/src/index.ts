@@ -10,10 +10,46 @@ type Env = {
   SENDGRID_MCP_API_KEY?: string;
   OPENAI_API_KEY?: string;
   OPENAI_TRANSCRIBE_MODEL?: string;
+  GLOO_CLIENT_ID?: string;
+  GLOO_CLIENT_SECRET?: string;
+  GLOO_BASE_URL?: string; // default https://platform.ai.gloo.com/ai/v2
+  GLOO_RAG_PUBLISHER?: string;
 };
 
 function nowIso() {
   return new Date().toISOString();
+}
+
+type GlooTokenCache = { accessToken: string; expiresAtMs: number };
+let glooTokenCache: GlooTokenCache | null = null;
+
+async function getGlooAccessToken(env: Env): Promise<string> {
+  const clientId = (env.GLOO_CLIENT_ID ?? "").trim();
+  const clientSecret = (env.GLOO_CLIENT_SECRET ?? "").trim();
+  if (!clientId || !clientSecret) throw new Error("Missing GLOO_CLIENT_ID / GLOO_CLIENT_SECRET");
+
+  const now = Date.now();
+  if (glooTokenCache && glooTokenCache.expiresAtMs - now > 60_000) return glooTokenCache.accessToken;
+
+  const auth = btoa(`${clientId}:${clientSecret}`);
+  const body = `grant_type=client_credentials&scope=${encodeURIComponent("api/access")}`;
+  const res = await fetch("https://platform.ai.gloo.com/oauth2/token", {
+    method: "POST",
+    headers: {
+      authorization: `Basic ${auth}`,
+      "content-type": "application/x-www-form-urlencoded",
+      accept: "application/json",
+    },
+    body,
+  });
+  const raw = await res.text().catch(() => "");
+  if (!res.ok) throw new Error(`Gloo token error (${res.status}): ${raw || "no body"}`);
+  const j = safeJsonParse(raw) as any;
+  const token = typeof j?.access_token === "string" ? j.access_token : "";
+  const expiresIn = typeof j?.expires_in === "number" ? j.expires_in : Number(j?.expires_in ?? 3600);
+  if (!token) throw new Error("Gloo token response missing access_token");
+  glooTokenCache = { accessToken: token, expiresAtMs: now + Math.max(300, expiresIn) * 1000 };
+  return token;
 }
 
 function normalizePhone(input: string) {
@@ -1447,6 +1483,12 @@ const ChatSchema = z.object({
   args: z.record(z.string(), z.unknown()).optional().nullable(),
 });
 
+const ChatGlooSchema = ChatSchema.extend({
+  mode: z.enum(["general", "grounded", "auto"]).optional().nullable(),
+  sources_limit: z.number().int().min(1).max(25).optional().nullable(),
+  rag_publisher: z.string().min(1).optional().nullable(),
+});
+
 // Households + check-in
 const HouseholdIdentifySchema = z.object({
   identity: IdentitySchema,
@@ -1848,6 +1890,7 @@ async function handleThreadAppend(req: Request, env: Env) {
 function defaultTopicTemplates() {
   // Tools: guide, faith_journey, community_manager, calendar, bible_reader, weekly_sermons, etc.
   return [
+    { slug: "ask_our_church", title: "Ask our church", description: "Answers grounded in our church content (beliefs, sermons, policies).", toolIds: ["guide", "weekly_sermons"] },
     { slug: "faith_journey", title: "Faith journey", description: "Track where you are and next steps (baptism, groups, serving).", toolIds: ["faith_journey", "guide", "bible_reader"] },
     { slug: "your_community", title: "Find your community", description: "Explore groups, classes, outreach, and ways to connect.", toolIds: ["community_manager", "calendar", "guide"] },
     { slug: "home_group", title: "Find a home group", description: "Help me find and join a small group that fits.", toolIds: ["community_manager", "guide", "calendar"] },
@@ -1955,6 +1998,194 @@ async function runAgentStream(env: Env, args: { threadId: string; inputPayload: 
   if (!res.ok || !res.body) {
     const raw = await res.text().catch(() => "");
     throw new Error(`LangGraph stream error (${res.status}): ${raw || "no body"}`);
+  }
+  return res;
+}
+
+type GlooChatMode = "general" | "grounded" | "auto";
+type GlooMsg = { role: "system" | "user" | "assistant"; content: string };
+
+async function loadThreadMessagesForGloo(env: Env, args: { churchId: string; threadId: string; limit?: number }) {
+  const limit = Math.max(1, Math.min(400, args.limit ?? 200));
+  const rows =
+    (
+      await env.churchcore
+        .prepare(
+          `SELECT sender_type AS senderType, content
+           FROM chat_messages
+           WHERE church_id=?1 AND thread_id=?2
+           ORDER BY created_at ASC
+           LIMIT ${limit}`,
+        )
+        .bind(args.churchId, args.threadId)
+        .all()
+    ).results ?? [];
+
+  const msgs: GlooMsg[] = [];
+  for (const r of rows as any[]) {
+    const sender = String(r?.senderType ?? "").toLowerCase();
+    const content = typeof r?.content === "string" ? String(r.content) : "";
+    if (!content.trim()) continue;
+    if (sender === "assistant") msgs.push({ role: "assistant", content });
+    else if (sender === "user") msgs.push({ role: "user", content });
+    else continue;
+  }
+  return msgs;
+}
+
+function compactJson(value: unknown, maxChars: number) {
+  try {
+    const s = JSON.stringify(value ?? null);
+    if (s.length <= maxChars) return s;
+    return `${s.slice(0, Math.max(0, maxChars - 3))}...`;
+  } catch {
+    return "";
+  }
+}
+
+async function getKbExcerptForQuery(env: Env, args: { churchId: string; query: string; limit?: number }) {
+  const q = String(args.query ?? "").trim();
+  if (!q) return "";
+  const terms = q
+    .split(/\s+/g)
+    .map((t) => t.trim())
+    .filter((t) => t.length >= 4)
+    .slice(0, 6);
+  if (!terms.length) return "";
+  const limit = Math.max(1, Math.min(6, args.limit ?? 3));
+
+  const patterns = terms.map((t) => `%${t.toLowerCase()}%`);
+  const clauses = patterns.map((_, i) => `LOWER(text) LIKE ?${i + 2}`).join(" OR ");
+  const binds = [args.churchId, ...patterns];
+
+  const rows =
+    (
+      await env.churchcore
+        .prepare(
+          `SELECT source_id AS sourceId, text, updated_at AS updatedAt
+           FROM kb_chunks
+           WHERE church_id=?1 AND (${clauses})
+           ORDER BY updated_at DESC
+           LIMIT ${limit}`,
+        )
+        .bind(...(binds as any))
+        .all()
+    ).results ?? [];
+
+  const parts: string[] = [];
+  for (const r of rows as any[]) {
+    const sourceId = typeof r?.sourceId === "string" ? r.sourceId : "unknown_source";
+    const text = typeof r?.text === "string" ? r.text : "";
+    if (!text.trim()) continue;
+    parts.push(`- source: ${sourceId}\n${text.trim().slice(0, 900)}`);
+  }
+  return parts.join("\n\n");
+}
+
+function buildGlooSystemPrompt(args: {
+  role: string;
+  identityContact: any;
+  journey: any;
+  weekly: any;
+  kbExcerpt: string;
+}) {
+  const role = String(args.role || "seeker");
+  const kb = String(args.kbExcerpt || "").trim();
+  const weeklyCompact = compactJson(args.weekly, 3500);
+  const journeyCompact = compactJson(args.journey, 2200);
+  const contactCompact = compactJson(args.identityContact, 800);
+
+  return [
+    `You are the ChurchCore assistant for a local evangelical church.`,
+    ``,
+    `## Guardrails`,
+    `- Be honest about what you know; do not invent church facts, policies, times, or staff names.`,
+    `- Distinguish biblical counsel (general) from this church's policies (specific). If unsure about church policy, ask a clarifying question or suggest where to confirm.`,
+    `- If the user expresses self-harm, abuse, or imminent danger, urge immediate local help (call emergency services / a trusted person) and offer to connect to church pastoral care.`,
+    ``,
+    `## Tradition`,
+    `- tradition: evangelical`,
+    ``,
+    `## ChurchCore context (may be partial)`,
+    `identity_contact: ${contactCompact || "{}"}`,
+    `journey: ${journeyCompact || "{}"}`,
+    `weekly: ${weeklyCompact || "null"}`,
+    kb ? `` : "",
+    kb ? `## ChurchCore KB excerpt (unverified; cite softly)` : "",
+    kb ? kb : "",
+    ``,
+    `## Output`,
+    `- Respond concisely, with warmth and clarity.`,
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+async function runGlooCompletion(env: Env, args: {
+  mode: GlooChatMode;
+  messages: GlooMsg[];
+  sourcesLimit?: number | null;
+  ragPublisher?: string | null;
+}) {
+  const token = await getGlooAccessToken(env);
+  const base = ((env.GLOO_BASE_URL ?? "https://platform.ai.gloo.com/ai/v2").trim() || "https://platform.ai.gloo.com/ai/v2").replace(/\/$/, "");
+  const mode = (args.mode ?? "grounded") as GlooChatMode;
+  const url = mode === "general" ? `${base}/chat/completions` : `${base}/chat/completions/grounded`;
+
+  const body: any = {
+    auto_routing: true,
+    tradition: "evangelical",
+    messages: args.messages,
+  };
+  const sourcesLimit = args.sourcesLimit ?? null;
+  if (mode !== "general" && typeof sourcesLimit === "number") body.sources_limit = sourcesLimit;
+  const rp = String(args.ragPublisher ?? env.GLOO_RAG_PUBLISHER ?? "").trim();
+  if (mode !== "general" && rp) body.rag_publisher = rp;
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { authorization: `Bearer ${token}`, "content-type": "application/json", accept: "application/json" },
+    body: JSON.stringify(body),
+  });
+  const raw = await res.text().catch(() => "");
+  const j = safeJsonParse(raw) as any;
+  if (!res.ok) throw new Error(`Gloo completion error (${res.status}): ${raw || "no body"}`);
+
+  const choice = Array.isArray(j?.choices) && j.choices.length ? j.choices[0] : null;
+  const content = typeof choice?.message?.content === "string" ? String(choice.message.content) : "";
+  return { raw: j, content };
+}
+
+async function runGlooCompletionStream(env: Env, args: {
+  mode: GlooChatMode;
+  messages: GlooMsg[];
+  sourcesLimit?: number | null;
+  ragPublisher?: string | null;
+}) {
+  const token = await getGlooAccessToken(env);
+  const base = ((env.GLOO_BASE_URL ?? "https://platform.ai.gloo.com/ai/v2").trim() || "https://platform.ai.gloo.com/ai/v2").replace(/\/$/, "");
+  const mode = (args.mode ?? "grounded") as GlooChatMode;
+  const url = mode === "general" ? `${base}/chat/completions` : `${base}/chat/completions/grounded`;
+
+  const body: any = {
+    auto_routing: true,
+    tradition: "evangelical",
+    stream: true,
+    messages: args.messages,
+  };
+  const sourcesLimit = args.sourcesLimit ?? null;
+  if (mode !== "general" && typeof sourcesLimit === "number") body.sources_limit = sourcesLimit;
+  const rp = String(args.ragPublisher ?? env.GLOO_RAG_PUBLISHER ?? "").trim();
+  if (mode !== "general" && rp) body.rag_publisher = rp;
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { authorization: `Bearer ${token}`, "content-type": "application/json", accept: "text/event-stream" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok || !res.body) {
+    const raw = await res.text().catch(() => "");
+    throw new Error(`Gloo stream error (${res.status}): ${raw || "no body"}`);
   }
   return res;
 }
@@ -2473,6 +2704,214 @@ async function handleChatStream(req: Request, env: Env) {
         const finalText = typeof (envelope as any)?.message === "string" ? String((envelope as any).message) : assistantText;
         await appendMessage(env, { churchId, userId, threadId, senderType: "assistant", content: finalText || "", envelope });
 
+        controller.enqueue(encoder.encode(`event: final\ndata: ${JSON.stringify(envelope ?? {})}\n\n`));
+        controller.enqueue(encoder.encode(`event: done\ndata: {\"ok\":true}\n\n`));
+      } catch (e: any) {
+        controller.enqueue(encoder.encode(`event: error\ndata: ${JSON.stringify({ error: String(e?.message ?? e ?? "error") })}\n\n`));
+      } finally {
+        controller.close();
+      }
+    },
+  });
+  return new Response(stream, { headers: { "content-type": "text/event-stream; charset=utf-8" } });
+}
+
+async function handleChatGloo(req: Request, env: Env) {
+  const parsed = ChatGlooSchema.safeParse(await parseJson(req));
+  if (!parsed.success) return json({ error: "Invalid body", issues: parsed.error.issues }, { status: 400 });
+  const { identity } = parsed.data;
+
+  const churchId = identity.tenant_id;
+  const userId = identity.user_id;
+  const threadId = parsed.data.thread_id;
+  const message = parsed.data.message;
+  const role = (identity.role ?? "seeker") as string;
+  const mode = ((parsed.data.mode ?? "grounded") as GlooChatMode) || "grounded";
+  const sourcesLimit = parsed.data.sources_limit ?? null;
+  const ragPublisher = parsed.data.rag_publisher ?? null;
+
+  // Persist user message
+  const m1 = await appendMessage(env, { churchId, userId, threadId, senderType: "user", content: message });
+  if ((m1 as any)?.error) return json(m1, { status: 404 });
+
+  const { personId } = await resolvePerson(env, identity);
+  const [personMemory, hh] = personId
+    ? await Promise.all([getPersonMemory(env, { churchId, personId }), getHouseholdSummary(env, { churchId, personId })])
+    : [{ memory: null, updatedAt: null }, { householdId: null, summary: "" }];
+
+  const memCampusIdRaw = (personMemory as any)?.memory?.identity?.campusId;
+  const memCampusId = typeof memCampusIdRaw === "string" && /^campus_[a-z0-9_]+$/i.test(memCampusIdRaw.trim()) ? memCampusIdRaw.trim() : null;
+  const effectiveCampusId = memCampusId ?? identity.campus_id ?? "campus_boulder";
+  const memPreferredNameRaw = (personMemory as any)?.memory?.identity?.preferredName;
+  const memPreferredName = typeof memPreferredNameRaw === "string" ? memPreferredNameRaw.trim() : "";
+  const memEmailRaw = (personMemory as any)?.memory?.contact?.email;
+  const memPhoneRaw = (personMemory as any)?.memory?.contact?.phone;
+  let email = typeof memEmailRaw === "string" ? memEmailRaw.trim() : "";
+  let phone = typeof memPhoneRaw === "string" ? memPhoneRaw.trim() : "";
+  if (personId && (!email || !phone)) {
+    const row = (await env.churchcore.prepare(`SELECT email, phone FROM people WHERE church_id=?1 AND id=?2 LIMIT 1`).bind(churchId, personId).first()) as any;
+    if (!email && typeof row?.email === "string") email = String(row.email).trim();
+    if (!phone && typeof row?.phone === "string") phone = String(row.phone).trim();
+  }
+  const identityContact = { churchId, campusId: effectiveCampusId, preferredName: memPreferredName || null, email: email || null, phone: phone || null };
+
+  const redactedMemory = redactMemoryForRole(role, (personMemory as any).memory);
+  const journeyState = personId
+    ? await ensurePersonJourneyState(env, { churchId, personId, personMemory: (personMemory as any).memory ?? {} })
+    : { currentStageId: null, confidence: 0.5, updatedAt: null };
+  const currentStageId = journeyState.currentStageId ?? "stage_seeker";
+  const journeyCurrentStage = personId ? await getJourneyNode(env, { churchId, nodeId: currentStageId }) : null;
+  const journey = { current_stage: journeyCurrentStage, next_steps: [] };
+
+  const weekly = personId ? await getWeeklySermonPlanContext(env, { churchId, campusId: effectiveCampusId, personId }) : null;
+  const kbExcerpt = mode === "general" ? "" : await getKbExcerptForQuery(env, { churchId, query: message, limit: 3 });
+  const systemPrompt = buildGlooSystemPrompt({ role, identityContact, journey, weekly, kbExcerpt });
+
+  const history = await loadThreadMessagesForGloo(env, { churchId, threadId, limit: 200 });
+  const messages: GlooMsg[] = [{ role: "system", content: systemPrompt }, ...history];
+
+  const { raw, content } = await runGlooCompletion(env, { mode, messages, sourcesLimit, ragPublisher });
+  const assistantText = String(content || "").trim();
+
+  const envelope: any = {
+    message: assistantText,
+    data: { gloo: { mode, raw } },
+    citations: [],
+    suggested_next_actions: [],
+    cards: [],
+    forms: [],
+    handoff: [],
+  };
+
+  await appendMessage(env, { churchId, userId, threadId, senderType: "assistant", content: assistantText || "", envelope });
+  return json({ thread_id: threadId, output: envelope });
+}
+
+async function handleChatGlooStream(req: Request, env: Env) {
+  const parsed = ChatGlooSchema.safeParse(await parseJson(req));
+  if (!parsed.success) return json({ error: "Invalid body", issues: parsed.error.issues }, { status: 400 });
+
+  const encoder = new TextEncoder();
+  const stream = new ReadableStream<Uint8Array>({
+    async start(controller) {
+      try {
+        const { identity } = parsed.data;
+        const churchId = identity.tenant_id;
+        const userId = identity.user_id;
+        const threadId = parsed.data.thread_id;
+        const message = parsed.data.message;
+        const role = (identity.role ?? "seeker") as string;
+        const mode = ((parsed.data.mode ?? "grounded") as GlooChatMode) || "grounded";
+        const sourcesLimit = parsed.data.sources_limit ?? null;
+        const ragPublisher = parsed.data.rag_publisher ?? null;
+
+        const m1 = await appendMessage(env, { churchId, userId, threadId, senderType: "user", content: message });
+        if ((m1 as any)?.error) throw new Error(String((m1 as any)?.error ?? "append failed"));
+
+        const { personId } = await resolvePerson(env, identity);
+        const [personMemory, hh] = personId
+          ? await Promise.all([getPersonMemory(env, { churchId, personId }), getHouseholdSummary(env, { churchId, personId })])
+          : [{ memory: null, updatedAt: null }, { householdId: null, summary: "" }];
+
+        const memCampusIdRaw = (personMemory as any)?.memory?.identity?.campusId;
+        const memCampusId = typeof memCampusIdRaw === "string" && /^campus_[a-z0-9_]+$/i.test(memCampusIdRaw.trim()) ? memCampusIdRaw.trim() : null;
+        const effectiveCampusId = memCampusId ?? identity.campus_id ?? "campus_boulder";
+        const memPreferredNameRaw = (personMemory as any)?.memory?.identity?.preferredName;
+        const memPreferredName = typeof memPreferredNameRaw === "string" ? memPreferredNameRaw.trim() : "";
+        const memEmailRaw = (personMemory as any)?.memory?.contact?.email;
+        const memPhoneRaw = (personMemory as any)?.memory?.contact?.phone;
+        let email = typeof memEmailRaw === "string" ? memEmailRaw.trim() : "";
+        let phone = typeof memPhoneRaw === "string" ? memPhoneRaw.trim() : "";
+        if (personId && (!email || !phone)) {
+          const row = (await env.churchcore.prepare(`SELECT email, phone FROM people WHERE church_id=?1 AND id=?2 LIMIT 1`).bind(churchId, personId).first()) as any;
+          if (!email && typeof row?.email === "string") email = String(row.email).trim();
+          if (!phone && typeof row?.phone === "string") phone = String(row.phone).trim();
+        }
+        const identityContact = { churchId, campusId: effectiveCampusId, preferredName: memPreferredName || null, email: email || null, phone: phone || null };
+
+        const redactedMemory = redactMemoryForRole(role, (personMemory as any).memory);
+        const journeyState = personId
+          ? await ensurePersonJourneyState(env, { churchId, personId, personMemory: (personMemory as any).memory ?? {} })
+          : { currentStageId: null, confidence: 0.5, updatedAt: null };
+        const currentStageId = journeyState.currentStageId ?? "stage_seeker";
+        const journeyCurrentStage = personId ? await getJourneyNode(env, { churchId, nodeId: currentStageId }) : null;
+        const journey = { current_stage: journeyCurrentStage, next_steps: [] };
+
+        const weekly = personId ? await getWeeklySermonPlanContext(env, { churchId, campusId: effectiveCampusId, personId }) : null;
+        const kbExcerpt = mode === "general" ? "" : await getKbExcerptForQuery(env, { churchId, query: message, limit: 3 });
+        const systemPrompt = buildGlooSystemPrompt({ role, identityContact, journey, weekly, kbExcerpt });
+
+        const history = await loadThreadMessagesForGloo(env, { churchId, threadId, limit: 200 });
+        const messages: GlooMsg[] = [{ role: "system", content: systemPrompt }, ...history];
+
+        const glooRes = await runGlooCompletionStream(env, { mode, messages, sourcesLimit, ragPublisher });
+        const reader = glooRes.body!.getReader();
+        const decoder = new TextDecoder();
+        let buf = "";
+        let assistantText = "";
+        let lastChunk: any = null;
+
+        function emitToken(t: string) {
+          if (!t) return;
+          assistantText += t;
+          const safe = t.replace(/\r/g, "").replace(/\n/g, "\\n");
+          controller.enqueue(encoder.encode(`event: token\ndata: ${safe}\n\n`));
+        }
+
+        function processEventBlock(block: string) {
+          const lines = block.split("\n").map((l) => l.trimEnd());
+          const dataLines: string[] = [];
+          for (const ln of lines) {
+            if (ln.startsWith("data:")) dataLines.push(ln.slice(5).trimStart());
+          }
+          const dataRaw = dataLines.join("\n").trim();
+          if (!dataRaw) return;
+          if (dataRaw === "[DONE]") return;
+          const j = safeJsonParse(dataRaw) as any;
+          if (!j || typeof j !== "object") return;
+          lastChunk = j;
+          const choice = Array.isArray(j?.choices) && j.choices.length ? j.choices[0] : null;
+          const delta = choice?.delta ?? null;
+          const token = typeof delta?.content === "string" ? String(delta.content) : "";
+          if (token) emitToken(token);
+        }
+
+        for (;;) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buf += decoder.decode(value, { stream: true });
+          for (;;) {
+            const idxN = buf.indexOf("\n\n");
+            const idxR = buf.indexOf("\r\n\r\n");
+            let idx = -1;
+            let delimLen = 0;
+            if (idxN !== -1 && (idxR === -1 || idxN < idxR)) {
+              idx = idxN;
+              delimLen = 2;
+            } else if (idxR !== -1) {
+              idx = idxR;
+              delimLen = 4;
+            }
+            if (idx === -1) break;
+            const block = buf.slice(0, idx).trim();
+            buf = buf.slice(idx + delimLen);
+            if (block) processEventBlock(block);
+          }
+        }
+        const tail = buf.trim();
+        if (tail) processEventBlock(tail);
+
+        const envelope: any = {
+          message: assistantText,
+          data: { gloo: { mode, lastChunk } },
+          citations: [],
+          suggested_next_actions: [],
+          cards: [],
+          forms: [],
+          handoff: [],
+        };
+
+        await appendMessage(env, { churchId, userId, threadId, senderType: "assistant", content: assistantText || "", envelope });
         controller.enqueue(encoder.encode(`event: final\ndata: ${JSON.stringify(envelope ?? {})}\n\n`));
         controller.enqueue(encoder.encode(`event: done\ndata: {\"ok\":true}\n\n`));
       } catch (e: any) {
@@ -4083,6 +4522,10 @@ export default {
         return handleChat(req, env);
       case "/a2a/chat.stream":
         return handleChatStream(req, env);
+      case "/a2a/chat.gloo":
+        return handleChatGloo(req, env);
+      case "/a2a/chat.gloo.stream":
+        return handleChatGlooStream(req, env);
       case "/a2a/household.identify":
         return handleHouseholdIdentify(req, env);
       case "/a2a/household.create":
