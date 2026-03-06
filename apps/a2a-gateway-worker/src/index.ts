@@ -1355,10 +1355,18 @@ async function computeJourneyNextSteps(
 
 async function requireOwnedThread(env: Env, args: { churchId: string; userId: string; threadId: string }) {
   const { churchId, userId, threadId } = args;
-  const row = (await env.churchcore
-    .prepare(`SELECT id,title,status FROM chat_threads WHERE church_id=?1 AND user_id=?2 AND id=?3`)
-    .bind(churchId, userId, threadId)
-    .first()) as any;
+  let row: any = null;
+  try {
+    row = (await env.churchcore
+      .prepare(`SELECT id,title,status,metadata_json AS metadataJson FROM chat_threads WHERE church_id=?1 AND user_id=?2 AND id=?3`)
+      .bind(churchId, userId, threadId)
+      .first()) as any;
+  } catch {
+    row = (await env.churchcore
+      .prepare(`SELECT id,title,status FROM chat_threads WHERE church_id=?1 AND user_id=?2 AND id=?3`)
+      .bind(churchId, userId, threadId)
+      .first()) as any;
+  }
   return row ?? null;
 }
 
@@ -1395,6 +1403,11 @@ const ThreadListSchema = z.object({
   include_archived: z.boolean().optional().nullable(),
 });
 
+const TopicTemplateListSchema = z.object({
+  identity: IdentitySchema,
+  include_inactive: z.boolean().optional().nullable(),
+});
+
 const ThreadGetSchema = z.object({
   identity: IdentitySchema,
   thread_id: z.string().min(1),
@@ -1409,6 +1422,11 @@ const ThreadRenameSchema = z.object({
 });
 
 const ThreadArchiveSchema = z.object({
+  identity: IdentitySchema,
+  thread_id: z.string().min(1),
+});
+
+const ThreadClearSchema = z.object({
   identity: IdentitySchema,
   thread_id: z.string().min(1),
 });
@@ -1640,10 +1658,20 @@ async function handleThreadCreate(req: Request, env: Env) {
   const title = (parsed.data.title ?? "New topic").trim() || "New topic";
   const id = crypto.randomUUID();
   const ts = nowIso();
-  await env.churchcore
-    .prepare(`INSERT INTO chat_threads (id, church_id, user_id, title, status, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, 'active', ?5, ?6)`)
-    .bind(id, churchId, userId, title, ts, ts)
-    .run();
+  const metadata = parsed.data.metadata && typeof parsed.data.metadata === "object" ? parsed.data.metadata : null;
+  const metadataJson = metadata ? JSON.stringify(metadata) : null;
+  try {
+    await env.churchcore
+      .prepare(`INSERT INTO chat_threads (id, church_id, user_id, title, metadata_json, status, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, 'active', ?6, ?7)`)
+      .bind(id, churchId, userId, title, metadataJson, ts, ts)
+      .run();
+  } catch {
+    // Backwards-compatible if `metadata_json` isn't deployed yet.
+    await env.churchcore
+      .prepare(`INSERT INTO chat_threads (id, church_id, user_id, title, status, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, 'active', ?5, ?6)`)
+      .bind(id, churchId, userId, title, ts, ts)
+      .run();
+  }
   return json({ thread_id: id, title });
 }
 
@@ -1657,18 +1685,34 @@ async function handleThreadList(req: Request, env: Env) {
   const includeArchived = Boolean(parsed.data.include_archived);
   const statusWhere = includeArchived ? "" : "AND status != 'archived'";
 
-  const rows =
-    (
-      await env.churchcore
-        .prepare(
-          `SELECT id,title,status,created_at AS createdAt,updated_at AS updatedAt
-           FROM chat_threads
-           WHERE church_id=?1 AND user_id=?2 ${statusWhere}
-           ORDER BY updated_at DESC`,
-        )
-        .bind(churchId, userId)
-        .all()
-    ).results ?? [];
+  let rows: any[] = [];
+  try {
+    rows =
+      (
+        await env.churchcore
+          .prepare(
+            `SELECT id,title,status,metadata_json AS metadataJson,created_at AS createdAt,updated_at AS updatedAt
+             FROM chat_threads
+             WHERE church_id=?1 AND user_id=?2 ${statusWhere}
+             ORDER BY updated_at DESC`,
+          )
+          .bind(churchId, userId)
+          .all()
+      ).results ?? [];
+  } catch {
+    rows =
+      (
+        await env.churchcore
+          .prepare(
+            `SELECT id,title,status,created_at AS createdAt,updated_at AS updatedAt
+             FROM chat_threads
+             WHERE church_id=?1 AND user_id=?2 ${statusWhere}
+             ORDER BY updated_at DESC`,
+          )
+          .bind(churchId, userId)
+          .all()
+      ).results ?? [];
+  }
 
   const { person } = await resolvePerson(env, identity);
   return json({ threads: rows, person });
@@ -1713,8 +1757,18 @@ async function handleThreadGet(req: Request, env: Env) {
     return { id: r.id, senderType: r.senderType, content: r.content, envelope, createdAt: r.createdAt };
   });
 
+  let threadMeta: any = thread;
+  if (thread && typeof (thread as any)?.metadataJson === "string") {
+    try {
+      const mj = JSON.parse(String((thread as any).metadataJson));
+      threadMeta = { ...(thread as any), metadata: mj };
+    } catch {
+      threadMeta = thread;
+    }
+  }
+
   const { person } = await resolvePerson(env, identity);
-  return json({ thread, messages, person });
+  return json({ thread: threadMeta, messages, person });
 }
 
 async function handleThreadRename(req: Request, env: Env) {
@@ -1755,6 +1809,23 @@ async function handleThreadArchive(req: Request, env: Env) {
   return json({ ok: true });
 }
 
+async function handleThreadClear(req: Request, env: Env) {
+  const parsed = ThreadClearSchema.safeParse(await parseJson(req));
+  if (!parsed.success) return json({ error: "Invalid body", issues: parsed.error.issues }, { status: 400 });
+  const { identity } = parsed.data;
+  const churchId = identity.tenant_id;
+  const userId = identity.user_id;
+  const threadId = parsed.data.thread_id;
+
+  const thread = await requireOwnedThread(env, { churchId, userId, threadId });
+  if (!thread) return json({ error: "Thread not found" }, { status: 404 });
+
+  await env.churchcore.prepare(`DELETE FROM chat_messages WHERE church_id=?1 AND thread_id=?2`).bind(churchId, threadId).run();
+  const ts = nowIso();
+  await env.churchcore.prepare(`UPDATE chat_threads SET updated_at=?1 WHERE church_id=?2 AND user_id=?3 AND id=?4`).bind(ts, churchId, userId, threadId).run();
+  return json({ ok: true, thread_id: threadId, cleared_at: ts });
+}
+
 async function handleThreadAppend(req: Request, env: Env) {
   const parsed = ThreadAppendSchema.safeParse(await parseJson(req));
   if (!parsed.success) return json({ error: "Invalid body", issues: parsed.error.issues }, { status: 400 });
@@ -1772,6 +1843,59 @@ async function handleThreadAppend(req: Request, env: Env) {
   });
   const status = (out as any)?.error ? 404 : 200;
   return json(out, { status });
+}
+
+function defaultTopicTemplates() {
+  // Tools: guide, faith_journey, community_manager, calendar, bible_reader, weekly_sermons, etc.
+  return [
+    { slug: "faith_journey", title: "Faith journey", description: "Track where you are and next steps (baptism, groups, serving).", toolIds: ["faith_journey", "guide", "bible_reader"] },
+    { slug: "your_community", title: "Find your community", description: "Explore groups, classes, outreach, and ways to connect.", toolIds: ["community_manager", "calendar", "guide"] },
+    { slug: "home_group", title: "Find a home group", description: "Help me find and join a small group that fits.", toolIds: ["community_manager", "guide", "calendar"] },
+    { slug: "sermon_discussion", title: "This week’s sermon", description: "Sermon recap, questions, and weekly Bible plan.", toolIds: ["weekly_sermons", "bible_reader", "guide"] },
+    { slug: "bible_plan", title: "Bible reading plan", description: "Stay on track with this week’s readings and mark progress.", toolIds: ["bible_reader", "guide"] },
+    { slug: "events", title: "Events & schedule", description: "What’s happening this week and what should I attend?", toolIds: ["calendar", "community_manager"] },
+    { slug: "prayer", title: "Prayer", description: "Share prayer requests and get support.", toolIds: ["care_pastoral", "guide"] },
+    { slug: "kids", title: "Kids & family", description: "Kids check-in, household info, allergies, custody notes.", toolIds: ["kids_checkin", "household_manager"] },
+  ];
+}
+
+async function handleTopicTemplateList(req: Request, env: Env) {
+  const parsed = TopicTemplateListSchema.safeParse(await parseJson(req));
+  if (!parsed.success) return json({ error: "Invalid body", issues: parsed.error.issues }, { status: 400 });
+  const { identity } = parsed.data;
+  const churchId = identity.tenant_id;
+  const includeInactive = Boolean(parsed.data.include_inactive);
+
+  // If table exists, prefer it; otherwise return defaults.
+  try {
+    const rows =
+      (
+        await env.churchcore
+          .prepare(
+            `SELECT slug,title,description,tool_ids_json AS toolIdsJson,sort_order AS sortOrder,is_active AS isActive,updated_at AS updatedAt
+             FROM topic_templates
+             WHERE church_id=?1 ${includeInactive ? "" : "AND is_active=1"}
+             ORDER BY sort_order ASC, updated_at DESC`,
+          )
+          .bind(churchId)
+          .all()
+      ).results ?? [];
+    const items = (rows as any[]).map((r) => {
+      let toolIds: string[] = [];
+      try {
+        const j = r?.toolIdsJson ? JSON.parse(String(r.toolIdsJson)) : [];
+        toolIds = Array.isArray(j) ? j.map((x) => String(x)).filter(Boolean) : [];
+      } catch {
+        toolIds = [];
+      }
+      return { slug: String(r.slug), title: String(r.title), description: r.description ?? null, toolIds, sortOrder: Number(r.sortOrder ?? 0) };
+    });
+    if (items.length) return json({ ok: true, templates: items });
+  } catch {
+    // fall back
+  }
+
+  return json({ ok: true, templates: defaultTopicTemplates() });
 }
 
 async function runAgent(env: Env, args: { threadId: string; inputPayload: Record<string, unknown> }) {
@@ -3949,6 +4073,10 @@ export default {
         return handleThreadRename(req, env);
       case "/a2a/thread.archive":
         return handleThreadArchive(req, env);
+      case "/a2a/thread.clear":
+        return handleThreadClear(req, env);
+      case "/a2a/topic.template.list":
+        return handleTopicTemplateList(req, env);
       case "/a2a/thread.append":
         return handleThreadAppend(req, env);
       case "/a2a/chat":

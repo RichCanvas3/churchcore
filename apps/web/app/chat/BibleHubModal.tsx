@@ -40,6 +40,7 @@ export function BibleHubModal(props: { identity: Identity; initialRef?: string |
   const [planErr, setPlanErr] = useState<string>("");
   const [sermon, setSermon] = useState<any | null>(null);
   const [sermonBusy, setSermonBusy] = useState(false);
+  const [planMutating, setPlanMutating] = useState(false);
 
   const today = useMemo(() => isoToday(), []);
   const completedIds = useMemo(() => {
@@ -60,6 +61,21 @@ export function BibleHubModal(props: { identity: Identity; initialRef?: string |
       setPlan(null);
     } finally {
       setPlanBusy(false);
+    }
+  }
+
+  async function markComplete(itemId: string) {
+    const id = String(itemId ?? "").trim();
+    if (!id) return;
+    setPlanMutating(true);
+    setPlanErr("");
+    try {
+      await postJson("/api/a2a/bible/plan/item/complete", { identity: props.identity, item_id: id });
+      await loadPlan();
+    } catch (e: any) {
+      setPlanErr(String(e?.message ?? e ?? "Failed to mark complete"));
+    } finally {
+      setPlanMutating(false);
     }
   }
 
@@ -94,6 +110,7 @@ export function BibleHubModal(props: { identity: Identity; initialRef?: string |
   }, [plan?.week?.anchorMessageId]);
 
   const todays = useMemo(() => (plan?.items ?? []).filter((it) => String(it.dayDate) === today), [plan?.items, today]);
+  const weekItems = useMemo(() => (plan?.items ?? []).slice().sort((a, b) => (a.dayDate < b.dayDate ? -1 : a.dayDate > b.dayDate ? 1 : String(a.kind).localeCompare(String(b.kind)))), [plan?.items]);
   const nextUp = useMemo(() => {
     const first = todays.find((it) => !completedIds.has(it.id)) ?? todays[0] ?? null;
     return first?.ref ? String(first.ref) : plan?.week?.passage ? String(plan.week.passage) : "";
@@ -167,61 +184,65 @@ export function BibleHubModal(props: { identity: Identity; initialRef?: string |
 
         <div style={{ minHeight: 0, display: "grid", gridTemplateColumns: "1.35fr 0.65fr" }}>
           <div style={{ minHeight: 0, borderRight: "1px solid #e2e8f0" }}>
-            <BibleReaderPanel identity={props.identity} initialRef={ref} onClose={props.onClose} />
+            <BibleReaderPanel identity={props.identity} initialRef={ref} onClose={props.onClose} showPlan={false} />
           </div>
 
           <div style={{ minHeight: 0, overflow: "auto", padding: 12, background: "#f8fafc", display: "grid", gap: 12, alignContent: "start" }}>
-            <section style={{ background: "white", border: "1px solid #e2e8f0", borderRadius: 14, padding: 12, display: "grid", gap: 8 }}>
-              <div style={{ fontSize: 12, fontWeight: 900, color: "#0f172a" }}>Today’s reading</div>
+            <section style={{ background: "white", border: "1px solid #e2e8f0", borderRadius: 14, padding: 12, display: "grid", gap: 10 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "baseline", flexWrap: "wrap" }}>
+                <div style={{ fontSize: 12, fontWeight: 900, color: "#0f172a" }}>Bible Reading Plan</div>
+                <div style={{ fontSize: 12, color: "#64748b" }}>{plan?.week?.weekStartDate ? `Week of ${String(plan.week.weekStartDate)} → ${String(plan.week.weekEndDate ?? "")}` : today}</div>
+              </div>
               {planErr ? <div style={{ fontSize: 12, color: "#b91c1c", fontWeight: 800 }}>{planErr}</div> : null}
               {todays.length ? (
                 <div style={{ display: "grid", gap: 6 }}>
                   {todays.map((it) => {
                     const done = completedIds.has(it.id);
                     return (
-                      <button
-                        key={it.id}
-                        type="button"
-                        onClick={() => setRef(String(it.ref ?? plan?.week?.passage ?? ref))}
-                        style={{
-                          textAlign: "left",
-                          border: "1px solid #e2e8f0",
-                          background: done ? "#f0fdf4" : "white",
-                          borderRadius: 12,
-                          padding: 10,
-                          cursor: "pointer",
-                        }}
-                      >
-                        <div style={{ fontSize: 12, fontWeight: 900, color: "#0f172a" }}>{String(it.label ?? "Reading")}</div>
-                        <div style={{ fontSize: 12, color: "#64748b" }}>
-                          {String(it.ref ?? "")} {done ? "· Done" : ""}
+                      <div key={it.id} style={{ border: "1px solid #e2e8f0", background: done ? "#f0fdf4" : "white", borderRadius: 12, padding: 10, display: "grid", gap: 6 }}>
+                        <button type="button" onClick={() => setRef(String(it.ref ?? plan?.week?.passage ?? ref))} style={{ padding: 0, border: "none", background: "transparent", cursor: "pointer", textAlign: "left" }}>
+                          <div style={{ fontSize: 12, fontWeight: 900, color: "#0f172a" }}>{String(it.label ?? "Reading")}</div>
+                          <div style={{ fontSize: 12, color: "#64748b" }}>{String(it.ref ?? "")}</div>
+                        </button>
+                        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                          <button type="button" onClick={() => void markComplete(it.id)} disabled={planMutating || done} style={btn}>
+                            {done ? "Done" : "Mark complete"}
+                          </button>
                         </div>
-                      </button>
+                      </div>
                     );
                   })}
                 </div>
               ) : (
                 <div style={{ fontSize: 12, color: "#64748b" }}>{planBusy ? "Loading…" : "No plan items scheduled for today."}</div>
               )}
+
+              {weekItems.length ? (
+                <div style={{ marginTop: 6, display: "grid", gap: 6 }}>
+                  <div style={{ fontSize: 12, fontWeight: 900, color: "#0f172a" }}>This week</div>
+                  {weekItems.slice(0, 14).map((it) => {
+                    const done = completedIds.has(it.id);
+                    return (
+                      <div key={`w-${it.id}`} style={{ display: "flex", gap: 10, alignItems: "center", justifyContent: "space-between", border: "1px solid #e2e8f0", borderRadius: 12, padding: "8px 10px", background: done ? "#f0fdf4" : "white" }}>
+                        <button type="button" onClick={() => setRef(String(it.ref ?? plan?.week?.passage ?? ref))} style={{ padding: 0, border: "none", background: "transparent", cursor: "pointer", textAlign: "left", minWidth: 0, flex: 1 }}>
+                          <div style={{ fontSize: 11, color: "#64748b", fontWeight: 900 }}>{String(it.dayDate)}</div>
+                          <div style={{ fontSize: 12, color: "#0f172a", fontWeight: 900, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            {String(it.label ?? "Reading")}
+                            {it.ref ? ` · ${String(it.ref)}` : ""}
+                          </div>
+                        </button>
+                        <button type="button" onClick={() => void markComplete(it.id)} disabled={planMutating || done} style={btn}>
+                          {done ? "Done" : "Complete"}
+                        </button>
+                      </div>
+                    );
+                  })}
+                  {weekItems.length > 14 ? <div style={{ fontSize: 12, color: "#64748b" }}>…and {weekItems.length - 14} more</div> : null}
+                </div>
+              ) : null}
             </section>
 
-            {plan?.week ? (
-              <section style={{ background: "white", border: "1px solid #e2e8f0", borderRadius: 14, padding: 12, display: "grid", gap: 8 }}>
-                <div style={{ fontSize: 12, fontWeight: 900, color: "#0f172a" }}>This week</div>
-                <div style={{ fontSize: 12, color: "#64748b" }}>
-                  {String(plan.week.weekStartDate ?? "")} → {String(plan.week.weekEndDate ?? "")}
-                </div>
-                {plan.week.title || plan.week.passage ? (
-                  <div style={{ fontSize: 12, color: "#0f172a" }}>
-                    {plan.week.title ? <strong>{String(plan.week.title)}</strong> : null}
-                    {plan.week.passage ? ` · ${String(plan.week.passage)}` : ""}
-                  </div>
-                ) : null}
-                <button type="button" onClick={() => setRef(String(plan.week?.passage ?? ref))} style={btn}>
-                  Open week passage
-                </button>
-              </section>
-            ) : null}
+            {/* Week summary is already included in the plan section above. */}
 
             <section style={{ background: "white", border: "1px solid #e2e8f0", borderRadius: 14, padding: 12, display: "grid", gap: 8 }}>
               <div style={{ fontSize: 12, fontWeight: 900, color: "#0f172a" }}>Sermon & guides</div>

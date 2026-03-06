@@ -22,7 +22,7 @@ import { WeeklySermonsPanel } from "./WeeklySermonsPanel";
 import { BibleHubModal } from "./BibleHubModal";
 import styles from "./ChatLayout.module.css";
 
-type ThreadMeta = { id: string; title: string; status: string; updatedAt?: string; createdAt?: string };
+type ThreadMeta = { id: string; title: string; status: string; updatedAt?: string; createdAt?: string; metadataJson?: string | null; metadata?: any };
 
 async function postJson<T>(url: string, body: unknown): Promise<T> {
   const res = await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
@@ -95,6 +95,13 @@ export default function ChatPage() {
   const [sermonCompareMatch, setSermonCompareMatch] = useState<any | null>(null);
   const [bibleHubOpen, setBibleHubOpen] = useState(false);
   const [bibleHubRef, setBibleHubRef] = useState<string | null>(null);
+  const [threadReloadNonce, setThreadReloadNonce] = useState(0);
+  const [newTopicOpen, setNewTopicOpen] = useState(false);
+  const [templateBusy, setTemplateBusy] = useState(false);
+  const [templateErr, setTemplateErr] = useState<string>("");
+  const [templates, setTemplates] = useState<Array<{ slug: string; title: string; description?: string | null; toolIds?: string[] }>>([]);
+  const [templateSearch, setTemplateSearch] = useState("");
+  const [customTitle, setCustomTitle] = useState("");
 
   const closeTool = () => {
     setActiveUiToolId(null);
@@ -192,6 +199,24 @@ export default function ChatPage() {
     return threads.some((t) => t && t.id === activeThreadId) ? activeThreadId : null;
   }, [activeThreadId, identity.user_id, threads, threadsOwnerUserId]);
 
+  const activeThreadMeta = useMemo(() => {
+    if (!effectiveThreadId) return null;
+    const t = threads.find((x) => x && x.id === effectiveThreadId) ?? null;
+    if (!t) return null;
+    let meta: any = null;
+    if (typeof (t as any).metadataJson === "string" && String((t as any).metadataJson).trim()) {
+      try {
+        meta = JSON.parse(String((t as any).metadataJson));
+      } catch {
+        meta = null;
+      }
+    } else if (typeof (t as any).metadata === "object") {
+      meta = (t as any).metadata;
+    }
+    const toolIds = Array.isArray(meta?.tool_ids) ? meta.tool_ids.map((x: any) => String(x)).filter(Boolean) : [];
+    return { templateId: typeof meta?.template_id === "string" ? meta.template_id : null, toolIds };
+  }, [effectiveThreadId, threads]);
+
   const session = useMemo<Session>(
     () => ({
       churchId: identity.tenant_id,
@@ -260,9 +285,17 @@ export default function ChatPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [effectiveThreadId]);
 
+  function toolDisplayTitle(toolId: string, title?: string) {
+    if (toolId === "guide") return "Your Personal Guide";
+    if (toolId === "calendar") return "My Calendar";
+    if (toolId === "bible_reader") return "Bible Scripture";
+    const t = String(title ?? "").trim();
+    return t || toolId;
+  }
+
   function ToolButton(props: { toolId: string; title?: string; variant?: "inline" | "cta" }) {
     const variant = props.variant ?? "inline";
-    const label = props.title || props.toolId;
+    const label = toolDisplayTitle(props.toolId, props.title);
     return (
       <button
         onClick={() => openTool(props.toolId)}
@@ -376,19 +409,44 @@ export default function ChatPage() {
       return out.length ? out : s;
     }
 
-    // Replace inline {"type":"ui_tool","tool_id":"kids_checkin"} snippets with buttons.
-    const re = /\{\s*"type"\s*:\s*"ui_tool"\s*,\s*"tool_id"\s*:\s*"([^"]+)"\s*\}/g;
+    // Replace inline {"type":"ui_tool","tool_id":"kids_checkin"} (or escaped variants) with buttons.
     const parts: Array<{ kind: "text"; value: string } | { kind: "tool"; toolId: string }> = [];
-    let last = 0;
-    for (;;) {
-      const m = re.exec(text);
-      if (!m) break;
-      const idx = m.index;
-      if (idx > last) parts.push({ kind: "text", value: text.slice(last, idx) });
-      parts.push({ kind: "tool", toolId: String(m[1] || "").trim() });
-      last = idx + m[0].length;
+    const s0 = String(text ?? "");
+    const patterns = [
+      // Normal JSON
+      /\{\s*"type"\s*:\s*"ui_tool"\s*,\s*"tool_id"\s*:\s*"([^"]+)"\s*\}/g,
+      // Escaped JSON inside strings, e.g. {\"type\":\"ui_tool\",\"tool_id\":\"calendar\"}
+      /\{\s*\\"type\\"\s*:\s*\\"ui_tool\\"\s*,\s*\\"tool_id\\"\s*:\s*\\"([^\\"]+)\\"\s*\}/g,
+    ];
+    // Collect matches from either pattern, then split in one pass.
+    const matches: Array<{ start: number; end: number; toolId: string }> = [];
+    for (const re of patterns) {
+      re.lastIndex = 0;
+      for (;;) {
+        const m = re.exec(s0);
+        if (!m) break;
+        const toolId = String(m[1] || "").trim();
+        if (toolId) matches.push({ start: m.index, end: m.index + m[0].length, toolId });
+      }
     }
-    if (last < text.length) parts.push({ kind: "text", value: text.slice(last) });
+    matches.sort((a, b) => a.start - b.start || b.end - a.end);
+    // Remove overlaps (prefer the earliest + longest).
+    const pruned: Array<{ start: number; end: number; toolId: string }> = [];
+    for (const m of matches) {
+      const last = pruned[pruned.length - 1];
+      if (!last) {
+        pruned.push(m);
+        continue;
+      }
+      if (m.start >= last.end) pruned.push(m);
+    }
+    let lastIdx = 0;
+    for (const m of pruned) {
+      if (m.start > lastIdx) parts.push({ kind: "text", value: s0.slice(lastIdx, m.start) });
+      parts.push({ kind: "tool", toolId: m.toolId });
+      lastIdx = m.end;
+    }
+    if (lastIdx < s0.length) parts.push({ kind: "text", value: s0.slice(lastIdx) });
     const textStyle: React.CSSProperties = { whiteSpace: "pre-wrap", overflowWrap: "anywhere", wordBreak: "break-word" };
     if (parts.length <= 1) return <span style={textStyle}>{renderTextWithLinks(text)}</span>;
 
@@ -483,6 +541,7 @@ export default function ChatPage() {
     );
   }
   async function createThread() {
+    // Backwards-compat: still allow a quick blank thread creation (used by template modal).
     const out = await postJson<{ thread_id?: string }>("/api/a2a/thread/create", {
       identity: {
         tenant_id: identity.tenant_id,
@@ -492,10 +551,69 @@ export default function ChatPage() {
         timezone: identity.timezone ?? undefined,
         persona_id: (identity as any).persona_id ?? null,
       },
-      title: "New topic",
+      title: (customTitle || "New topic").trim() || "New topic",
+      metadata: customTitle ? { template_id: "blank", tool_ids: [] } : undefined,
     });
     await refreshThreads();
     if (out?.thread_id) setActiveThreadId(String(out.thread_id));
+    setNewTopicOpen(false);
+    setCustomTitle("");
+    setTemplateSearch("");
+  }
+
+  async function loadTemplates() {
+    setTemplateBusy(true);
+    setTemplateErr("");
+    try {
+      const out = await postJson<any>("/api/a2a/topic/template/list", {
+        identity: {
+          tenant_id: identity.tenant_id,
+          user_id: identity.user_id,
+          role: identity.role,
+          campus_id: identity.campus_id ?? undefined,
+          timezone: identity.timezone ?? undefined,
+          persona_id: (identity as any).persona_id ?? null,
+        },
+        include_inactive: false,
+      });
+      const list = Array.isArray(out?.templates) ? out.templates : [];
+      const normalized = list
+        .filter((t: any) => t && typeof t === "object" && typeof t.slug === "string" && typeof t.title === "string")
+        .map((t: any) => ({
+          slug: String(t.slug),
+          title: String(t.title),
+          description: typeof t.description === "string" ? t.description : null,
+          toolIds: Array.isArray(t.toolIds) ? t.toolIds.map((x: any) => String(x)).filter(Boolean) : [],
+        }));
+      setTemplates(normalized);
+    } catch (e: any) {
+      setTemplateErr(String(e?.message ?? e ?? "Failed to load templates"));
+      setTemplates([]);
+    } finally {
+      setTemplateBusy(false);
+    }
+  }
+
+  async function createThreadFromTemplate(tpl: { slug: string; title: string; toolIds?: string[] }) {
+    const title = (customTitle || tpl.title || "New topic").trim() || "New topic";
+    const metadata = { template_id: tpl.slug, tool_ids: Array.isArray(tpl.toolIds) ? tpl.toolIds : [] };
+    const out = await postJson<{ thread_id?: string }>("/api/a2a/thread/create", {
+      identity: {
+        tenant_id: identity.tenant_id,
+        user_id: identity.user_id,
+        role: identity.role,
+        campus_id: identity.campus_id ?? undefined,
+        timezone: identity.timezone ?? undefined,
+        persona_id: (identity as any).persona_id ?? null,
+      },
+      title,
+      metadata,
+    });
+    await refreshThreads();
+    if (out?.thread_id) setActiveThreadId(String(out.thread_id));
+    setNewTopicOpen(false);
+    setCustomTitle("");
+    setTemplateSearch("");
   }
 
   async function archiveThread(threadId: string) {
@@ -512,6 +630,28 @@ export default function ChatPage() {
     });
     setActiveThreadId(null);
     await refreshThreads();
+  }
+
+  async function clearThreadMessages(threadId: string) {
+    if (!threadId) return;
+    setUiError(null);
+    try {
+      await postJson("/api/a2a/thread/clear", {
+        identity: {
+          tenant_id: identity.tenant_id,
+          user_id: identity.user_id,
+          role: identity.role,
+          campus_id: identity.campus_id ?? undefined,
+          timezone: identity.timezone ?? undefined,
+          persona_id: (identity as any).persona_id ?? null,
+        },
+        thread_id: threadId,
+      });
+      setThreadReloadNonce((n) => n + 1);
+      await refreshThreads();
+    } catch (e: any) {
+      setUiError(String(e?.message ?? e ?? "Clear failed"));
+    }
   }
 
   async function renameThread(threadId: string, nextTitle: string) {
@@ -735,7 +875,13 @@ export default function ChatPage() {
           {!effectiveLeftCollapsed ? <div style={{ color: "#64748b", fontSize: 12 }}>{meLabel}</div> : null}
           <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
             <button
-              onClick={() => createThread()}
+              onClick={() => {
+                setNewTopicOpen(true);
+                setTemplateErr("");
+                setTemplateSearch("");
+                setCustomTitle("");
+                void loadTemplates();
+              }}
               style={{ border: "1px solid #0f172a", background: "#0f172a", color: "white", padding: "8px 10px", borderRadius: 10, cursor: "pointer" }}
             >
               {effectiveLeftCollapsed ? "+" : "New topic"}
@@ -791,11 +937,13 @@ export default function ChatPage() {
                     <path d="M20 6 9 17l-5-5" stroke="#0f172a" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
                 );
-                const IconArchive = () => (
+                const IconTrash = () => (
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                    <path d="M21 8v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8" stroke="#0f172a" strokeWidth="2" strokeLinejoin="round" />
-                    <path d="M22 4H2v4h20V4Z" stroke="#0f172a" strokeWidth="2" strokeLinejoin="round" />
-                    <path d="M10 12h4" stroke="#0f172a" strokeWidth="2" strokeLinecap="round" />
+                    <path d="M3 6h18" stroke="#0f172a" strokeWidth="2" strokeLinecap="round" />
+                    <path d="M8 6V4h8v2" stroke="#0f172a" strokeWidth="2" strokeLinejoin="round" />
+                    <path d="M19 6l-1 16H6L5 6" stroke="#0f172a" strokeWidth="2" strokeLinejoin="round" />
+                    <path d="M10 11v6" stroke="#0f172a" strokeWidth="2" strokeLinecap="round" />
+                    <path d="M14 11v6" stroke="#0f172a" strokeWidth="2" strokeLinecap="round" />
                   </svg>
                 );
 
@@ -879,13 +1027,13 @@ export default function ChatPage() {
                         ) : null}
 
                         <IconButton
-                          title="Archive"
+                          title="Delete"
                           onClick={(e) => {
                             e.stopPropagation();
                             archiveThread(t.id);
                           }}
                         >
-                          <IconArchive />
+                          <IconTrash />
                         </IconButton>
                       </div>
                     ) : null}
@@ -924,6 +1072,20 @@ export default function ChatPage() {
           <div style={{ fontSize: 16, fontWeight: 600, minWidth: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
             {threads.find((t) => t.id === effectiveThreadId)?.title ?? "Select a topic"}
           </div>
+          {effectiveThreadId ? (
+            <div className={styles.desktopOnly} style={{ display: "inline-flex", gap: 8, alignItems: "center" }}>
+              {(activeThreadMeta?.toolIds ?? []).slice(0, 5).map((toolId: string) => (
+                <ToolButton key={toolId} toolId={toolId} title={toolDisplayTitle(toolId)} variant="inline" />
+              ))}
+              <button
+                onClick={() => void clearThreadMessages(effectiveThreadId)}
+                title="Clear messages"
+                style={{ border: "1px solid #e2e8f0", background: "white", borderRadius: 10, padding: "6px 8px", cursor: "pointer", fontSize: 12, fontWeight: 900 }}
+              >
+                🧹
+              </button>
+            </div>
+          ) : null}
           {activeUiToolId ? (
             <>
               <button
@@ -941,7 +1103,7 @@ export default function ChatPage() {
 
         {effectiveThreadId ? (
           <A2AChatRuntime
-            key={effectiveThreadId}
+            key={`${effectiveThreadId}:${threadReloadNonce}`}
             session={session}
             threadId={effectiveThreadId}
             historyAdapter={historyAdapter}
@@ -1313,6 +1475,124 @@ export default function ChatPage() {
           initialRef={bibleHubRef}
           onClose={() => setBibleHubOpen(false)}
         />
+      ) : null}
+
+      {newTopicOpen ? (
+        <div
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setNewTopicOpen(false)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 2400,
+            background: "rgba(15, 23, 42, 0.55)",
+            display: "grid",
+            placeItems: "center",
+            padding: 12,
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: "min(920px, 98vw)",
+              height: "min(84vh, 820px)",
+              background: "white",
+              borderRadius: 16,
+              border: "1px solid #e2e8f0",
+              overflow: "hidden",
+              display: "grid",
+              gridTemplateRows: "auto auto 1fr",
+              boxShadow: "0 30px 120px rgba(15, 23, 42, 0.38)",
+            }}
+          >
+            <div style={{ padding: 14, borderBottom: "1px solid #e2e8f0", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 14, fontWeight: 900 }}>New topic</div>
+                <div style={{ fontSize: 12, color: "#64748b" }}>Choose a template or start blank.</div>
+              </div>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button
+                  type="button"
+                  onClick={() => void loadTemplates()}
+                  disabled={templateBusy}
+                  style={{ border: "1px solid #e2e8f0", background: "white", borderRadius: 10, padding: "6px 10px", cursor: "pointer", fontSize: 12 }}
+                >
+                  Refresh
+                </button>
+                <button type="button" onClick={() => setNewTopicOpen(false)} style={{ border: "1px solid #e2e8f0", background: "white", borderRadius: 10, padding: "6px 10px", cursor: "pointer", fontSize: 12 }}>
+                  Close
+                </button>
+              </div>
+            </div>
+
+            <div style={{ padding: 14, borderBottom: "1px solid #e2e8f0", display: "grid", gap: 10 }}>
+              {templateErr ? <div style={{ fontSize: 12, color: "#b91c1c", fontWeight: 800 }}>{templateErr}</div> : null}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                <label style={{ display: "grid", gap: 6 }}>
+                  <div style={{ fontSize: 12, color: "#64748b", fontWeight: 800 }}>Search templates</div>
+                  <input value={templateSearch} onChange={(e) => setTemplateSearch(e.target.value)} placeholder="e.g. faith journey, groups, sermon" style={{ border: "1px solid #cbd5e1", borderRadius: 10, padding: "8px 10px" }} />
+                </label>
+                <label style={{ display: "grid", gap: 6 }}>
+                  <div style={{ fontSize: 12, color: "#64748b", fontWeight: 800 }}>Custom title (optional)</div>
+                  <input value={customTitle} onChange={(e) => setCustomTitle(e.target.value)} placeholder="Leave blank to use template title" style={{ border: "1px solid #cbd5e1", borderRadius: 10, padding: "8px 10px" }} />
+                </label>
+              </div>
+
+              <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                <button
+                  type="button"
+                  onClick={() => void createThread()}
+                  style={{ border: "1px solid #0f172a", background: "#0f172a", color: "white", borderRadius: 10, padding: "8px 10px", cursor: "pointer", fontSize: 12, fontWeight: 900 }}
+                >
+                  Create blank topic
+                </button>
+              </div>
+            </div>
+
+            <div style={{ padding: 14, overflow: "auto", background: "#f8fafc" }}>
+              {templateBusy ? <div style={{ fontSize: 12, color: "#64748b", fontWeight: 800 }}>Loading templates…</div> : null}
+              <div style={{ display: "grid", gap: 10, gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))" }}>
+                {templates
+                  .filter((t) => {
+                    const q = templateSearch.trim().toLowerCase();
+                    if (!q) return true;
+                    return String(t.title).toLowerCase().includes(q) || String(t.slug).toLowerCase().includes(q) || String(t.description ?? "").toLowerCase().includes(q);
+                  })
+                  .map((t) => (
+                    <button
+                      key={t.slug}
+                      type="button"
+                      onClick={() => void createThreadFromTemplate(t)}
+                      style={{
+                        textAlign: "left",
+                        border: "1px solid #e2e8f0",
+                        background: "white",
+                        borderRadius: 14,
+                        padding: 12,
+                        cursor: "pointer",
+                        display: "grid",
+                        gap: 8,
+                      }}
+                      title="Create topic from template"
+                    >
+                      <div style={{ fontSize: 13, fontWeight: 900, color: "#0f172a" }}>{t.title}</div>
+                      {t.description ? <div style={{ fontSize: 12, color: "#64748b" }}>{t.description}</div> : null}
+                      {(t.toolIds?.length ?? 0) ? (
+                        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                          {t.toolIds!.slice(0, 4).map((toolId) => (
+                            <span key={toolId} style={{ fontSize: 11, fontWeight: 900, color: "#0f172a", background: "#f1f5f9", border: "1px solid #e2e8f0", borderRadius: 999, padding: "3px 8px" }}>
+                              {toolDisplayTitle(toolId)}
+                            </span>
+                          ))}
+                        </div>
+                      ) : null}
+                    </button>
+                  ))}
+              </div>
+            </div>
+          </div>
+        </div>
       ) : null}
     </div>
   );

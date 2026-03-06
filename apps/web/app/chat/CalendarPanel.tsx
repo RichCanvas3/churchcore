@@ -39,6 +39,16 @@ type Schedule = {
   events: ChurchEvent[];
 };
 
+type MyActivity = {
+  communityId: string;
+  title: string;
+  kind?: string | null;
+  campusId?: string | null;
+  startAt?: string | null;
+  endAt?: string | null;
+  status?: string | null;
+};
+
 async function postJson<T>(url: string, body: unknown): Promise<T> {
   const res = await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
   const json = (await res.json().catch(() => ({}))) as T;
@@ -79,6 +89,11 @@ export function CalendarPanel(props: { identity: Identity; onClose: () => void }
   const [schedule, setSchedule] = useState<Schedule | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string>("");
+  const [myBusy, setMyBusy] = useState(false);
+  const [myErr, setMyErr] = useState<string>("");
+  const [myActivities, setMyActivities] = useState<MyActivity[]>([]);
+  const [showChurch, setShowChurch] = useState(false);
+  const [showMine, setShowMine] = useState(true);
 
   const weekDates = useMemo(() => {
     const dates: string[] = [];
@@ -106,6 +121,43 @@ export function CalendarPanel(props: { identity: Identity; onClose: () => void }
     };
   }, [identity, weekStartISO]);
 
+  useEffect(() => {
+    let cancelled = false;
+    async function loadMine() {
+      setMyBusy(true);
+      setMyErr("");
+      try {
+        const out = await postJson<any>("/api/a2a/community/my/list", { identity, include_inactive: false, limit: 200, offset: 0 });
+        const items = Array.isArray(out?.items) ? out.items : [];
+        const normalized = items
+          .filter((it: any) => it && typeof it === "object" && typeof it.communityId === "string" && typeof it.title === "string")
+          .map(
+            (it: any) =>
+              ({
+                communityId: String(it.communityId),
+                title: String(it.title),
+                kind: typeof it.kind === "string" ? it.kind : null,
+                campusId: typeof it.campusId === "string" ? it.campusId : null,
+                startAt: typeof it.startAt === "string" ? it.startAt : null,
+                endAt: typeof it.endAt === "string" ? it.endAt : null,
+                status: typeof it.status === "string" ? it.status : null,
+              }) as MyActivity,
+          )
+          .filter((it: MyActivity) => typeof it.startAt === "string" && Boolean(it.startAt));
+        if (!cancelled) setMyActivities(normalized);
+      } catch (e: any) {
+        if (!cancelled) setMyErr(String(e?.message ?? e ?? "Failed to load your activities"));
+        if (!cancelled) setMyActivities([]);
+      } finally {
+        if (!cancelled) setMyBusy(false);
+      }
+    }
+    void loadMine();
+    return () => {
+      cancelled = true;
+    };
+  }, [identity]);
+
   const events = useMemo(() => {
     const items = Array.isArray(schedule?.events) ? schedule!.events : [];
     return items
@@ -115,15 +167,25 @@ export function CalendarPanel(props: { identity: Identity; onClose: () => void }
   }, [schedule]);
 
   const grouped = useMemo(() => {
-    const map = new Map<string, ChurchEvent[]>();
-    for (const d of weekDates) map.set(d, []);
+    const map = new Map<string, { church: ChurchEvent[]; mine: MyActivity[] }>();
+    for (const d of weekDates) map.set(d, { church: [], mine: [] });
     for (const e of events) {
       const key = new Date(e.start_at).toISOString().slice(0, 10);
       const arr = map.get(key);
-      if (arr) arr.push(e);
+      if (arr) arr.church.push(e);
+    }
+    for (const a of myActivities) {
+      const key = String(a.startAt).slice(0, 10);
+      const arr = map.get(key);
+      if (arr) arr.mine.push(a);
+    }
+    for (const [k, v] of map.entries()) {
+      v.church.sort((a, b) => Date.parse(a.start_at) - Date.parse(b.start_at));
+      v.mine.sort((a, b) => Date.parse(String(a.startAt)) - Date.parse(String(b.startAt)));
+      map.set(k, v);
     }
     return [...map.entries()];
-  }, [events, weekDates]);
+  }, [events, myActivities, weekDates]);
 
   const buttonStyle: React.CSSProperties = {
     border: "1px solid #e2e8f0",
@@ -139,12 +201,14 @@ export function CalendarPanel(props: { identity: Identity; onClose: () => void }
     <div style={{ height: "100%", minHeight: 0, display: "grid", gridTemplateRows: "auto 1fr", background: "white" }}>
       <div style={{ padding: 12, borderBottom: "1px solid #e2e8f0", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
         <div style={{ display: "grid", gap: 2 }}>
-          <div style={{ fontWeight: 900 }}>Events calendar</div>
+          <div style={{ fontWeight: 900 }}>My Calendar</div>
           <div style={{ fontSize: 12, color: "#64748b" }}>
             {weekDates[0]} → {weekDates[6]} {schedule?.asOfISO ? ` (as-of ${schedule.asOfISO})` : ""}
           </div>
-          {busy ? <div style={{ fontSize: 12, color: "#64748b" }}>Loading…</div> : null}
+          {busy ? <div style={{ fontSize: 12, color: "#64748b" }}>Loading church events…</div> : null}
           {err ? <div style={{ fontSize: 12, color: "#b91c1c", fontWeight: 800 }}>{err}</div> : null}
+          {myBusy ? <div style={{ fontSize: 12, color: "#64748b" }}>Loading my activities…</div> : null}
+          {myErr ? <div style={{ fontSize: 12, color: "#b91c1c", fontWeight: 800 }}>{myErr}</div> : null}
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", justifyContent: "flex-end" }}>
           <button style={buttonStyle} onClick={() => setWeekStartISO(addDaysISO(weekStartISO, -7))}>
@@ -166,46 +230,85 @@ export function CalendarPanel(props: { identity: Identity; onClose: () => void }
       </div>
 
       <div style={{ minHeight: 0, overflow: "auto", padding: 12 }}>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
+          <button
+            type="button"
+            onClick={() => setShowMine((v) => !v)}
+            style={{ ...buttonStyle, borderRadius: 999, background: showMine ? "#f0fdf4" : "white", border: showMine ? "1px solid #86efac" : "1px solid #e2e8f0" }}
+            title="Toggle my activities"
+          >
+            My activities
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowChurch((v) => !v)}
+            style={{ ...buttonStyle, borderRadius: 999, background: showChurch ? "#eff6ff" : "white", border: showChurch ? "1px solid #93c5fd" : "1px solid #e2e8f0" }}
+            title="Toggle church events"
+          >
+            Church events
+          </button>
+        </div>
+
         <div style={{ display: "grid", gap: 12 }}>
-          {grouped.map(([dateISO, items]) => (
+          {grouped.map(([dateISO, bucket]) => {
+            const itemsMine = showMine ? bucket.mine : [];
+            const itemsChurch = showChurch ? bucket.church : [];
+            const total = itemsMine.length + itemsChurch.length;
+            return (
             <div key={dateISO} style={{ border: "1px solid #e2e8f0", borderRadius: 14, padding: 10 }}>
               <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10 }}>
                 <div style={{ fontSize: 12, fontWeight: 900 }}>
                   {formatWeekday(dateISO)} <span style={{ color: "#64748b", fontWeight: 700 }}>{formatMonthDay(dateISO)}</span>
                 </div>
-                <div style={{ fontSize: 12, color: "#64748b", fontWeight: 800 }}>{items.length}</div>
+                <div style={{ fontSize: 12, color: "#64748b", fontWeight: 800 }}>{total}</div>
               </div>
               <div style={{ marginTop: 8, display: "grid", gap: 8 }}>
-                {items.length === 0 ? (
+                {total === 0 ? (
                   <div style={{ color: "#94a3b8", fontSize: 12 }}>—</div>
                 ) : (
-                  items.map((e) => {
-                    const wf = e.weatherForecast ?? null;
-                    const isOutdoor = Boolean(e.is_outdoor);
-                    return (
-                      <div key={e.id} style={{ border: "1px solid #e2e8f0", borderRadius: 12, padding: 10, display: "grid", gap: 6 }}>
+                  <>
+                    {itemsMine.map((a) => (
+                      <div key={`mine:${a.communityId}`} style={{ border: "1px solid #86efac", background: "#f0fdf4", borderRadius: 12, padding: 10, display: "grid", gap: 6 }}>
                         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-                          <div style={{ fontSize: 12, fontWeight: 900 }}>{formatLocalTime(e.start_at)}</div>
-                          {isOutdoor ? (
-                            <div style={{ fontSize: 10, fontWeight: 900, background: "#fff7ed", border: "1px solid #fdba74", color: "#78350f", borderRadius: 999, padding: "3px 8px" }}>
-                              Outdoor
+                          <div style={{ fontSize: 12, fontWeight: 900, color: "#166534" }}>{a.startAt ? formatLocalTime(String(a.startAt)) : ""}</div>
+                          <div style={{ fontSize: 10, fontWeight: 900, background: "#dcfce7", border: "1px solid #86efac", color: "#166534", borderRadius: 999, padding: "3px 8px" }}>My</div>
+                        </div>
+                        <div style={{ fontSize: 13, fontWeight: 900 }}>{a.title}</div>
+                        {a.kind ? <div style={{ fontSize: 11, color: "#166534", fontWeight: 800 }}>{String(a.kind)}</div> : null}
+                      </div>
+                    ))}
+                    {itemsChurch.map((e) => {
+                      const wf = e.weatherForecast ?? null;
+                      const isOutdoor = Boolean(e.is_outdoor);
+                      return (
+                        <div key={`church:${e.id}`} style={{ border: "1px solid #e2e8f0", borderRadius: 12, padding: 10, display: "grid", gap: 6 }}>
+                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                            <div style={{ fontSize: 12, fontWeight: 900 }}>{formatLocalTime(e.start_at)}</div>
+                            {isOutdoor ? (
+                              <div style={{ fontSize: 10, fontWeight: 900, background: "#fff7ed", border: "1px solid #fdba74", color: "#78350f", borderRadius: 999, padding: "3px 8px" }}>
+                                Outdoor
+                              </div>
+                            ) : (
+                              <div style={{ fontSize: 10, fontWeight: 900, background: "#eff6ff", border: "1px solid #93c5fd", color: "#1e3a8a", borderRadius: 999, padding: "3px 8px" }}>
+                                Church
+                              </div>
+                            )}
+                          </div>
+                          <div style={{ fontSize: 13, fontWeight: 900 }}>{e.title}</div>
+                          {wf ? (
+                            <div style={{ fontSize: 11, color: "#64748b", fontWeight: 700 }}>
+                              {wf.summary ?? "Forecast"} • {typeof wf.temp === "number" ? `${wf.temp.toFixed(0)}°F` : "?"} •{" "}
+                              {typeof wf.pop === "number" ? `${Math.round(wf.pop * 100)}% precip` : "?"}
                             </div>
                           ) : null}
                         </div>
-                        <div style={{ fontSize: 13, fontWeight: 900 }}>{e.title}</div>
-                        {wf ? (
-                          <div style={{ fontSize: 11, color: "#64748b", fontWeight: 700 }}>
-                            {wf.summary ?? "Forecast"} • {typeof wf.temp === "number" ? `${wf.temp.toFixed(0)}°F` : "?"} •{" "}
-                            {typeof wf.pop === "number" ? `${Math.round(wf.pop * 100)}% precip` : "?"}
-                          </div>
-                        ) : null}
-                      </div>
-                    );
-                  })
+                      );
+                    })}
+                  </>
                 )}
               </div>
             </div>
-          ))}
+          )})}
         </div>
       </div>
     </div>

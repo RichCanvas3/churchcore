@@ -46,6 +46,12 @@ type SermonTranscriptMeta = {
   updatedAt?: string | null;
 };
 
+function normalizeCampusId(raw: unknown): string | null {
+  const s = typeof raw === "string" ? raw.trim() : "";
+  if (!s) return null;
+  return /^campus_[a-z0-9_]+$/i.test(s) ? s : null;
+}
+
 async function postJson<T = any>(url: string, body: unknown): Promise<T> {
   const res = await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
   const json = (await res.json().catch(() => ({}))) as any;
@@ -66,7 +72,7 @@ export function WeeklySermonsPanel(props: { identity: Identity; onClose: () => v
   const [loading, setLoading] = useState(false);
   const [uiError, setUiError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
-  const [campusId, setCampusId] = useState<string>(() => identity.campus_id ?? "campus_boulder");
+  const [campusId, setCampusId] = useState<string>(() => normalizeCampusId(identity.campus_id) ?? "campus_boulder");
   const [sermons, setSermons] = useState<SermonRow[]>([]);
   const [selectedId, setSelectedId] = useState<string>("");
   const [selected, setSelected] = useState<SermonRow | null>(null);
@@ -119,16 +125,37 @@ export function WeeklySermonsPanel(props: { identity: Identity; onClose: () => v
   }
 
   useEffect(() => {
+    let cancelled = false;
     setSermons([]);
     setSelectedId("");
     setSelected(null);
     setAnalysis(null);
     setTranscript(null);
     setSearch("");
-    setCampusId(identity.campus_id ?? "campus_boulder");
-    void refreshList(identity.campus_id ?? "campus_boulder");
+
+    async function init() {
+      // Prefer person memory campus (most authoritative), then identity campus, then fallback.
+      let next: string | null = null;
+      try {
+        const out = await postJson<any>("/api/a2a/memory/get", { identity });
+        const memCampusRaw = out?.memory?.identity?.campusId;
+        next = normalizeCampusId(memCampusRaw);
+      } catch {
+        // ignore
+      }
+      if (!next) next = normalizeCampusId(identity.campus_id);
+      next = next ?? "campus_boulder";
+      if (cancelled) return;
+      setCampusId(next);
+      await refreshList(next);
+    }
+
+    void init();
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [identity.tenant_id, identity.user_id]);
+  }, [identity.tenant_id, identity.user_id, identity.campus_id, identity.persona_id]);
 
   // If opened with an explicit sermon id, select it (only if nothing selected yet).
   useEffect(() => {

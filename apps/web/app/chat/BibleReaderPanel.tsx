@@ -65,8 +65,9 @@ function normalizeRef(raw: string) {
     .replace(/\s+/g, " ");
 }
 
-export function BibleReaderPanel(props: { identity: Identity; initialRef?: string | null; onClose: () => void }) {
+export function BibleReaderPanel(props: { identity: Identity; initialRef?: string | null; onClose: () => void; showPlan?: boolean }) {
   const identity = props.identity;
+  const showPlan = props.showPlan !== false;
   const [ref, setRef] = useState<string>(() => normalizeRef(props.initialRef || "Ephesians 2:8-9"));
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string>("");
@@ -130,9 +131,10 @@ export function BibleReaderPanel(props: { identity: Identity; initialRef?: strin
   }
 
   useEffect(() => {
+    if (!showPlan) return;
     void loadPlan();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [identity.tenant_id, identity.user_id, identity.persona_id, identity.role, identity.campus_id]);
+  }, [showPlan, identity.tenant_id, identity.user_id, identity.persona_id, identity.role, identity.campus_id]);
 
   const completedIds = useMemo(() => {
     const s = new Set<string>();
@@ -225,7 +227,8 @@ export function BibleReaderPanel(props: { identity: Identity; initialRef?: strin
           )}
         </section>
 
-        <section style={{ background: "white", border: "1px solid #e2e8f0", borderRadius: 14, padding: 12, display: "grid", gap: 10 }}>
+        {showPlan ? (
+          <section style={{ background: "white", border: "1px solid #e2e8f0", borderRadius: 14, padding: 12, display: "grid", gap: 10 }}>
           <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
             <div style={{ fontSize: 12, fontWeight: 900, color: "#0f172a" }}>Bible Reading Plan</div>
             <button type="button" onClick={() => void loadPlan()} style={btn} disabled={planLoading}>
@@ -308,6 +311,7 @@ export function BibleReaderPanel(props: { identity: Identity; initialRef?: strin
             </div>
           ) : null}
         </section>
+        ) : null}
       </div>
     </div>
   );
