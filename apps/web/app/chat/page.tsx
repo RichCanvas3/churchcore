@@ -14,6 +14,7 @@ import { TeamsSkillsPanel } from "./TeamsSkillsPanel";
 import { CarePastoralPanel } from "./CarePastoralPanel";
 import { MemoryManagerPanel } from "./MemoryManagerPanel";
 import { CommunityManagerPanel } from "./CommunityManagerPanel";
+import { GroupsPanel } from "./GroupsPanel";
 import { GuidePanel } from "./GuidePanel";
 import { ChurchOverviewPanel } from "./ChurchOverviewPanel";
 import { StrategicIntentPanel } from "./StrategicIntentPanel";
@@ -305,6 +306,7 @@ export default function ChatPage() {
     if (toolId === "guide") return "Your Personal Guide";
     if (toolId === "calendar") return "My Calendar";
     if (toolId === "bible_reader") return "Bible Scripture";
+    if (toolId === "groups_manager") return "My Groups";
     const t = String(title ?? "").trim();
     return t || toolId;
   }
@@ -1322,6 +1324,18 @@ export default function ChatPage() {
               />
             ) : activeUiToolId === "community_manager" ? (
               <CommunityManagerPanel
+                identity={{
+                  tenant_id: identity.tenant_id,
+                  user_id: identity.user_id,
+                  role: identity.role,
+                  campus_id: identity.campus_id ?? null,
+                  timezone: identity.timezone ?? null,
+                  persona_id: (identity as any).persona_id ?? null,
+                }}
+                onClose={closeTool}
+              />
+            ) : activeUiToolId === "groups_manager" ? (
+              <GroupsPanel
                 identity={{
                   tenant_id: identity.tenant_id,
                   user_id: identity.user_id,

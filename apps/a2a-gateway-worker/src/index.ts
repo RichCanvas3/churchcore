@@ -147,6 +147,13 @@ function agentCard(req: Request, env: Env) {
           examples: ["Show me LifeGroups", "Join Starting Point", "What outreach is available?", "Mark that I attended"],
         },
         {
+          id: "group_membership",
+          name: "Group membership",
+          description: "Manage long-lived groups (Life Groups, Men's/Women's, Bible study groups): my groups, rosters, invites, group schedule, and group Bible study notes.",
+          tags: ["groups", "membership", "bible_study", "schedule"],
+          examples: ["Show my groups", "Invite someone to my group", "Add a group event", "Start a Bible study for our group"],
+        },
+        {
           id: "calendar",
           name: "Calendar",
           description: "Week-view calendar of church events; outdoor events include a weather snapshot (48h/8d forecast).",
@@ -178,6 +185,23 @@ function agentCard(req: Request, env: Env) {
         thread_create: `${baseUrl}a2a/thread.create`,
         thread_rename: `${baseUrl}a2a/thread.rename`,
         thread_archive: `${baseUrl}a2a/thread.archive`,
+        group_my_list: `${baseUrl}a2a/group.my.list`,
+        group_get: `${baseUrl}a2a/group.get`,
+        group_members_list: `${baseUrl}a2a/group.members.list`,
+        group_invite_create: `${baseUrl}a2a/group.invite.create`,
+        group_invite_respond: `${baseUrl}a2a/group.invite.respond`,
+        group_member_remove: `${baseUrl}a2a/group.member.remove`,
+        group_member_set_role: `${baseUrl}a2a/group.member.set_role`,
+        group_events_list: `${baseUrl}a2a/group.events.list`,
+        group_event_create: `${baseUrl}a2a/group.event.create`,
+        group_event_update: `${baseUrl}a2a/group.event.update`,
+        group_event_delete: `${baseUrl}a2a/group.event.delete`,
+        group_bible_study_list: `${baseUrl}a2a/group.bible_study.list`,
+        group_bible_study_create: `${baseUrl}a2a/group.bible_study.create`,
+        group_bible_study_reading_add: `${baseUrl}a2a/group.bible_study.reading.add`,
+        group_bible_study_note_add: `${baseUrl}a2a/group.bible_study.note.add`,
+        group_bible_study_sessions_list: `${baseUrl}a2a/group.bible_study.sessions.list`,
+        group_bible_study_session_create: `${baseUrl}a2a/group.bible_study.session.create`,
         household_identify: `${baseUrl}a2a/household.identify`,
         household_create: `${baseUrl}a2a/household.create`,
         household_get: `${baseUrl}a2a/household.get`,
@@ -1669,6 +1693,127 @@ const CommunityMarkSchema = z.object({
   identity: IdentitySchema,
   community_id: z.string().min(1),
   status: z.enum(["attended", "completed"]),
+});
+
+// Groups (long-lived membership + schedule + bible study)
+const GroupMyListSchema = z.object({
+  identity: IdentitySchema,
+  include_inactive: z.boolean().optional().nullable(),
+  limit: z.number().int().min(1).max(200).optional().nullable(),
+  offset: z.number().int().min(0).max(500000).optional().nullable(),
+});
+
+const GroupGetSchema = z.object({
+  identity: IdentitySchema,
+  group_id: z.string().min(1),
+});
+
+const GroupMembersListSchema = z.object({
+  identity: IdentitySchema,
+  group_id: z.string().min(1),
+  include_inactive: z.boolean().optional().nullable(),
+});
+
+const GroupInviteCreateSchema = z.object({
+  identity: IdentitySchema,
+  group_id: z.string().min(1),
+  invitee_person_id: z.string().min(1),
+});
+
+const GroupInviteRespondSchema = z.object({
+  identity: IdentitySchema,
+  invite_id: z.string().min(1),
+  action: z.enum(["accept", "decline"]),
+});
+
+const GroupMemberRemoveSchema = z.object({
+  identity: IdentitySchema,
+  group_id: z.string().min(1),
+  member_person_id: z.string().min(1),
+});
+
+const GroupMemberSetRoleSchema = z.object({
+  identity: IdentitySchema,
+  group_id: z.string().min(1),
+  member_person_id: z.string().min(1),
+  role: z.enum(["member", "leader", "host"]),
+});
+
+const GroupEventsListSchema = z.object({
+  identity: IdentitySchema,
+  group_id: z.string().min(1),
+  from_iso: z.string().min(1),
+  to_iso: z.string().min(1),
+});
+
+const GroupEventCreateSchema = z.object({
+  identity: IdentitySchema,
+  group_id: z.string().min(1),
+  title: z.string().min(1),
+  description: z.string().optional().nullable(),
+  location: z.string().optional().nullable(),
+  start_at: z.string().min(1),
+  end_at: z.string().optional().nullable(),
+  visibility: z.enum(["members", "leaders"]).optional().nullable(),
+});
+
+const GroupEventUpdateSchema = z.object({
+  identity: IdentitySchema,
+  group_id: z.string().min(1),
+  event_id: z.string().min(1),
+  title: z.string().min(1).optional().nullable(),
+  description: z.string().optional().nullable(),
+  location: z.string().optional().nullable(),
+  start_at: z.string().min(1).optional().nullable(),
+  end_at: z.string().optional().nullable(),
+  visibility: z.enum(["members", "leaders"]).optional().nullable(),
+});
+
+const GroupEventDeleteSchema = z.object({
+  identity: IdentitySchema,
+  group_id: z.string().min(1),
+  event_id: z.string().min(1),
+});
+
+const GroupBibleStudyListSchema = z.object({
+  identity: IdentitySchema,
+  group_id: z.string().min(1),
+  include_archived: z.boolean().optional().nullable(),
+});
+
+const GroupBibleStudyCreateSchema = z.object({
+  identity: IdentitySchema,
+  group_id: z.string().min(1),
+  title: z.string().min(1),
+  description: z.string().optional().nullable(),
+});
+
+const GroupBibleStudyAddReadingSchema = z.object({
+  identity: IdentitySchema,
+  bible_study_id: z.string().min(1),
+  ref: z.string().min(1),
+  order_index: z.number().int().min(0).max(100000).optional().nullable(),
+  notes: z.string().optional().nullable(),
+});
+
+const GroupBibleStudyAddNoteSchema = z.object({
+  identity: IdentitySchema,
+  bible_study_id: z.string().min(1),
+  content_markdown: z.string().min(1),
+  visibility: z.enum(["members", "leaders"]).optional().nullable(),
+});
+
+const GroupBibleStudySessionsListSchema = z.object({
+  identity: IdentitySchema,
+  bible_study_id: z.string().min(1),
+});
+
+const GroupBibleStudySessionCreateSchema = z.object({
+  identity: IdentitySchema,
+  bible_study_id: z.string().min(1),
+  session_at: z.string().min(1),
+  title: z.string().optional().nullable(),
+  agenda: z.string().optional().nullable(),
 });
 
 const CheckinStartSchema = z.object({
@@ -4285,6 +4430,587 @@ async function handleCommunityMark(req: Request, env: Env) {
   return json({ ok: true, person_id: personId, community_id: communityId, status, actor: { userId, role } });
 }
 
+async function groupActorRole(env: Env, args: { churchId: string; groupId: string; actorPersonId: string }) {
+  const row = (await env.churchcore
+    .prepare(`SELECT role,status FROM group_memberships WHERE church_id=?1 AND group_id=?2 AND person_id=?3`)
+    .bind(args.churchId, args.groupId, args.actorPersonId)
+    .first()) as any;
+  const status = String(row?.status ?? "");
+  const role = String(row?.role ?? "member").toLowerCase();
+  return { status, role: role === "leader" || role === "host" ? role : "member" };
+}
+
+async function canManageGroupMembers(env: Env, args: { churchId: string; userId: string; identityRole: string; groupId: string; personId: string }) {
+  const roles = await getUserRoles(env, { churchId: args.churchId, userId: args.userId });
+  const isStaff = String(args.identityRole || "").toLowerCase() === "guide" || roles.has("staff");
+  if (isStaff) return true;
+  const actor = await groupActorRole(env, { churchId: args.churchId, groupId: args.groupId, actorPersonId: args.personId });
+  return actor.status === "active" && (actor.role === "leader" || actor.role === "host");
+}
+
+async function handleGroupMyList(req: Request, env: Env) {
+  const parsed = GroupMyListSchema.safeParse(await parseJson(req));
+  if (!parsed.success) return json({ error: "Invalid body", issues: parsed.error.issues }, { status: 400 });
+  const { identity } = parsed.data;
+  const churchId = identity.tenant_id;
+  const userId = identity.user_id;
+  const role = (identity.role ?? "seeker") as string;
+  const includeInactive = Boolean(parsed.data.include_inactive);
+  const limit = parsed.data.limit ?? 100;
+  const offset = parsed.data.offset ?? 0;
+
+  const { personId } = await resolvePerson(env, identity);
+  if (!personId) return json({ ok: true, person_id: null, groups: [], actor: { userId, role } });
+
+  const statusClause = includeInactive ? "" : "AND gm.status IN ('active','pending')";
+  const rows =
+    (
+      await env.churchcore
+        .prepare(
+          `SELECT g.id,g.campus_id AS campusId,g.name,g.description,g.leader_person_id AS leaderPersonId,g.meeting_details AS meetingDetails,g.is_open AS isOpen,
+                  gm.role AS myRole, gm.status AS myStatus, gm.joined_at AS joinedAt
+           FROM group_memberships gm
+           JOIN groups g ON g.id=gm.group_id
+           WHERE gm.church_id=?1 AND gm.person_id=?2 ${statusClause}
+           ORDER BY g.name ASC
+           LIMIT ${limit} OFFSET ${offset}`,
+        )
+        .bind(churchId, personId)
+        .all()
+    ).results ?? [];
+  return json({ ok: true, person_id: personId, groups: rows, actor: { userId, role } });
+}
+
+async function handleGroupGet(req: Request, env: Env) {
+  const parsed = GroupGetSchema.safeParse(await parseJson(req));
+  if (!parsed.success) return json({ error: "Invalid body", issues: parsed.error.issues }, { status: 400 });
+  const { identity } = parsed.data;
+  const churchId = identity.tenant_id;
+  const userId = identity.user_id;
+  const role = (identity.role ?? "seeker") as string;
+  const groupId = parsed.data.group_id.trim();
+
+  const group = (await env.churchcore
+    .prepare(
+      `SELECT id,campus_id AS campusId,name,description,leader_person_id AS leaderPersonId,meeting_details AS meetingDetails,is_open AS isOpen,created_at AS createdAt,updated_at AS updatedAt
+       FROM groups WHERE church_id=?1 AND id=?2`,
+    )
+    .bind(churchId, groupId)
+    .first()) as any;
+  if (!group) return json({ ok: false, error: "Group not found", actor: { userId, role } }, { status: 404 });
+
+  const counts = (await env.churchcore
+    .prepare(
+      `SELECT status, COUNT(*) AS c
+       FROM group_memberships
+       WHERE church_id=?1 AND group_id=?2
+       GROUP BY status`,
+    )
+    .bind(churchId, groupId)
+    .all()) as any;
+  const membershipCounts: Record<string, number> = {};
+  for (const r of ((counts?.results ?? []) as any[]).filter(Boolean)) membershipCounts[String(r.status)] = Number(r.c ?? 0);
+
+  return json({ ok: true, group, membershipCounts, actor: { userId, role } });
+}
+
+async function handleGroupMembersList(req: Request, env: Env) {
+  const parsed = GroupMembersListSchema.safeParse(await parseJson(req));
+  if (!parsed.success) return json({ error: "Invalid body", issues: parsed.error.issues }, { status: 400 });
+  const { identity } = parsed.data;
+  const churchId = identity.tenant_id;
+  const userId = identity.user_id;
+  const role = (identity.role ?? "seeker") as string;
+  const groupId = parsed.data.group_id.trim();
+  const includeInactive = Boolean(parsed.data.include_inactive);
+
+  const { personId } = await resolvePerson(env, identity);
+  if (!personId) return json({ ok: false, error: "No personId" }, { status: 400 });
+  const actor = await groupActorRole(env, { churchId, groupId, actorPersonId: personId });
+  if (actor.status !== "active") return json({ ok: false, error: "Not permitted" }, { status: 403 });
+
+  const statusClause = includeInactive ? "" : "AND gm.status='active'";
+  const rows =
+    (
+      await env.churchcore
+        .prepare(
+          `SELECT gm.person_id AS personId, gm.role, gm.status, gm.joined_at AS joinedAt,
+                  p.first_name AS firstName, p.last_name AS lastName, p.email, p.phone
+           FROM group_memberships gm
+           JOIN people p ON p.id=gm.person_id
+           WHERE gm.church_id=?1 AND gm.group_id=?2 ${statusClause}
+           ORDER BY gm.role DESC, p.last_name ASC, p.first_name ASC`,
+        )
+        .bind(churchId, groupId)
+        .all()
+    ).results ?? [];
+
+  return json({ ok: true, members: rows, actor: { userId, role, personId } });
+}
+
+async function handleGroupInviteCreate(req: Request, env: Env) {
+  const parsed = GroupInviteCreateSchema.safeParse(await parseJson(req));
+  if (!parsed.success) return json({ error: "Invalid body", issues: parsed.error.issues }, { status: 400 });
+  const { identity } = parsed.data;
+  const churchId = identity.tenant_id;
+  const userId = identity.user_id;
+  const role = (identity.role ?? "seeker") as string;
+  const groupId = parsed.data.group_id.trim();
+  const inviteePersonId = parsed.data.invitee_person_id.trim();
+
+  const { personId } = await resolvePerson(env, identity);
+  if (!personId) return json({ ok: false, error: "No personId" }, { status: 400 });
+  if (inviteePersonId === personId) return json({ ok: false, error: "Cannot invite self" }, { status: 400 });
+  const actor = await groupActorRole(env, { churchId, groupId, actorPersonId: personId });
+  if (actor.status !== "active") return json({ ok: false, error: "Not a group member" }, { status: 403 });
+
+  const existing = (await env.churchcore
+    .prepare(`SELECT status FROM group_memberships WHERE church_id=?1 AND group_id=?2 AND person_id=?3`)
+    .bind(churchId, groupId, inviteePersonId)
+    .first()) as any;
+  if (existing && String(existing.status) !== "inactive") return json({ ok: true, invite: null, note: "Already a member", actor: { userId, role, personId } });
+
+  const now = nowIso();
+  const id = crypto.randomUUID();
+  await env.churchcore
+    .prepare(
+      `INSERT INTO group_invites (id, church_id, group_id, invited_by_person_id, invitee_person_id, status, created_at, updated_at)
+       VALUES (?1, ?2, ?3, ?4, ?5, 'pending', ?6, ?7)
+       ON CONFLICT(church_id, group_id, invitee_person_id) DO UPDATE
+         SET invited_by_person_id=excluded.invited_by_person_id,
+             status='pending',
+             updated_at=excluded.updated_at`,
+    )
+    .bind(id, churchId, groupId, personId, inviteePersonId, now, now)
+    .run();
+
+  const invite = (await env.churchcore
+    .prepare(
+      `SELECT id,group_id AS groupId,invited_by_person_id AS invitedByPersonId,invitee_person_id AS inviteePersonId,status,created_at AS createdAt,updated_at AS updatedAt
+       FROM group_invites WHERE church_id=?1 AND group_id=?2 AND invitee_person_id=?3`,
+    )
+    .bind(churchId, groupId, inviteePersonId)
+    .first()) as any;
+
+  return json({ ok: true, invite, actor: { userId, role, personId } });
+}
+
+async function handleGroupInviteRespond(req: Request, env: Env) {
+  const parsed = GroupInviteRespondSchema.safeParse(await parseJson(req));
+  if (!parsed.success) return json({ error: "Invalid body", issues: parsed.error.issues }, { status: 400 });
+  const { identity } = parsed.data;
+  const churchId = identity.tenant_id;
+  const userId = identity.user_id;
+  const role = (identity.role ?? "seeker") as string;
+  const inviteId = parsed.data.invite_id.trim();
+  const action = parsed.data.action;
+
+  const { personId } = await resolvePerson(env, identity);
+  if (!personId) return json({ ok: false, error: "No personId" }, { status: 400 });
+
+  const invite = (await env.churchcore
+    .prepare(
+      `SELECT id,group_id AS groupId,invitee_person_id AS inviteePersonId,status
+       FROM group_invites WHERE church_id=?1 AND id=?2`,
+    )
+    .bind(churchId, inviteId)
+    .first()) as any;
+  if (!invite) return json({ ok: false, error: "Invite not found" }, { status: 404 });
+  if (String(invite.inviteePersonId) !== personId) return json({ ok: false, error: "Not permitted" }, { status: 403 });
+  if (String(invite.status) !== "pending") return json({ ok: false, error: "Invite is not pending" }, { status: 400 });
+
+  const now = nowIso();
+  const nextStatus = action === "accept" ? "accepted" : "declined";
+  await env.churchcore.prepare(`UPDATE group_invites SET status=?4, updated_at=?3 WHERE church_id=?1 AND id=?2`).bind(churchId, inviteId, now, nextStatus).run();
+  if (action === "accept") {
+    await env.churchcore
+      .prepare(
+        `INSERT INTO group_memberships (church_id, group_id, person_id, role, status, joined_at)
+         VALUES (?1, ?2, ?3, 'member', 'active', ?4)
+         ON CONFLICT(group_id, person_id) DO UPDATE
+           SET status='active',
+               role=excluded.role,
+               joined_at=COALESCE(group_memberships.joined_at, excluded.joined_at)`,
+      )
+      .bind(churchId, String(invite.groupId), personId, now)
+      .run();
+  }
+
+  return json({ ok: true, status: nextStatus, group_id: String(invite.groupId), actor: { userId, role, personId } });
+}
+
+async function handleGroupMemberRemove(req: Request, env: Env) {
+  const parsed = GroupMemberRemoveSchema.safeParse(await parseJson(req));
+  if (!parsed.success) return json({ error: "Invalid body", issues: parsed.error.issues }, { status: 400 });
+  const { identity } = parsed.data;
+  const churchId = identity.tenant_id;
+  const userId = identity.user_id;
+  const role = (identity.role ?? "seeker") as string;
+  const groupId = parsed.data.group_id.trim();
+  const memberPersonId = parsed.data.member_person_id.trim();
+
+  const { personId } = await resolvePerson(env, identity);
+  if (!personId) return json({ ok: false, error: "No personId" }, { status: 400 });
+  const ok = await canManageGroupMembers(env, { churchId, userId, identityRole: role, groupId, personId });
+  if (!ok) return json({ ok: false, error: "Forbidden" }, { status: 403 });
+  if (memberPersonId === personId) return json({ ok: false, error: "Cannot remove self" }, { status: 400 });
+
+  await env.churchcore.prepare(`UPDATE group_memberships SET status='inactive' WHERE church_id=?1 AND group_id=?2 AND person_id=?3`).bind(churchId, groupId, memberPersonId).run();
+  return json({ ok: true, actor: { userId, role, personId } });
+}
+
+async function handleGroupMemberSetRole(req: Request, env: Env) {
+  const parsed = GroupMemberSetRoleSchema.safeParse(await parseJson(req));
+  if (!parsed.success) return json({ error: "Invalid body", issues: parsed.error.issues }, { status: 400 });
+  const { identity } = parsed.data;
+  const churchId = identity.tenant_id;
+  const userId = identity.user_id;
+  const role = (identity.role ?? "seeker") as string;
+  const groupId = parsed.data.group_id.trim();
+  const memberPersonId = parsed.data.member_person_id.trim();
+  const nextRole = parsed.data.role;
+
+  const { personId } = await resolvePerson(env, identity);
+  if (!personId) return json({ ok: false, error: "No personId" }, { status: 400 });
+  const ok = await canManageGroupMembers(env, { churchId, userId, identityRole: role, groupId, personId });
+  if (!ok) return json({ ok: false, error: "Forbidden" }, { status: 403 });
+
+  await env.churchcore.prepare(`UPDATE group_memberships SET role=?4 WHERE church_id=?1 AND group_id=?2 AND person_id=?3`).bind(churchId, groupId, memberPersonId, nextRole).run();
+  return json({ ok: true, actor: { userId, role, personId } });
+}
+
+async function handleGroupEventsList(req: Request, env: Env) {
+  const parsed = GroupEventsListSchema.safeParse(await parseJson(req));
+  if (!parsed.success) return json({ error: "Invalid body", issues: parsed.error.issues }, { status: 400 });
+  const { identity } = parsed.data;
+  const churchId = identity.tenant_id;
+  const userId = identity.user_id;
+  const role = (identity.role ?? "seeker") as string;
+  const groupId = parsed.data.group_id.trim();
+  const fromIso = parsed.data.from_iso.trim();
+  const toIso = parsed.data.to_iso.trim();
+
+  const { personId } = await resolvePerson(env, identity);
+  if (!personId) return json({ ok: false, error: "No personId" }, { status: 400 });
+  const actor = await groupActorRole(env, { churchId, groupId, actorPersonId: personId });
+  if (actor.status !== "active") return json({ ok: false, error: "Not permitted" }, { status: 403 });
+
+  const rows =
+    (
+      await env.churchcore
+        .prepare(
+          `SELECT id,group_id AS groupId,title,description,location,start_at AS startAt,end_at AS endAt,created_by_person_id AS createdByPersonId,visibility,created_at AS createdAt,updated_at AS updatedAt
+           FROM group_events
+           WHERE church_id=?1 AND group_id=?2 AND start_at>=?3 AND start_at<=?4
+           ORDER BY start_at ASC`,
+        )
+        .bind(churchId, groupId, fromIso, toIso)
+        .all()
+    ).results ?? [];
+
+  return json({ ok: true, events: rows, actor: { userId, role, personId } });
+}
+
+async function handleGroupEventCreate(req: Request, env: Env) {
+  const parsed = GroupEventCreateSchema.safeParse(await parseJson(req));
+  if (!parsed.success) return json({ error: "Invalid body", issues: parsed.error.issues }, { status: 400 });
+  const { identity } = parsed.data;
+  const churchId = identity.tenant_id;
+  const userId = identity.user_id;
+  const role = (identity.role ?? "seeker") as string;
+  const groupId = parsed.data.group_id.trim();
+
+  const { personId } = await resolvePerson(env, identity);
+  if (!personId) return json({ ok: false, error: "No personId" }, { status: 400 });
+  const actor = await groupActorRole(env, { churchId, groupId, actorPersonId: personId });
+  if (actor.status !== "active") return json({ ok: false, error: "Not permitted" }, { status: 403 });
+
+  const id = crypto.randomUUID();
+  const now = nowIso();
+  await env.churchcore
+    .prepare(
+      `INSERT INTO group_events (id, church_id, group_id, title, description, location, start_at, end_at, created_by_person_id, visibility, created_at, updated_at)
+       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)`,
+    )
+    .bind(
+      id,
+      churchId,
+      groupId,
+      parsed.data.title,
+      parsed.data.description ?? null,
+      parsed.data.location ?? null,
+      parsed.data.start_at,
+      parsed.data.end_at ?? null,
+      personId,
+      parsed.data.visibility ?? "members",
+      now,
+      now,
+    )
+    .run();
+
+  return json({ ok: true, event_id: id, actor: { userId, role, personId } });
+}
+
+async function handleGroupEventUpdate(req: Request, env: Env) {
+  const parsed = GroupEventUpdateSchema.safeParse(await parseJson(req));
+  if (!parsed.success) return json({ error: "Invalid body", issues: parsed.error.issues }, { status: 400 });
+  const { identity } = parsed.data;
+  const churchId = identity.tenant_id;
+  const userId = identity.user_id;
+  const role = (identity.role ?? "seeker") as string;
+  const groupId = parsed.data.group_id.trim();
+  const eventId = parsed.data.event_id.trim();
+
+  const { personId } = await resolvePerson(env, identity);
+  if (!personId) return json({ ok: false, error: "No personId" }, { status: 400 });
+  const actor = await groupActorRole(env, { churchId, groupId, actorPersonId: personId });
+  const roles = await getUserRoles(env, { churchId, userId });
+  const isStaff = String(role).toLowerCase() === "guide" || roles.has("staff");
+  if (!isStaff && actor.status !== "active") return json({ ok: false, error: "Not permitted" }, { status: 403 });
+
+  const ev = (await env.churchcore
+    .prepare(`SELECT created_by_person_id AS createdBy FROM group_events WHERE church_id=?1 AND id=?2 AND group_id=?3`)
+    .bind(churchId, eventId, groupId)
+    .first()) as any;
+  if (!ev) return json({ ok: false, error: "Event not found" }, { status: 404 });
+  const isPriv = isStaff || (actor.status === "active" && (actor.role === "leader" || actor.role === "host"));
+  const isCreator = String(ev.createdBy ?? "") && String(ev.createdBy) === personId;
+  if (!isPriv && !isCreator) return json({ ok: false, error: "Forbidden" }, { status: 403 });
+
+  const now = nowIso();
+  await env.churchcore
+    .prepare(
+      `UPDATE group_events
+       SET title=COALESCE(?4, title),
+           description=COALESCE(?5, description),
+           location=COALESCE(?6, location),
+           start_at=COALESCE(?7, start_at),
+           end_at=COALESCE(?8, end_at),
+           visibility=COALESCE(?9, visibility),
+           updated_at=?10
+       WHERE church_id=?1 AND id=?2 AND group_id=?3`,
+    )
+    .bind(
+      churchId,
+      eventId,
+      groupId,
+      parsed.data.title ?? null,
+      parsed.data.description ?? null,
+      parsed.data.location ?? null,
+      parsed.data.start_at ?? null,
+      parsed.data.end_at ?? null,
+      parsed.data.visibility ?? null,
+      now,
+    )
+    .run();
+
+  return json({ ok: true, actor: { userId, role, personId } });
+}
+
+async function handleGroupEventDelete(req: Request, env: Env) {
+  const parsed = GroupEventDeleteSchema.safeParse(await parseJson(req));
+  if (!parsed.success) return json({ error: "Invalid body", issues: parsed.error.issues }, { status: 400 });
+  const { identity } = parsed.data;
+  const churchId = identity.tenant_id;
+  const userId = identity.user_id;
+  const role = (identity.role ?? "seeker") as string;
+  const groupId = parsed.data.group_id.trim();
+  const eventId = parsed.data.event_id.trim();
+
+  const { personId } = await resolvePerson(env, identity);
+  if (!personId) return json({ ok: false, error: "No personId" }, { status: 400 });
+  const actor = await groupActorRole(env, { churchId, groupId, actorPersonId: personId });
+  const roles = await getUserRoles(env, { churchId, userId });
+  const isStaff = String(role).toLowerCase() === "guide" || roles.has("staff");
+  if (!isStaff && actor.status !== "active") return json({ ok: false, error: "Not permitted" }, { status: 403 });
+
+  const ev = (await env.churchcore
+    .prepare(`SELECT created_by_person_id AS createdBy FROM group_events WHERE church_id=?1 AND id=?2 AND group_id=?3`)
+    .bind(churchId, eventId, groupId)
+    .first()) as any;
+  if (!ev) return json({ ok: false, error: "Event not found" }, { status: 404 });
+  const isPriv = isStaff || (actor.status === "active" && (actor.role === "leader" || actor.role === "host"));
+  const isCreator = String(ev.createdBy ?? "") && String(ev.createdBy) === personId;
+  if (!isPriv && !isCreator) return json({ ok: false, error: "Forbidden" }, { status: 403 });
+
+  await env.churchcore.prepare(`DELETE FROM group_events WHERE church_id=?1 AND id=?2 AND group_id=?3`).bind(churchId, eventId, groupId).run();
+  return json({ ok: true, actor: { userId, role, personId } });
+}
+
+async function handleGroupBibleStudyList(req: Request, env: Env) {
+  const parsed = GroupBibleStudyListSchema.safeParse(await parseJson(req));
+  if (!parsed.success) return json({ error: "Invalid body", issues: parsed.error.issues }, { status: 400 });
+  const { identity } = parsed.data;
+  const churchId = identity.tenant_id;
+  const userId = identity.user_id;
+  const role = (identity.role ?? "seeker") as string;
+  const groupId = parsed.data.group_id.trim();
+  const includeArchived = Boolean(parsed.data.include_archived);
+
+  const { personId } = await resolvePerson(env, identity);
+  if (!personId) return json({ ok: false, error: "No personId" }, { status: 400 });
+  const actor = await groupActorRole(env, { churchId, groupId, actorPersonId: personId });
+  if (actor.status !== "active") return json({ ok: false, error: "Not permitted" }, { status: 403 });
+
+  const clause = includeArchived ? "" : "AND status='active'";
+  const rows =
+    (
+      await env.churchcore
+        .prepare(
+          `SELECT id,group_id AS groupId,title,description,status,created_by_person_id AS createdByPersonId,created_at AS createdAt,updated_at AS updatedAt
+           FROM group_bible_studies
+           WHERE church_id=?1 AND group_id=?2 ${clause}
+           ORDER BY updated_at DESC`,
+        )
+        .bind(churchId, groupId)
+        .all()
+    ).results ?? [];
+  return json({ ok: true, studies: rows, actor: { userId, role, personId } });
+}
+
+async function handleGroupBibleStudyCreate(req: Request, env: Env) {
+  const parsed = GroupBibleStudyCreateSchema.safeParse(await parseJson(req));
+  if (!parsed.success) return json({ error: "Invalid body", issues: parsed.error.issues }, { status: 400 });
+  const { identity } = parsed.data;
+  const churchId = identity.tenant_id;
+  const userId = identity.user_id;
+  const role = (identity.role ?? "seeker") as string;
+  const groupId = parsed.data.group_id.trim();
+
+  const { personId } = await resolvePerson(env, identity);
+  if (!personId) return json({ ok: false, error: "No personId" }, { status: 400 });
+  const actor = await groupActorRole(env, { churchId, groupId, actorPersonId: personId });
+  if (actor.status !== "active") return json({ ok: false, error: "Not permitted" }, { status: 403 });
+
+  const id = crypto.randomUUID();
+  const now = nowIso();
+  await env.churchcore
+    .prepare(
+      `INSERT INTO group_bible_studies (id, church_id, group_id, title, description, status, created_by_person_id, created_at, updated_at)
+       VALUES (?1, ?2, ?3, ?4, ?5, 'active', ?6, ?7, ?8)`,
+    )
+    .bind(id, churchId, groupId, parsed.data.title, parsed.data.description ?? null, personId, now, now)
+    .run();
+  return json({ ok: true, bible_study_id: id, actor: { userId, role, personId } });
+}
+
+async function handleGroupBibleStudyAddReading(req: Request, env: Env) {
+  const parsed = GroupBibleStudyAddReadingSchema.safeParse(await parseJson(req));
+  if (!parsed.success) return json({ error: "Invalid body", issues: parsed.error.issues }, { status: 400 });
+  const { identity } = parsed.data;
+  const churchId = identity.tenant_id;
+  const userId = identity.user_id;
+  const role = (identity.role ?? "seeker") as string;
+
+  const { personId } = await resolvePerson(env, identity);
+  if (!personId) return json({ ok: false, error: "No personId" }, { status: 400 });
+
+  const bibleStudyId = parsed.data.bible_study_id.trim();
+  const study = (await env.churchcore.prepare(`SELECT group_id AS groupId FROM group_bible_studies WHERE church_id=?1 AND id=?2`).bind(churchId, bibleStudyId).first()) as any;
+  if (!study) return json({ ok: false, error: "Bible study not found" }, { status: 404 });
+  const groupId = String(study.groupId);
+  const actor = await groupActorRole(env, { churchId, groupId, actorPersonId: personId });
+  if (actor.status !== "active") return json({ ok: false, error: "Not permitted" }, { status: 403 });
+
+  const id = crypto.randomUUID();
+  const now = nowIso();
+  await env.churchcore
+    .prepare(`INSERT INTO group_bible_study_readings (id, church_id, bible_study_id, ref, order_index, notes, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)`)
+    .bind(id, churchId, bibleStudyId, parsed.data.ref, parsed.data.order_index ?? 0, parsed.data.notes ?? null, now)
+    .run();
+  return json({ ok: true, reading_id: id, actor: { userId, role, personId } });
+}
+
+async function handleGroupBibleStudyAddNote(req: Request, env: Env) {
+  const parsed = GroupBibleStudyAddNoteSchema.safeParse(await parseJson(req));
+  if (!parsed.success) return json({ error: "Invalid body", issues: parsed.error.issues }, { status: 400 });
+  const { identity } = parsed.data;
+  const churchId = identity.tenant_id;
+  const userId = identity.user_id;
+  const role = (identity.role ?? "seeker") as string;
+
+  const { personId } = await resolvePerson(env, identity);
+  if (!personId) return json({ ok: false, error: "No personId" }, { status: 400 });
+
+  const bibleStudyId = parsed.data.bible_study_id.trim();
+  const study = (await env.churchcore.prepare(`SELECT group_id AS groupId FROM group_bible_studies WHERE church_id=?1 AND id=?2`).bind(churchId, bibleStudyId).first()) as any;
+  if (!study) return json({ ok: false, error: "Bible study not found" }, { status: 404 });
+  const groupId = String(study.groupId);
+  const actor = await groupActorRole(env, { churchId, groupId, actorPersonId: personId });
+  if (actor.status !== "active") return json({ ok: false, error: "Not permitted" }, { status: 403 });
+
+  const id = crypto.randomUUID();
+  const now = nowIso();
+  await env.churchcore
+    .prepare(`INSERT INTO group_bible_study_notes (id, church_id, bible_study_id, author_person_id, content_markdown, visibility, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)`)
+    .bind(id, churchId, bibleStudyId, personId, parsed.data.content_markdown, parsed.data.visibility ?? "members", now)
+    .run();
+  return json({ ok: true, note_id: id, actor: { userId, role, personId } });
+}
+
+async function handleGroupBibleStudySessionsList(req: Request, env: Env) {
+  const parsed = GroupBibleStudySessionsListSchema.safeParse(await parseJson(req));
+  if (!parsed.success) return json({ error: "Invalid body", issues: parsed.error.issues }, { status: 400 });
+  const { identity } = parsed.data;
+  const churchId = identity.tenant_id;
+  const userId = identity.user_id;
+  const role = (identity.role ?? "seeker") as string;
+
+  const bibleStudyId = parsed.data.bible_study_id.trim();
+  const study = (await env.churchcore.prepare(`SELECT group_id AS groupId FROM group_bible_studies WHERE church_id=?1 AND id=?2`).bind(churchId, bibleStudyId).first()) as any;
+  if (!study) return json({ ok: false, error: "Bible study not found" }, { status: 404 });
+  const groupId = String(study.groupId);
+
+  const { personId } = await resolvePerson(env, identity);
+  if (!personId) return json({ ok: false, error: "No personId" }, { status: 400 });
+  const actor = await groupActorRole(env, { churchId, groupId, actorPersonId: personId });
+  if (actor.status !== "active") return json({ ok: false, error: "Not permitted" }, { status: 403 });
+
+  const rows =
+    (
+      await env.churchcore
+        .prepare(
+          `SELECT id,bible_study_id AS bibleStudyId,session_at AS sessionAt,title,agenda,created_at AS createdAt,updated_at AS updatedAt
+           FROM group_bible_study_sessions
+           WHERE church_id=?1 AND bible_study_id=?2
+           ORDER BY session_at DESC`,
+        )
+        .bind(churchId, bibleStudyId)
+        .all()
+    ).results ?? [];
+  return json({ ok: true, sessions: rows, actor: { userId, role, personId } });
+}
+
+async function handleGroupBibleStudySessionCreate(req: Request, env: Env) {
+  const parsed = GroupBibleStudySessionCreateSchema.safeParse(await parseJson(req));
+  if (!parsed.success) return json({ error: "Invalid body", issues: parsed.error.issues }, { status: 400 });
+  const { identity } = parsed.data;
+  const churchId = identity.tenant_id;
+  const userId = identity.user_id;
+  const role = (identity.role ?? "seeker") as string;
+
+  const { personId } = await resolvePerson(env, identity);
+  if (!personId) return json({ ok: false, error: "No personId" }, { status: 400 });
+
+  const bibleStudyId = parsed.data.bible_study_id.trim();
+  const study = (await env.churchcore.prepare(`SELECT group_id AS groupId FROM group_bible_studies WHERE church_id=?1 AND id=?2`).bind(churchId, bibleStudyId).first()) as any;
+  if (!study) return json({ ok: false, error: "Bible study not found" }, { status: 404 });
+  const groupId = String(study.groupId);
+  const actor = await groupActorRole(env, { churchId, groupId, actorPersonId: personId });
+  if (actor.status !== "active") return json({ ok: false, error: "Not permitted" }, { status: 403 });
+
+  const id = crypto.randomUUID();
+  const now = nowIso();
+  await env.churchcore
+    .prepare(
+      `INSERT INTO group_bible_study_sessions (id, church_id, bible_study_id, session_at, title, agenda, created_at, updated_at)
+       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)`,
+    )
+    .bind(id, churchId, bibleStudyId, parsed.data.session_at, parsed.data.title ?? null, parsed.data.agenda ?? null, now, now)
+    .run();
+  return json({ ok: true, session_id: id, actor: { userId, role, personId } });
+}
+
 async function handleCheckinStart(req: Request, env: Env) {
   const parsed = CheckinStartSchema.safeParse(await parseJson(req));
   if (!parsed.success) return json({ error: "Invalid body", issues: parsed.error.issues }, { status: 400 });
@@ -4572,6 +5298,40 @@ export default {
         return handleCommunityLeave(req, env);
       case "/a2a/community.mark":
         return handleCommunityMark(req, env);
+      case "/a2a/group.my.list":
+        return handleGroupMyList(req, env);
+      case "/a2a/group.get":
+        return handleGroupGet(req, env);
+      case "/a2a/group.members.list":
+        return handleGroupMembersList(req, env);
+      case "/a2a/group.invite.create":
+        return handleGroupInviteCreate(req, env);
+      case "/a2a/group.invite.respond":
+        return handleGroupInviteRespond(req, env);
+      case "/a2a/group.member.remove":
+        return handleGroupMemberRemove(req, env);
+      case "/a2a/group.member.set_role":
+        return handleGroupMemberSetRole(req, env);
+      case "/a2a/group.events.list":
+        return handleGroupEventsList(req, env);
+      case "/a2a/group.event.create":
+        return handleGroupEventCreate(req, env);
+      case "/a2a/group.event.update":
+        return handleGroupEventUpdate(req, env);
+      case "/a2a/group.event.delete":
+        return handleGroupEventDelete(req, env);
+      case "/a2a/group.bible_study.list":
+        return handleGroupBibleStudyList(req, env);
+      case "/a2a/group.bible_study.create":
+        return handleGroupBibleStudyCreate(req, env);
+      case "/a2a/group.bible_study.reading.add":
+        return handleGroupBibleStudyAddReading(req, env);
+      case "/a2a/group.bible_study.note.add":
+        return handleGroupBibleStudyAddNote(req, env);
+      case "/a2a/group.bible_study.sessions.list":
+        return handleGroupBibleStudySessionsList(req, env);
+      case "/a2a/group.bible_study.session.create":
+        return handleGroupBibleStudySessionCreate(req, env);
       case "/a2a/checkin.start":
         return handleCheckinStart(req, env);
       case "/a2a/checkin.preview":

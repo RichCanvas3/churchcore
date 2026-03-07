@@ -286,12 +286,47 @@ def _ui_handoff_for_user_text(user_text: str) -> list[dict[str, Any]]:
             }
         ]
 
+    group_membershipish = any(
+        k in u
+        for k in [
+            "my group",
+            "my groups",
+            "our group",
+            "group roster",
+            "group members",
+            "invite to group",
+            "invite someone",
+            "remove from group",
+            "change role",
+            "life group",
+            "lifegroup",
+            "men's group",
+            "mens group",
+            "women's group",
+            "womens group",
+            "bible study group",
+            "group bible study",
+            "group study",
+            "study notes",
+            "group schedule",
+            "group event",
+            "plan an activity",
+        ]
+    )
+    if group_membershipish:
+        return [
+            {
+                "type": "ui_tool",
+                "tool_id": "groups_manager",
+                "title": "My groups",
+                "instructions": "Open the groups panel (my groups, roster, schedule, and group Bible study).",
+            }
+        ]
+
     communityish = any(
         k in u
         for k in [
             "community",
-            "group",
-            "groups",
             "lifegroup",
             "life group",
             "lifegroups",
@@ -1400,6 +1435,7 @@ async def handle_seeker_skill(
             "- kids_checkin: run kids check-in flow (find family, preview rooms, commit check-in).\n"
             "- guide: show journey position + next steps + resources.\n"
             "- memory_manager: manage person memory areas (hub).\n"
+            "- groups_manager: manage my long-lived groups (roster, invites, schedule, group Bible study).\n"
             "- identity_contact: view/edit preferred name + email/phone.\n"
             "- faith_journey: view/edit faith journey phase and milestones (Seeker, New Believer, Growing, etc.).\n"
             "- comm_prefs: view/edit communication preferences (SMS/email opt-in, preferred channel).\n"
