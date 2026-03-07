@@ -7,6 +7,7 @@ import { MemoryManagerPanel } from "../app/chat/MemoryManagerPanel";
 import { IdentityContactPanel } from "../app/chat/IdentityContactPanel";
 import { FaithJourneyPanel } from "../app/chat/FaithJourneyPanel";
 import { CommunityManagerPanel } from "../app/chat/CommunityManagerPanel";
+import { GroupsPanel } from "../app/chat/GroupsPanel";
 import { HouseholdManagerPanel } from "../app/chat/HouseholdManagerPanel";
 import { CommPrefsPanel } from "../app/chat/CommPrefsPanel";
 import { CarePastoralPanel } from "../app/chat/CarePastoralPanel";
@@ -28,6 +29,7 @@ export function AppHeader(props: { height?: number }) {
 
   const [person, setPerson] = useState<Person>(null);
   const [headerToolId, setHeaderToolId] = useState<string | null>(null);
+  const [headerToolBackId, setHeaderToolBackId] = useState<string | null>(null);
 
   useEffect(() => {
     postJson<{ person?: any }>("/api/a2a/thread/list", { identity, include_archived: false })
@@ -63,6 +65,19 @@ export function AppHeader(props: { height?: number }) {
     [identity],
   );
 
+  function openHeaderTool(toolId: string, backId: string | null) {
+    setHeaderToolBackId(backId);
+    setHeaderToolId(toolId);
+  }
+
+  function closeHeaderTool() {
+    setHeaderToolId((cur) => {
+      if (!cur) return null;
+      return headerToolBackId ?? null;
+    });
+    setHeaderToolBackId((back) => (back ? null : back));
+  }
+
   function renderHeaderTool() {
     if (!headerToolId) return null;
     if (headerToolId === "calendar") return <CalendarPanel identity={identityForTools as any} onClose={() => setHeaderToolId(null)} />;
@@ -70,17 +85,21 @@ export function AppHeader(props: { height?: number }) {
       return (
         <MemoryManagerPanel
           identity={identityForTools as any}
-          onClose={() => setHeaderToolId(null)}
-          onOpenTool={(toolId: string) => setHeaderToolId(toolId)}
+          onClose={() => {
+            setHeaderToolId(null);
+            setHeaderToolBackId(null);
+          }}
+          onOpenTool={(toolId: string) => openHeaderTool(toolId, "memory_manager")}
         />
       );
-    if (headerToolId === "identity_contact") return <IdentityContactPanel identity={identityForTools as any} onClose={() => setHeaderToolId("memory_manager")} />;
-    if (headerToolId === "faith_journey") return <FaithJourneyPanel identity={identityForTools as any} onClose={() => setHeaderToolId("memory_manager")} />;
-    if (headerToolId === "community_manager") return <CommunityManagerPanel identity={identityForTools as any} onClose={() => setHeaderToolId("memory_manager")} />;
-    if (headerToolId === "household_manager") return <HouseholdManagerPanel identity={identityForTools as any} onClose={() => setHeaderToolId("memory_manager")} />;
-    if (headerToolId === "comm_prefs") return <CommPrefsPanel identity={identityForTools as any} onClose={() => setHeaderToolId("memory_manager")} />;
-    if (headerToolId === "care_pastoral") return <CarePastoralPanel identity={identityForTools as any} onClose={() => setHeaderToolId("memory_manager")} />;
-    if (headerToolId === "teams_skills") return <TeamsSkillsPanel identity={identityForTools as any} onClose={() => setHeaderToolId("memory_manager")} />;
+    if (headerToolId === "identity_contact") return <IdentityContactPanel identity={identityForTools as any} onClose={closeHeaderTool} />;
+    if (headerToolId === "faith_journey") return <FaithJourneyPanel identity={identityForTools as any} onClose={closeHeaderTool} />;
+    if (headerToolId === "community_manager") return <CommunityManagerPanel identity={identityForTools as any} onClose={closeHeaderTool} />;
+    if (headerToolId === "groups_manager") return <GroupsPanel identity={identityForTools as any} onClose={closeHeaderTool} />;
+    if (headerToolId === "household_manager") return <HouseholdManagerPanel identity={identityForTools as any} onClose={closeHeaderTool} />;
+    if (headerToolId === "comm_prefs") return <CommPrefsPanel identity={identityForTools as any} onClose={closeHeaderTool} />;
+    if (headerToolId === "care_pastoral") return <CarePastoralPanel identity={identityForTools as any} onClose={closeHeaderTool} />;
+    if (headerToolId === "teams_skills") return <TeamsSkillsPanel identity={identityForTools as any} onClose={closeHeaderTool} />;
     return <div style={{ padding: 14 }}>Unknown tool: {headerToolId}</div>;
   }
 
@@ -114,10 +133,34 @@ export function AppHeader(props: { height?: number }) {
         </div>
 
         <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-          <button type="button" style={pill} onClick={() => setHeaderToolId("calendar")}>
+          <button
+            type="button"
+            style={pill}
+            onClick={() => {
+              setHeaderToolBackId(null);
+              setHeaderToolId("groups_manager");
+            }}
+          >
+            My Groups
+          </button>
+          <button
+            type="button"
+            style={pill}
+            onClick={() => {
+              setHeaderToolBackId(null);
+              setHeaderToolId("calendar");
+            }}
+          >
             My Calendar
           </button>
-          <button type="button" style={pill} onClick={() => setHeaderToolId("memory_manager")}>
+          <button
+            type="button"
+            style={pill}
+            onClick={() => {
+              setHeaderToolBackId(null);
+              setHeaderToolId("memory_manager");
+            }}
+          >
             Me
           </button>
 

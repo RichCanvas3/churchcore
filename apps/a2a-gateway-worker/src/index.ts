@@ -187,9 +187,12 @@ function agentCard(req: Request, env: Env) {
         thread_archive: `${baseUrl}a2a/thread.archive`,
         group_my_list: `${baseUrl}a2a/group.my.list`,
         group_get: `${baseUrl}a2a/group.get`,
+        group_create: `${baseUrl}a2a/group.create`,
         group_members_list: `${baseUrl}a2a/group.members.list`,
         group_invite_create: `${baseUrl}a2a/group.invite.create`,
         group_invite_respond: `${baseUrl}a2a/group.invite.respond`,
+        group_invites_inbox_list: `${baseUrl}a2a/group.invites.inbox.list`,
+        people_search: `${baseUrl}a2a/people.search`,
         group_member_remove: `${baseUrl}a2a/group.member.remove`,
         group_member_set_role: `${baseUrl}a2a/group.member.set_role`,
         group_events_list: `${baseUrl}a2a/group.events.list`,
@@ -200,6 +203,8 @@ function agentCard(req: Request, env: Env) {
         group_bible_study_create: `${baseUrl}a2a/group.bible_study.create`,
         group_bible_study_reading_add: `${baseUrl}a2a/group.bible_study.reading.add`,
         group_bible_study_note_add: `${baseUrl}a2a/group.bible_study.note.add`,
+        group_bible_study_readings_list: `${baseUrl}a2a/group.bible_study.readings.list`,
+        group_bible_study_notes_list: `${baseUrl}a2a/group.bible_study.notes.list`,
         group_bible_study_sessions_list: `${baseUrl}a2a/group.bible_study.sessions.list`,
         group_bible_study_session_create: `${baseUrl}a2a/group.bible_study.session.create`,
         household_identify: `${baseUrl}a2a/household.identify`,
@@ -1726,6 +1731,28 @@ const GroupInviteRespondSchema = z.object({
   action: z.enum(["accept", "decline"]),
 });
 
+const GroupCreateSchema = z.object({
+  identity: IdentitySchema,
+  campus_id: z.string().optional().nullable(),
+  name: z.string().min(1),
+  description: z.string().optional().nullable(),
+  meeting_details: z.string().optional().nullable(),
+  is_open: z.boolean().optional().nullable(),
+});
+
+const GroupInvitesInboxListSchema = z.object({
+  identity: IdentitySchema,
+  status: z.enum(["pending", "accepted", "declined", "cancelled"]).optional().nullable(),
+  limit: z.number().int().min(1).max(200).optional().nullable(),
+  offset: z.number().int().min(0).max(100000).optional().nullable(),
+});
+
+const PeopleSearchSchema = z.object({
+  identity: IdentitySchema,
+  q: z.string().min(1),
+  limit: z.number().int().min(1).max(50).optional().nullable(),
+});
+
 const GroupMemberRemoveSchema = z.object({
   identity: IdentitySchema,
   group_id: z.string().min(1),
@@ -1801,6 +1828,16 @@ const GroupBibleStudyAddNoteSchema = z.object({
   bible_study_id: z.string().min(1),
   content_markdown: z.string().min(1),
   visibility: z.enum(["members", "leaders"]).optional().nullable(),
+});
+
+const GroupBibleStudyReadingsListSchema = z.object({
+  identity: IdentitySchema,
+  bible_study_id: z.string().min(1),
+});
+
+const GroupBibleStudyNotesListSchema = z.object({
+  identity: IdentitySchema,
+  bible_study_id: z.string().min(1),
 });
 
 const GroupBibleStudySessionsListSchema = z.object({
@@ -4639,6 +4676,131 @@ async function handleGroupInviteRespond(req: Request, env: Env) {
   return json({ ok: true, status: nextStatus, group_id: String(invite.groupId), actor: { userId, role, personId } });
 }
 
+async function handleGroupCreate(req: Request, env: Env) {
+  const parsed = GroupCreateSchema.safeParse(await parseJson(req));
+  if (!parsed.success) return json({ error: "Invalid body", issues: parsed.error.issues }, { status: 400 });
+  const { identity } = parsed.data;
+  const churchId = identity.tenant_id;
+  const userId = identity.user_id;
+  const role = (identity.role ?? "seeker") as string;
+
+  const { personId } = await resolvePerson(env, identity);
+  if (!personId) return json({ ok: false, error: "No personId" }, { status: 400 });
+
+  const id = crypto.randomUUID();
+  const now = nowIso();
+  await env.churchcore
+    .prepare(
+      `INSERT INTO groups (id, church_id, campus_id, name, description, leader_person_id, meeting_details, is_open, created_at, updated_at)
+       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)`,
+    )
+    .bind(
+      id,
+      churchId,
+      parsed.data.campus_id ?? identity.campus_id ?? null,
+      parsed.data.name,
+      parsed.data.description ?? null,
+      personId,
+      parsed.data.meeting_details ?? null,
+      parsed.data.is_open == null ? 1 : parsed.data.is_open ? 1 : 0,
+      now,
+      now,
+    )
+    .run();
+
+  await env.churchcore
+    .prepare(
+      `INSERT INTO group_memberships (church_id, group_id, person_id, role, status, joined_at)
+       VALUES (?1, ?2, ?3, 'leader', 'active', ?4)
+       ON CONFLICT(group_id, person_id) DO UPDATE
+         SET status='active',
+             role='leader',
+             joined_at=COALESCE(group_memberships.joined_at, excluded.joined_at)`,
+    )
+    .bind(churchId, id, personId, now)
+    .run();
+
+  return json({ ok: true, group_id: id, actor: { userId, role, personId } });
+}
+
+async function handleGroupInvitesInboxList(req: Request, env: Env) {
+  const parsed = GroupInvitesInboxListSchema.safeParse(await parseJson(req));
+  if (!parsed.success) return json({ error: "Invalid body", issues: parsed.error.issues }, { status: 400 });
+  const { identity } = parsed.data;
+  const churchId = identity.tenant_id;
+  const userId = identity.user_id;
+  const role = (identity.role ?? "seeker") as string;
+
+  const { personId } = await resolvePerson(env, identity);
+  if (!personId) return json({ ok: false, error: "No personId" }, { status: 400 });
+
+  const status = (parsed.data.status ?? "pending") as string;
+  const limit = parsed.data.limit ?? 50;
+  const offset = parsed.data.offset ?? 0;
+
+  const rows =
+    (
+      await env.churchcore
+        .prepare(
+          `SELECT i.id,
+                  i.group_id AS groupId,
+                  g.name AS groupName,
+                  g.description AS groupDescription,
+                  i.invited_by_person_id AS invitedByPersonId,
+                  p.first_name AS invitedByFirstName,
+                  p.last_name AS invitedByLastName,
+                  i.status,
+                  i.created_at AS createdAt,
+                  i.updated_at AS updatedAt
+           FROM group_invites i
+           JOIN groups g ON g.id=i.group_id AND g.church_id=i.church_id
+           LEFT JOIN people p ON p.id=i.invited_by_person_id AND p.church_id=i.church_id
+           WHERE i.church_id=?1 AND i.invitee_person_id=?2 AND i.status=?3
+           ORDER BY i.updated_at DESC
+           LIMIT ?4 OFFSET ?5`,
+        )
+        .bind(churchId, personId, status, limit, offset)
+        .all()
+    ).results ?? [];
+
+  return json({ ok: true, invites: rows, actor: { userId, role, personId } });
+}
+
+async function handlePeopleSearch(req: Request, env: Env) {
+  const parsed = PeopleSearchSchema.safeParse(await parseJson(req));
+  if (!parsed.success) return json({ error: "Invalid body", issues: parsed.error.issues }, { status: 400 });
+  const { identity } = parsed.data;
+  const churchId = identity.tenant_id;
+  const userId = identity.user_id;
+  const role = (identity.role ?? "seeker") as string;
+
+  const q = parsed.data.q.trim();
+  const limit = parsed.data.limit ?? 12;
+  const like = `%${q.replaceAll("%", "").replaceAll("_", "")}%`;
+
+  const rows =
+    (
+      await env.churchcore
+        .prepare(
+          `SELECT id, first_name AS firstName, last_name AS lastName, email, phone, campus_id AS campusId
+           FROM people
+           WHERE church_id=?1
+             AND (
+               (first_name || ' ' || last_name) LIKE ?2 COLLATE NOCASE
+               OR (last_name || ' ' || first_name) LIKE ?2 COLLATE NOCASE
+               OR email LIKE ?2 COLLATE NOCASE
+               OR phone LIKE ?2 COLLATE NOCASE
+             )
+           ORDER BY last_name ASC, first_name ASC
+           LIMIT ?3`,
+        )
+        .bind(churchId, like, limit)
+        .all()
+    ).results ?? [];
+
+  return json({ ok: true, people: rows, actor: { userId, role } });
+}
+
 async function handleGroupMemberRemove(req: Request, env: Env) {
   const parsed = GroupMemberRemoveSchema.safeParse(await parseJson(req));
   if (!parsed.success) return json({ error: "Invalid body", issues: parsed.error.issues }, { status: 400 });
@@ -4946,6 +5108,82 @@ async function handleGroupBibleStudyAddNote(req: Request, env: Env) {
     .bind(id, churchId, bibleStudyId, personId, parsed.data.content_markdown, parsed.data.visibility ?? "members", now)
     .run();
   return json({ ok: true, note_id: id, actor: { userId, role, personId } });
+}
+
+async function handleGroupBibleStudyReadingsList(req: Request, env: Env) {
+  const parsed = GroupBibleStudyReadingsListSchema.safeParse(await parseJson(req));
+  if (!parsed.success) return json({ error: "Invalid body", issues: parsed.error.issues }, { status: 400 });
+  const { identity } = parsed.data;
+  const churchId = identity.tenant_id;
+  const userId = identity.user_id;
+  const role = (identity.role ?? "seeker") as string;
+
+  const { personId } = await resolvePerson(env, identity);
+  if (!personId) return json({ ok: false, error: "No personId" }, { status: 400 });
+
+  const bibleStudyId = parsed.data.bible_study_id.trim();
+  const study = (await env.churchcore.prepare(`SELECT group_id AS groupId FROM group_bible_studies WHERE church_id=?1 AND id=?2`).bind(churchId, bibleStudyId).first()) as any;
+  if (!study) return json({ ok: false, error: "Bible study not found" }, { status: 404 });
+  const groupId = String(study.groupId);
+  const actor = await groupActorRole(env, { churchId, groupId, actorPersonId: personId });
+  if (actor.status !== "active") return json({ ok: false, error: "Not permitted" }, { status: 403 });
+
+  const rows =
+    (
+      await env.churchcore
+        .prepare(
+          `SELECT id,bible_study_id AS bibleStudyId,ref,order_index AS orderIndex,notes,created_at AS createdAt
+           FROM group_bible_study_readings
+           WHERE church_id=?1 AND bible_study_id=?2
+           ORDER BY order_index ASC, created_at ASC`,
+        )
+        .bind(churchId, bibleStudyId)
+        .all()
+    ).results ?? [];
+
+  return json({ ok: true, readings: rows, actor: { userId, role, personId } });
+}
+
+async function handleGroupBibleStudyNotesList(req: Request, env: Env) {
+  const parsed = GroupBibleStudyNotesListSchema.safeParse(await parseJson(req));
+  if (!parsed.success) return json({ error: "Invalid body", issues: parsed.error.issues }, { status: 400 });
+  const { identity } = parsed.data;
+  const churchId = identity.tenant_id;
+  const userId = identity.user_id;
+  const role = (identity.role ?? "seeker") as string;
+
+  const { personId } = await resolvePerson(env, identity);
+  if (!personId) return json({ ok: false, error: "No personId" }, { status: 400 });
+
+  const bibleStudyId = parsed.data.bible_study_id.trim();
+  const study = (await env.churchcore.prepare(`SELECT group_id AS groupId FROM group_bible_studies WHERE church_id=?1 AND id=?2`).bind(churchId, bibleStudyId).first()) as any;
+  if (!study) return json({ ok: false, error: "Bible study not found" }, { status: 404 });
+  const groupId = String(study.groupId);
+  const actor = await groupActorRole(env, { churchId, groupId, actorPersonId: personId });
+  if (actor.status !== "active") return json({ ok: false, error: "Not permitted" }, { status: 403 });
+
+  const rows =
+    (
+      await env.churchcore
+        .prepare(
+          `SELECT n.id,
+                  n.bible_study_id AS bibleStudyId,
+                  n.author_person_id AS authorPersonId,
+                  p.first_name AS authorFirstName,
+                  p.last_name AS authorLastName,
+                  n.content_markdown AS contentMarkdown,
+                  n.visibility,
+                  n.created_at AS createdAt
+           FROM group_bible_study_notes n
+           LEFT JOIN people p ON p.church_id=n.church_id AND p.id=n.author_person_id
+           WHERE n.church_id=?1 AND n.bible_study_id=?2
+           ORDER BY n.created_at DESC`,
+        )
+        .bind(churchId, bibleStudyId)
+        .all()
+    ).results ?? [];
+
+  return json({ ok: true, notes: rows, actor: { userId, role, personId } });
 }
 
 async function handleGroupBibleStudySessionsList(req: Request, env: Env) {
@@ -5308,6 +5546,12 @@ export default {
         return handleGroupInviteCreate(req, env);
       case "/a2a/group.invite.respond":
         return handleGroupInviteRespond(req, env);
+      case "/a2a/group.create":
+        return handleGroupCreate(req, env);
+      case "/a2a/group.invites.inbox.list":
+        return handleGroupInvitesInboxList(req, env);
+      case "/a2a/people.search":
+        return handlePeopleSearch(req, env);
       case "/a2a/group.member.remove":
         return handleGroupMemberRemove(req, env);
       case "/a2a/group.member.set_role":
@@ -5328,6 +5572,10 @@ export default {
         return handleGroupBibleStudyAddReading(req, env);
       case "/a2a/group.bible_study.note.add":
         return handleGroupBibleStudyAddNote(req, env);
+      case "/a2a/group.bible_study.readings.list":
+        return handleGroupBibleStudyReadingsList(req, env);
+      case "/a2a/group.bible_study.notes.list":
+        return handleGroupBibleStudyNotesList(req, env);
       case "/a2a/group.bible_study.sessions.list":
         return handleGroupBibleStudySessionsList(req, env);
       case "/a2a/group.bible_study.session.create":

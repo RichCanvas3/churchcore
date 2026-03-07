@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 type Identity = {
   tenant_id: string;
@@ -57,6 +57,46 @@ type BibleStudySession = {
   agenda?: string | null;
 };
 
+type BibleStudyReading = {
+  id: string;
+  ref: string;
+  orderIndex?: number | null;
+  notes?: string | null;
+  createdAt?: string | null;
+};
+
+type BibleStudyNote = {
+  id: string;
+  authorPersonId?: string | null;
+  authorFirstName?: string | null;
+  authorLastName?: string | null;
+  contentMarkdown: string;
+  visibility?: string | null;
+  createdAt?: string | null;
+};
+
+type InviteInboxItem = {
+  id: string;
+  groupId: string;
+  groupName: string;
+  groupDescription?: string | null;
+  invitedByPersonId?: string | null;
+  invitedByFirstName?: string | null;
+  invitedByLastName?: string | null;
+  status: string;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+};
+
+type PersonHit = {
+  id: string;
+  firstName?: string | null;
+  lastName?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  campusId?: string | null;
+};
+
 async function postJson<T = unknown>(url: string, body: unknown): Promise<T> {
   const res = await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
   const data = (await res.json().catch(() => ({}))) as T & { error?: string };
@@ -87,6 +127,27 @@ export function GroupsPanel(props: { identity: Identity; onClose: () => void }) 
   const [sessions, setSessions] = useState<BibleStudySession[]>([]);
   const [sessionsErr, setSessionsErr] = useState<string | null>(null);
   const [activeStudyId, setActiveStudyId] = useState<string>("");
+
+  const [readings, setReadings] = useState<BibleStudyReading[]>([]);
+  const [readingsErr, setReadingsErr] = useState<string | null>(null);
+
+  const [notes, setNotes] = useState<BibleStudyNote[]>([]);
+  const [notesErr, setNotesErr] = useState<string | null>(null);
+
+  const [invites, setInvites] = useState<InviteInboxItem[]>([]);
+  const [invitesErr, setInvitesErr] = useState<string | null>(null);
+  const [invitesBusy, setInvitesBusy] = useState(false);
+
+  const [createOpen, setCreateOpen] = useState(false);
+  const [newGroupName, setNewGroupName] = useState("");
+  const [newGroupDesc, setNewGroupDesc] = useState("");
+  const [newGroupMeeting, setNewGroupMeeting] = useState("");
+  const [newGroupOpen, setNewGroupOpen] = useState(true);
+
+  const [inviteSearch, setInviteSearch] = useState("");
+  const [inviteHits, setInviteHits] = useState<PersonHit[]>([]);
+  const [inviteErr, setInviteErr] = useState<string | null>(null);
+  const inviteSearchTimer = useRef<number | null>(null);
 
   const [newEventTitle, setNewEventTitle] = useState("");
   const [newEventStart, setNewEventStart] = useState<string>(() => new Date().toISOString().slice(0, 16));
@@ -131,8 +192,88 @@ export function GroupsPanel(props: { identity: Identity; onClose: () => void }) 
     }
   }
 
+  async function refreshInvites() {
+    setInvitesBusy(true);
+    setInvitesErr(null);
+    try {
+      const out = await postJson<{ invites?: InviteInboxItem[] }>("/api/a2a/group/invites/inbox/list", { identity, status: "pending", limit: 50, offset: 0 });
+      setInvites(Array.isArray(out?.invites) ? out.invites : []);
+    } catch (e: any) {
+      setInvitesErr(String(e?.message ?? e ?? "Failed to load invites"));
+      setInvites([]);
+    } finally {
+      setInvitesBusy(false);
+    }
+  }
+
+  async function createGroup() {
+    const name = newGroupName.trim();
+    if (!name) return;
+    setError(null);
+    try {
+      const out = await postJson<any>("/api/a2a/group/create", {
+        identity,
+        name,
+        description: newGroupDesc.trim() || null,
+        meeting_details: newGroupMeeting.trim() || null,
+        is_open: Boolean(newGroupOpen),
+      });
+      const id = typeof out?.group_id === "string" ? String(out.group_id) : "";
+      setNewGroupName("");
+      setNewGroupDesc("");
+      setNewGroupMeeting("");
+      setNewGroupOpen(true);
+      setCreateOpen(false);
+      await refresh();
+      if (id) setActiveGroupId(id);
+    } catch (e: any) {
+      setError(String(e?.message ?? e ?? "Failed to create group"));
+    }
+  }
+
+  async function respondInvite(inviteId: string, action: "accept" | "decline") {
+    setInvitesErr(null);
+    try {
+      await postJson("/api/a2a/group/invite/respond", { identity, invite_id: inviteId, action });
+      await refreshInvites();
+      if (action === "accept") await refresh();
+    } catch (e: any) {
+      setInvitesErr(String(e?.message ?? e ?? "Failed to respond to invite"));
+    }
+  }
+
+  async function searchPeopleNow(q: string) {
+    const s = q.trim();
+    if (!s) {
+      setInviteHits([]);
+      setInviteErr(null);
+      return;
+    }
+    setInviteErr(null);
+    try {
+      const out = await postJson<{ people?: PersonHit[] }>("/api/a2a/people/search", { identity, q: s, limit: 12 });
+      setInviteHits(Array.isArray(out?.people) ? out.people : []);
+    } catch (e: any) {
+      setInviteErr(String(e?.message ?? e ?? "Search failed"));
+      setInviteHits([]);
+    }
+  }
+
+  async function invitePerson(personId: string) {
+    if (!activeGroupId) return;
+    setInviteErr(null);
+    try {
+      await postJson("/api/a2a/group/invite/create", { identity, group_id: activeGroupId, invitee_person_id: personId });
+      setInviteSearch("");
+      setInviteHits([]);
+    } catch (e: any) {
+      setInviteErr(String(e?.message ?? e ?? "Invite failed"));
+    }
+  }
+
   useEffect(() => {
     void refresh();
+    void refreshInvites();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [identity.tenant_id, identity.user_id, identity.persona_id, identity.role, identity.campus_id]);
 
@@ -170,10 +311,22 @@ export function GroupsPanel(props: { identity: Identity; onClose: () => void }) 
   useEffect(() => {
     setSessions([]);
     setSessionsErr(null);
+    setReadings([]);
+    setReadingsErr(null);
+    setNotes([]);
+    setNotesErr(null);
     if (!activeStudyId) return;
     void postJson<{ sessions?: BibleStudySession[] }>("/api/a2a/group/bible_study/sessions/list", { identity, bible_study_id: activeStudyId })
       .then((out) => setSessions(Array.isArray(out?.sessions) ? out.sessions : []))
       .catch((e) => setSessionsErr(String((e as any)?.message ?? e ?? "Failed to load sessions")));
+
+    void postJson<{ readings?: BibleStudyReading[] }>("/api/a2a/group/bible_study/readings/list", { identity, bible_study_id: activeStudyId })
+      .then((out) => setReadings(Array.isArray(out?.readings) ? out.readings : []))
+      .catch((e) => setReadingsErr(String((e as any)?.message ?? e ?? "Failed to load readings")));
+
+    void postJson<{ notes?: BibleStudyNote[] }>("/api/a2a/group/bible_study/notes/list", { identity, bible_study_id: activeStudyId })
+      .then((out) => setNotes(Array.isArray(out?.notes) ? out.notes : []))
+      .catch((e) => setNotesErr(String((e as any)?.message ?? e ?? "Failed to load notes")));
   }, [activeStudyId, identity]);
 
   async function createEvent() {
@@ -220,6 +373,8 @@ export function GroupsPanel(props: { identity: Identity; onClose: () => void }) 
     try {
       await postJson("/api/a2a/group/bible_study/reading/add", { identity, bible_study_id: activeStudyId, ref, order_index: 0, notes: null });
       setReadingRef("");
+      const out = await postJson<{ readings?: BibleStudyReading[] }>("/api/a2a/group/bible_study/readings/list", { identity, bible_study_id: activeStudyId });
+      setReadings(Array.isArray(out?.readings) ? out.readings : []);
     } catch (e: any) {
       setStudiesErr(String(e?.message ?? e ?? "Failed to add reading"));
     }
@@ -231,6 +386,8 @@ export function GroupsPanel(props: { identity: Identity; onClose: () => void }) 
     try {
       await postJson("/api/a2a/group/bible_study/note/add", { identity, bible_study_id: activeStudyId, content_markdown: md, visibility: "members" });
       setNoteMd("");
+      const out = await postJson<{ notes?: BibleStudyNote[] }>("/api/a2a/group/bible_study/notes/list", { identity, bible_study_id: activeStudyId });
+      setNotes(Array.isArray(out?.notes) ? out.notes : []);
     } catch (e: any) {
       setStudiesErr(String(e?.message ?? e ?? "Failed to add note"));
     }
@@ -239,7 +396,7 @@ export function GroupsPanel(props: { identity: Identity; onClose: () => void }) 
   return (
     <div style={{ height: "100%", background: "white", display: "grid", gridTemplateRows: "auto 1fr", overflow: "hidden" }}>
       <div style={{ padding: "12px 14px", borderBottom: "1px solid #e2e8f0", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
-        <span style={{ fontWeight: 700, fontSize: 15, color: "#0f172a" }}>Groups</span>
+        <span style={{ fontWeight: 700, fontSize: 15, color: "#0f172a" }}>My Small Groups</span>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           <button type="button" onClick={() => void refresh()} disabled={loading} style={smallBtn}>
             Refresh
@@ -255,7 +412,74 @@ export function GroupsPanel(props: { identity: Identity; onClose: () => void }) 
         {loading ? <div style={{ color: "#64748b" }}>Loading…</div> : null}
 
         <section style={{ background: "white", border: "1px solid #e2e8f0", borderRadius: 14, padding: 12, display: "grid", gap: 10 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10 }}>
+            <div style={{ fontWeight: 900, color: "#0f172a" }}>Invites</div>
+            <button type="button" style={smallBtn} onClick={() => void refreshInvites()} disabled={invitesBusy}>
+              Refresh
+            </button>
+          </div>
+          {invitesErr ? <div style={{ color: "#dc2626", fontSize: 12 }}>{invitesErr}</div> : null}
+          {invitesBusy ? <div style={{ fontSize: 12, color: "#64748b" }}>Loading invites…</div> : null}
+          {invites.length ? (
+            <div style={{ display: "grid", gap: 8 }}>
+              {invites.map((iv) => {
+                const who = `${iv.invitedByFirstName ?? ""} ${iv.invitedByLastName ?? ""}`.trim();
+                return (
+                  <div key={iv.id} style={{ border: "1px solid #e2e8f0", borderRadius: 12, padding: 10, display: "grid", gap: 8 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontWeight: 900, color: "#0f172a" }}>{iv.groupName}</div>
+                        <div style={{ fontSize: 12, color: "#64748b" }}>
+                          {who ? `Invited by ${who}` : "Invite"}
+                          {iv.updatedAt ? ` · ${String(iv.updatedAt).slice(0, 10)}` : ""}
+                        </div>
+                        {iv.groupDescription ? <div style={{ fontSize: 12, color: "#334155", marginTop: 6 }}>{iv.groupDescription}</div> : null}
+                      </div>
+                      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                        <button type="button" style={smallBtn} onClick={() => void respondInvite(iv.id, "decline")}>
+                          Decline
+                        </button>
+                        <button type="button" style={btn} onClick={() => void respondInvite(iv.id, "accept")}>
+                          Join
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div style={{ fontSize: 12, color: "#64748b" }}>No pending invites.</div>
+          )}
+        </section>
+
+        <section style={{ background: "white", border: "1px solid #e2e8f0", borderRadius: 14, padding: 12, display: "grid", gap: 10 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10 }}>
+            <div style={{ fontWeight: 900, color: "#0f172a" }}>Create a small group</div>
+            <button type="button" style={smallBtn} onClick={() => setCreateOpen((v) => !v)}>
+              {createOpen ? "Hide" : "Create"}
+            </button>
+          </div>
+          <div style={{ fontSize: 12, color: "#64748b" }}>Examples: “Joe’s Men’s Bible Study”, “Barbara’s Women’s Study”, “Twilighters Life Group”.</div>
+          {createOpen ? (
+            <div style={{ display: "grid", gap: 8 }}>
+              <input value={newGroupName} onChange={(e) => setNewGroupName(e.target.value)} placeholder="Group name" style={{ border: "1px solid #cbd5e1", borderRadius: 10, padding: "8px 10px" }} />
+              <input value={newGroupDesc} onChange={(e) => setNewGroupDesc(e.target.value)} placeholder="Short description (optional)" style={{ border: "1px solid #cbd5e1", borderRadius: 10, padding: "8px 10px" }} />
+              <textarea value={newGroupMeeting} onChange={(e) => setNewGroupMeeting(e.target.value)} placeholder="Meeting details (when/where/how often)" rows={3} style={{ border: "1px solid #cbd5e1", borderRadius: 10, padding: "8px 10px", resize: "vertical" }} />
+              <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 12, color: "#334155" }}>
+                <input type="checkbox" checked={newGroupOpen} onChange={(e) => setNewGroupOpen(e.target.checked)} />
+                Open to invites (recommended)
+              </label>
+              <button type="button" style={btn} onClick={() => void createGroup()}>
+                Create small group
+              </button>
+            </div>
+          ) : null}
+        </section>
+
+        <section style={{ background: "white", border: "1px solid #e2e8f0", borderRadius: 14, padding: 12, display: "grid", gap: 10 }}>
           <div style={{ fontWeight: 900, color: "#0f172a" }}>My groups</div>
+          <div style={{ fontSize: 12, color: "#64748b" }}>Select a group below to view people, schedule, and Bible study.</div>
           {groups.length ? (
             <div style={{ display: "grid", gap: 8 }}>
               {groups.map((g) => {
@@ -304,6 +528,44 @@ export function GroupsPanel(props: { identity: Identity; onClose: () => void }) 
             <section style={{ background: "white", border: "1px solid #e2e8f0", borderRadius: 14, padding: 12, display: "grid", gap: 10 }}>
               <div style={{ fontWeight: 900, color: "#0f172a" }}>People</div>
               {membersErr ? <div style={{ color: "#dc2626", fontSize: 12 }}>{membersErr}</div> : null}
+              <div style={{ border: "1px solid #e2e8f0", borderRadius: 12, padding: 10, background: "#f8fafc", display: "grid", gap: 8 }}>
+                <div style={{ fontSize: 12, fontWeight: 900, color: "#0f172a" }}>Invite someone</div>
+                <input
+                  value={inviteSearch}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setInviteSearch(v);
+                    if (inviteSearchTimer.current) window.clearTimeout(inviteSearchTimer.current);
+                    inviteSearchTimer.current = window.setTimeout(() => void searchPeopleNow(v), 250) as any;
+                  }}
+                  placeholder="Search name, email, or phone"
+                  style={{ border: "1px solid #cbd5e1", borderRadius: 10, padding: "8px 10px" }}
+                />
+                {inviteErr ? <div style={{ color: "#dc2626", fontSize: 12 }}>{inviteErr}</div> : null}
+                {inviteSearch.trim() ? (
+                  <div style={{ display: "grid", gap: 6 }}>
+                    {inviteHits.map((p) => {
+                      const name = `${p.firstName ?? ""} ${p.lastName ?? ""}`.trim() || p.id;
+                      const meta = p.email || p.phone || "";
+                      return (
+                        <button
+                          key={p.id}
+                          type="button"
+                          onClick={() => void invitePerson(p.id)}
+                          style={{ textAlign: "left", border: "1px solid #e2e8f0", background: "white", borderRadius: 10, padding: "8px 10px", cursor: "pointer" }}
+                          title="Invite to this group"
+                        >
+                          <div style={{ fontSize: 13, fontWeight: 900, color: "#0f172a" }}>{name}</div>
+                          {meta ? <div style={{ fontSize: 12, color: "#64748b" }}>{meta}</div> : null}
+                        </button>
+                      );
+                    })}
+                    {!inviteHits.length ? <div style={{ fontSize: 12, color: "#64748b" }}>No matches.</div> : null}
+                  </div>
+                ) : (
+                  <div style={{ fontSize: 12, color: "#64748b" }}>Type to search people already in this church database.</div>
+                )}
+              </div>
               <div style={{ display: "grid", gap: 8 }}>
                 {members.map((m) => (
                   <div key={m.personId} style={{ border: "1px solid #e2e8f0", borderRadius: 12, padding: 10, display: "flex", justifyContent: "space-between", gap: 10 }}>
@@ -380,11 +642,45 @@ export function GroupsPanel(props: { identity: Identity; onClose: () => void }) 
 
               {activeStudyId ? (
                 <>
+                  <div style={{ border: "1px solid #e2e8f0", borderRadius: 12, background: "#f8fafc", padding: 10, display: "grid", gap: 8 }}>
+                    <div style={{ fontSize: 12, fontWeight: 900, color: "#0f172a" }}>Readings</div>
+                    {readingsErr ? <div style={{ color: "#dc2626", fontSize: 12 }}>{readingsErr}</div> : null}
+                    <div style={{ display: "grid", gap: 6 }}>
+                      {readings.map((r) => (
+                        <div key={r.id} style={{ background: "white", border: "1px solid #e2e8f0", borderRadius: 10, padding: "8px 10px" }}>
+                          <div style={{ fontWeight: 900, color: "#0f172a", fontSize: 13 }}>{r.ref}</div>
+                          {r.notes ? <div style={{ fontSize: 12, color: "#334155", marginTop: 4 }}>{r.notes}</div> : null}
+                        </div>
+                      ))}
+                      {!readings.length ? <div style={{ fontSize: 12, color: "#64748b" }}>No readings yet.</div> : null}
+                    </div>
+                  </div>
+
                   <div style={{ display: "grid", gap: 8, gridTemplateColumns: "1fr auto" }}>
                     <input value={readingRef} onChange={(e) => setReadingRef(e.target.value)} placeholder="Add reading (e.g., John 14:1-14)" style={{ border: "1px solid #cbd5e1", borderRadius: 10, padding: "8px 10px" }} />
                     <button type="button" style={smallBtn} onClick={() => void addReading()}>
                       Add
                     </button>
+                  </div>
+
+                  <div style={{ border: "1px solid #e2e8f0", borderRadius: 12, background: "#f8fafc", padding: 10, display: "grid", gap: 8 }}>
+                    <div style={{ fontSize: 12, fontWeight: 900, color: "#0f172a" }}>Notes</div>
+                    {notesErr ? <div style={{ color: "#dc2626", fontSize: 12 }}>{notesErr}</div> : null}
+                    <div style={{ display: "grid", gap: 6 }}>
+                      {notes.map((n) => {
+                        const who = `${n.authorFirstName ?? ""} ${n.authorLastName ?? ""}`.trim();
+                        return (
+                          <div key={n.id} style={{ background: "white", border: "1px solid #e2e8f0", borderRadius: 10, padding: "8px 10px" }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
+                              <div style={{ fontSize: 12, fontWeight: 900, color: "#0f172a" }}>{who || "Note"}</div>
+                              <div style={{ fontSize: 12, color: "#64748b" }}>{n.createdAt ? String(n.createdAt).slice(0, 10) : ""}</div>
+                            </div>
+                            <div style={{ fontSize: 12, color: "#334155", marginTop: 6, whiteSpace: "pre-wrap" }}>{n.contentMarkdown}</div>
+                          </div>
+                        );
+                      })}
+                      {!notes.length ? <div style={{ fontSize: 12, color: "#64748b" }}>No notes yet.</div> : null}
+                    </div>
                   </div>
 
                   <div style={{ display: "grid", gap: 8 }}>
