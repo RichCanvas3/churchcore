@@ -2,6 +2,10 @@ from __future__ import annotations
 
 import json
 import os
+import base64
+import time
+import urllib.parse
+import urllib.request
 from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
@@ -10,6 +14,93 @@ from langchain_openai import ChatOpenAI
 from .knowledge_index import ensure_index_with_mcp, search_kb
 from .mcp_tools import load_mcp_tools_from_env
 from .models import Input, NextAction, OutputEnvelope, Session
+
+
+_gloo_token_cache: dict[str, Any] = {"token": None, "expires_at": 0.0}
+
+
+def _gloo_access_token() -> str:
+    """
+    OAuth2 client-credentials token for Gloo Completions V2.
+    Cached in-process; refreshes ~60s early.
+    """
+    now = time.time()
+    token = _gloo_token_cache.get("token")
+    expires_at = float(_gloo_token_cache.get("expires_at") or 0.0)
+    if isinstance(token, str) and token and now < (expires_at - 60.0):
+        return token
+
+    client_id = (os.environ.get("GLOO_CLIENT_ID") or "").strip()
+    client_secret = (os.environ.get("GLOO_CLIENT_SECRET") or "").strip()
+    if not client_id or not client_secret:
+        raise RuntimeError("Missing GLOO_CLIENT_ID / GLOO_CLIENT_SECRET")
+
+    token_url = (os.environ.get("GLOO_TOKEN_URL") or "https://platform.ai.gloo.com/oauth2/token").strip()
+    form = urllib.parse.urlencode({"grant_type": "client_credentials", "scope": "api/access"}).encode("utf-8")
+    basic = base64.b64encode(f"{client_id}:{client_secret}".encode("utf-8")).decode("ascii")
+    req = urllib.request.Request(
+        token_url,
+        data=form,
+        headers={
+            "content-type": "application/x-www-form-urlencoded",
+            "authorization": f"Basic {basic}",
+            "accept": "application/json",
+        },
+        method="POST",
+    )
+
+    with urllib.request.urlopen(req, timeout=15) as resp:
+        raw = resp.read().decode("utf-8") if resp is not None else "{}"
+    data = json.loads(raw or "{}") if isinstance(raw, str) else {}
+
+    access_token = str(data.get("access_token") or "").strip()
+    if not access_token:
+        raise RuntimeError("Gloo token exchange failed (missing access_token)")
+
+    # Spec says tokens expire in ~1h. Respect expires_in if provided.
+    expires_in = data.get("expires_in")
+    ttl = float(expires_in) if isinstance(expires_in, (int, float)) else 3600.0
+    _gloo_token_cache["token"] = access_token
+    _gloo_token_cache["expires_at"] = now + max(60.0, ttl)
+    return access_token
+
+
+def _llm_provider() -> str:
+    raw = (os.environ.get("LLM_PROVIDER") or "").strip().lower()
+    if raw in {"openai", "gloo"}:
+        return raw
+    # If Gloo is configured, prefer it by default.
+    if (os.environ.get("GLOO_CLIENT_ID") or "").strip() and (os.environ.get("GLOO_CLIENT_SECRET") or "").strip():
+        return "gloo"
+    return "openai"
+
+
+def get_chat_model(*, temperature: Optional[float] = None) -> ChatOpenAI:
+    """
+    Single switch-point for model provider in LangSmith-deployed langserver.
+
+    Env:
+      - LLM_PROVIDER: "gloo" | "openai" (if unset: prefer gloo when configured)
+      - OPENAI_MODEL (default "gpt-5.2")
+      - GLOO_MODEL (default "gloo-openai-gpt-5-mini")
+      - GLOO_BASE_URL (default "https://platform.ai.gloo.com/ai/v2")
+      - GLOO_CLIENT_ID / GLOO_CLIENT_SECRET (required for gloo)
+    """
+    provider = _llm_provider()
+    if provider == "gloo":
+        base_url = (os.environ.get("GLOO_BASE_URL") or "https://platform.ai.gloo.com/ai/v2").strip()
+        model = (os.environ.get("GLOO_MODEL") or "gloo-openai-gpt-5-mini").strip()
+        token = _gloo_access_token()
+        kwargs: dict[str, Any] = {"model": model, "api_key": token, "base_url": base_url}
+        if isinstance(temperature, (int, float)):
+            kwargs["temperature"] = float(temperature)
+        return ChatOpenAI(**kwargs)
+
+    model = (os.environ.get("OPENAI_MODEL") or "gpt-5.2").strip()
+    kwargs = {"model": model}
+    if isinstance(temperature, (int, float)):
+        kwargs["temperature"] = float(temperature)
+    return ChatOpenAI(**kwargs)
 
 
 def _as_text(v: Any, max_len: int = 8000) -> str:
@@ -1069,8 +1160,9 @@ async def handle_seeker_skill(
         )
 
     if skill == "weekly_podcast.analyze":
-        model_name = os.environ.get("OPENAI_MODEL", "gpt-5.2")
-        model = ChatOpenAI(model=model_name)
+        provider = _llm_provider()
+        model_name = os.environ.get("GLOO_MODEL", "gloo-openai-gpt-5-mini") if provider == "gloo" else os.environ.get("OPENAI_MODEL", "gpt-5.2")
+        model = get_chat_model()
         src = str(args.get("source_text") or "").strip()
         if len(src) < 20:
             return OutputEnvelope(message="Missing transcript/notes.", data={"skill": skill})
@@ -1120,8 +1212,9 @@ async def handle_seeker_skill(
         )
 
     if skill == "sermon.compare":
-        model_name = os.environ.get("OPENAI_MODEL", "gpt-5.2")
-        model = ChatOpenAI(model=model_name)
+        provider = _llm_provider()
+        model_name = os.environ.get("GLOO_MODEL", "gloo-openai-gpt-5-mini") if provider == "gloo" else os.environ.get("OPENAI_MODEL", "gpt-5.2")
+        model = get_chat_model()
         sermons = args.get("sermons")
         sermons_list = sermons if isinstance(sermons, list) else []
         sermons_clean: list[dict[str, Any]] = []
@@ -1215,7 +1308,7 @@ async def handle_seeker_skill(
         )
 
     if skill in {"chat", "chat.stream"}:
-        model = ChatOpenAI(model=os.environ.get("OPENAI_MODEL", "gpt-5.2"))
+        model = get_chat_model()
         user = (message or "").strip()
         mem, mem_summary = _memory_context_from_args(args)
         hh_summary = _household_context_from_args(args)
@@ -1650,7 +1743,7 @@ async def handle_guide_skill(
         return _permission_denied()
 
     if skill in {"chat", "chat.stream"}:
-        model = ChatOpenAI(model=os.environ.get("OPENAI_MODEL", "gpt-5.2"))
+        model = get_chat_model()
         kb_ttl = int(float(os.environ.get("KB_INDEX_TTL_SECONDS", "300") or "300"))
         kb_index = await ensure_index_with_mcp(church_id=session.churchId, ttl_seconds=max(30, kb_ttl))
         kb_text, kb_hits = search_kb(kb_index, (message or "").strip(), k=4) if (message or "").strip() and kb_index else ("", [])
