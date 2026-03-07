@@ -81,6 +81,7 @@ export default function ChatPage() {
   const [threadsOwnerUserId, setThreadsOwnerUserId] = useState<string>(() => identity.user_id);
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
+  const [threadEmpty, setThreadEmpty] = useState<boolean | null>(null);
   const [mePerson, setMePerson] = useState<Record<string, unknown> | null>(null);
   const [editingThreadId, setEditingThreadId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState<string>("");
@@ -295,6 +296,11 @@ export default function ChatPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [effectiveThreadId]);
 
+  // Welcome card is shown only when the thread is empty.
+  useEffect(() => {
+    setThreadEmpty(null);
+  }, [effectiveThreadId]);
+
   function toolDisplayTitle(toolId: string, title?: string) {
     if (toolId === "guide") return "Your Personal Guide";
     if (toolId === "calendar") return "My Calendar";
@@ -326,6 +332,89 @@ export default function ChatPage() {
       >
         {variant === "cta" ? `Open ${label}` : label}
       </button>
+    );
+  }
+
+  function welcomeSpec(templateId: string | null) {
+    const id = String(templateId ?? "").trim();
+    if (id === "ask_our_church") {
+      return {
+        heading: "Ask anything about Calvary.",
+        starters: ["What time are services at my campus?", "What does the church believe about baptism?", "Summarize last Sunday’s sermon in 5 bullets."],
+      };
+    }
+    if (id === "faith_journey") {
+      return {
+        heading: "Let’s map where you are and what’s next.",
+        starters: ["What stage am I in right now?", "What are my next 3 steps this week?", "Help me start a Bible plan for this week’s sermon."],
+      };
+    }
+    if (id === "your_community") {
+      return {
+        heading: "Let’s help you find your people.",
+        starters: ["What groups/classes fit my schedule?", "What’s a good next community step for my stage?", "Show upcoming events I should attend."],
+      };
+    }
+    if (id === "home_group") {
+      return {
+        heading: "Let’s find a home group that fits.",
+        starters: ["Help me find a group near Erie.", "What groups are best for newcomers?", "What’s the easiest first step this week?"],
+      };
+    }
+    if (id === "sermon_discussion") {
+      return {
+        heading: "Let’s unpack this week’s sermon together.",
+        starters: ["What was the big idea?", "Give me 5 discussion questions.", "What Scriptures should I reread this week?"],
+      };
+    }
+    if (id === "bible_plan") {
+      return {
+        heading: "Let’s keep your weekly Bible plan on track.",
+        starters: ["What’s today’s reading?", "Show this week’s plan.", "Help me catch up if I’m behind."],
+      };
+    }
+    if (id === "events") {
+      return { heading: "Here’s what’s coming up.", starters: ["What’s happening this week at my campus?", "Show my activities + church events.", "Any outdoor events (with weather)?"] };
+    }
+    if (id === "prayer") {
+      return { heading: "Share what you’d like prayer for.", starters: ["I’d like prayer for…", "Help me write a short prayer request.", "What should I pray about this week from the sermon?"] };
+    }
+    if (id === "kids") {
+      return { heading: "Let’s make Sundays smoother for your family.", starters: ["How does kids check-in work?", "Add a child (with allergies) to my household.", "What rooms are my kids eligible for?"] };
+    }
+    return { heading: "Welcome. Ask your first question.", starters: ["What should I do next?", "Tell me about this week’s sermon.", "Help me plan a visit."] };
+  }
+
+  function WelcomeCard() {
+    const threadTitle = threads.find((t) => t.id === effectiveThreadId)?.title ?? "New topic";
+    const tplId = activeThreadMeta?.templateId ?? null;
+    const tpl = tplId ? templates.find((t) => t.slug === tplId) ?? null : null;
+    const spec = welcomeSpec(tplId);
+    const title = tpl?.title ?? threadTitle;
+    const desc = (tpl?.description ?? "").trim();
+    const tools = (activeThreadMeta?.toolIds ?? []).slice(0, 5);
+
+    return (
+      <div style={{ border: "1px solid #e2e8f0", borderRadius: 14, padding: 14, background: "white" }}>
+        <div style={{ fontSize: 12, fontWeight: 900, color: "#0f172a" }}>{title}</div>
+        <div style={{ marginTop: 6, fontSize: 14, fontWeight: 700, color: "#0f172a" }}>{spec.heading}</div>
+        {desc ? <div style={{ marginTop: 6, fontSize: 12, color: "#475569" }}>{desc}</div> : null}
+        {tools.length ? (
+          <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap" }}>
+            {tools.map((toolId) => (
+              <ToolButton key={toolId} toolId={toolId} title={toolDisplayTitle(toolId)} variant="cta" />
+            ))}
+          </div>
+        ) : null}
+        <div style={{ marginTop: 12, fontSize: 12, fontWeight: 900, color: "#0f172a" }}>Try one</div>
+        <div style={{ marginTop: 6, display: "grid", gap: 6 }}>
+          {spec.starters.map((s) => (
+            <div key={s} style={{ fontSize: 12, color: "#334155" }}>
+              - {s}
+            </div>
+          ))}
+        </div>
+      </div>
     );
   }
 
@@ -704,7 +793,10 @@ export default function ChatPage() {
     const threadId = effectiveThreadId;
     return {
       async load() {
-        if (!threadId) return { headId: null, messages: [] };
+        if (!threadId) {
+          setThreadEmpty(null);
+          return { headId: null, messages: [] };
+        }
         let out: { messages?: any[] } | null = null;
         try {
           out = await postJson<{ messages?: any[] }>("/api/a2a/thread/get", {
@@ -722,6 +814,7 @@ export default function ChatPage() {
           });
         } catch {
           // Happens if the active threadId belongs to a different user (e.g. after switching accounts).
+          setThreadEmpty(true);
           return { headId: null, messages: [] };
         }
 
@@ -742,6 +835,8 @@ export default function ChatPage() {
             };
           })
           .filter(Boolean);
+
+        setThreadEmpty(likes.length === 0);
 
         function toThreadMessage(like: any) {
           const id = typeof like?.id === "string" && like.id ? like.id : crypto.randomUUID();
@@ -1144,6 +1239,7 @@ export default function ChatPage() {
                   scrollToBottomOnThreadSwitch
                   style={{ flex: 1, overflow: "auto", padding: 16, display: "grid", gap: 10, minHeight: 0 }}
                 >
+                  {threadEmpty === true ? <WelcomeCard /> : null}
                   <ThreadPrimitive.Messages components={{ UserMessage, AssistantMessage } as any} />
                 </ThreadPrimitive.Viewport>
 
@@ -1156,6 +1252,7 @@ export default function ChatPage() {
                 <div
                   onKeyDownCapture={() => {
                     setSending(true);
+                    setThreadEmpty(false);
                   }}
                 >
                   <Composer />

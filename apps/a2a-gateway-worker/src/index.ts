@@ -604,6 +604,8 @@ function isAllowedMemoryPathForSeeker(path: string) {
   if (p.startsWith("communicationPreferences.")) return true;
   if (p.startsWith("community.")) return true;
   if (p.startsWith("spiritualJourney.")) return true;
+  // Allow self-assessments/check-ins used by the Faith Journey tool.
+  if (p.startsWith("worldview.bdi.")) return true;
   if (p.startsWith("intentProfile.")) return true;
   if (p.startsWith("pastoralCare.prayerRequests")) return true;
   return false;
