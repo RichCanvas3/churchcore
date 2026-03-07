@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 type Identity = {
   tenant_id: string;
@@ -18,6 +18,12 @@ type Group = {
   description?: string | null;
   leaderPersonId?: string | null;
   meetingDetails?: string | null;
+  meetingFrequency?: string | null;
+  meetingDayOfWeek?: number | null;
+  meetingTimeLocal?: string | null;
+  meetingTimezone?: string | null;
+  meetingLocationName?: string | null;
+  meetingLocationAddress?: string | null;
   isOpen?: number | boolean | null;
   myRole?: string | null;
   myStatus?: string | null;
@@ -88,6 +94,17 @@ type InviteInboxItem = {
   updatedAt?: string | null;
 };
 
+type OutgoingInvite = {
+  id: string;
+  inviteePersonId: string;
+  inviteeFirstName?: string | null;
+  inviteeLastName?: string | null;
+  status: string;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+  expiresAt?: string | null;
+};
+
 type PersonHit = {
   id: string;
   firstName?: string | null;
@@ -148,6 +165,20 @@ export function GroupsPanel(props: { identity: Identity; onClose: () => void }) 
   const [inviteHits, setInviteHits] = useState<PersonHit[]>([]);
   const [inviteErr, setInviteErr] = useState<string | null>(null);
   const inviteSearchTimer = useRef<number | null>(null);
+  const [inviteOk, setInviteOk] = useState<string | null>(null);
+
+  const [outInvites, setOutInvites] = useState<OutgoingInvite[]>([]);
+  const [outInvitesErr, setOutInvitesErr] = useState<string | null>(null);
+  const [outInvitesBusy, setOutInvitesBusy] = useState(false);
+
+  const [editFreq, setEditFreq] = useState<"" | "weekly" | "biweekly">("");
+  const [editDow, setEditDow] = useState<number | "">("");
+  const [editTime, setEditTime] = useState("");
+  const [editTz, setEditTz] = useState("");
+  const [editLocName, setEditLocName] = useState("");
+  const [editLocAddr, setEditLocAddr] = useState("");
+  const [savingGroup, setSavingGroup] = useState(false);
+  const [groupSaveErr, setGroupSaveErr] = useState<string | null>(null);
 
   const [newEventTitle, setNewEventTitle] = useState("");
   const [newEventStart, setNewEventStart] = useState<string>(() => new Date().toISOString().slice(0, 16));
@@ -262,12 +293,45 @@ export function GroupsPanel(props: { identity: Identity; onClose: () => void }) 
   async function invitePerson(personId: string) {
     if (!activeGroupId) return;
     setInviteErr(null);
+    setInviteOk(null);
     try {
-      await postJson("/api/a2a/group/invite/create", { identity, group_id: activeGroupId, invitee_person_id: personId });
+      const out = await postJson<any>("/api/a2a/group/invite/create", { identity, group_id: activeGroupId, invitee_person_id: personId });
       setInviteSearch("");
       setInviteHits([]);
+      const exp = typeof out?.invite?.expiresAt === "string" ? String(out.invite.expiresAt) : "";
+      setInviteOk(exp ? `Invite sent (expires ${exp.slice(0, 10)}).` : "Invite sent.");
+      await refreshOutgoingInvites();
     } catch (e: any) {
       setInviteErr(String(e?.message ?? e ?? "Invite failed"));
+    }
+  }
+
+  const refreshOutgoingInvites = useCallback(async () => {
+    if (!activeGroupId) {
+      setOutInvites([]);
+      setOutInvitesErr(null);
+      return;
+    }
+    setOutInvitesBusy(true);
+    setOutInvitesErr(null);
+    try {
+      const out = await postJson<{ invites?: OutgoingInvite[] }>("/api/a2a/group/invites/sent/list", { identity, group_id: activeGroupId, status: "pending", limit: 50, offset: 0 });
+      setOutInvites(Array.isArray(out?.invites) ? out.invites : []);
+    } catch (e: any) {
+      setOutInvitesErr(String(e?.message ?? e ?? "Failed to load outgoing invites"));
+      setOutInvites([]);
+    } finally {
+      setOutInvitesBusy(false);
+    }
+  }, [activeGroupId, identity]);
+
+  async function cancelInvite(inviteId: string) {
+    setOutInvitesErr(null);
+    try {
+      await postJson("/api/a2a/group/invite/cancel", { identity, invite_id: inviteId });
+      await refreshOutgoingInvites();
+    } catch (e: any) {
+      setOutInvitesErr(String(e?.message ?? e ?? "Failed to cancel invite"));
     }
   }
 
@@ -306,7 +370,43 @@ export function GroupsPanel(props: { identity: Identity; onClose: () => void }) 
         setActiveStudyId((prev) => (prev && s.some((x) => x.id === prev) ? prev : s[0]?.id ?? ""));
       })
       .catch((e) => setStudiesErr(String((e as any)?.message ?? e ?? "Failed to load Bible studies")));
+
+    void refreshOutgoingInvites();
   }, [activeGroupId, identity]);
+
+  useEffect(() => {
+    setGroupSaveErr(null);
+    if (!activeGroup) return;
+    setEditFreq((activeGroup.meetingFrequency as any) || "");
+    setEditDow(typeof activeGroup.meetingDayOfWeek === "number" ? activeGroup.meetingDayOfWeek : "");
+    setEditTime(typeof activeGroup.meetingTimeLocal === "string" ? activeGroup.meetingTimeLocal : "");
+    setEditTz(typeof activeGroup.meetingTimezone === "string" ? activeGroup.meetingTimezone : identity.timezone ?? "");
+    setEditLocName(typeof activeGroup.meetingLocationName === "string" ? activeGroup.meetingLocationName : "");
+    setEditLocAddr(typeof activeGroup.meetingLocationAddress === "string" ? activeGroup.meetingLocationAddress : "");
+  }, [activeGroupId, activeGroup, identity.timezone]);
+
+  async function saveRecurringSchedule() {
+    if (!activeGroupId) return;
+    setSavingGroup(true);
+    setGroupSaveErr(null);
+    try {
+      await postJson("/api/a2a/group/update", {
+        identity,
+        group_id: activeGroupId,
+        meeting_frequency: editFreq || null,
+        meeting_day_of_week: editDow === "" ? null : Number(editDow),
+        meeting_time_local: editTime.trim() || null,
+        meeting_timezone: editTz.trim() || null,
+        meeting_location_name: editLocName.trim() || null,
+        meeting_location_address: editLocAddr.trim() || null,
+      });
+      await refresh();
+    } catch (e: any) {
+      setGroupSaveErr(String(e?.message ?? e ?? "Failed to save group schedule"));
+    } finally {
+      setSavingGroup(false);
+    }
+  }
 
   useEffect(() => {
     setSessions([]);
@@ -522,7 +622,59 @@ export function GroupsPanel(props: { identity: Identity; onClose: () => void }) 
             <section style={{ background: "white", border: "1px solid #e2e8f0", borderRadius: 14, padding: 12, display: "grid", gap: 8 }}>
               <div style={{ fontWeight: 900, color: "#0f172a" }}>Group details</div>
               {activeGroup.meetingDetails ? <div style={{ fontSize: 12, color: "#334155" }}>{activeGroup.meetingDetails}</div> : null}
-              {!activeGroup.meetingDetails ? <div style={{ fontSize: 12, color: "#64748b" }}>No meeting details yet.</div> : null}
+              {!activeGroup.meetingDetails ? <div style={{ fontSize: 12, color: "#64748b" }}>No extra notes yet.</div> : null}
+            </section>
+
+            <section style={{ background: "white", border: "1px solid #e2e8f0", borderRadius: 14, padding: 12, display: "grid", gap: 10 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10 }}>
+                <div style={{ fontWeight: 900, color: "#0f172a" }}>Recurring schedule</div>
+                <button type="button" style={smallBtn} onClick={() => void saveRecurringSchedule()} disabled={savingGroup || !canManageMembers}>
+                  Save
+                </button>
+              </div>
+              {!canManageMembers ? <div style={{ fontSize: 12, color: "#64748b" }}>Only leaders/hosts (or a guide) can edit schedule details.</div> : null}
+              {groupSaveErr ? <div style={{ color: "#dc2626", fontSize: 12 }}>{groupSaveErr}</div> : null}
+
+              <div style={{ display: "grid", gap: 8, gridTemplateColumns: "1fr 1fr" }}>
+                <div style={{ display: "grid", gap: 6 }}>
+                  <div style={{ fontSize: 12, fontWeight: 900, color: "#0f172a" }}>Frequency</div>
+                  <select value={editFreq} onChange={(e) => setEditFreq(e.target.value as any)} disabled={!canManageMembers} style={{ border: "1px solid #cbd5e1", borderRadius: 10, padding: "8px 10px" }}>
+                    <option value="">Not set</option>
+                    <option value="weekly">Weekly</option>
+                    <option value="biweekly">Bi-weekly</option>
+                  </select>
+                </div>
+                <div style={{ display: "grid", gap: 6 }}>
+                  <div style={{ fontSize: 12, fontWeight: 900, color: "#0f172a" }}>Day</div>
+                  <select value={editDow as any} onChange={(e) => setEditDow(e.target.value === "" ? "" : Number(e.target.value))} disabled={!canManageMembers} style={{ border: "1px solid #cbd5e1", borderRadius: 10, padding: "8px 10px" }}>
+                    <option value="">Not set</option>
+                    <option value="0">Sunday</option>
+                    <option value="1">Monday</option>
+                    <option value="2">Tuesday</option>
+                    <option value="3">Wednesday</option>
+                    <option value="4">Thursday</option>
+                    <option value="5">Friday</option>
+                    <option value="6">Saturday</option>
+                  </select>
+                </div>
+              </div>
+
+              <div style={{ display: "grid", gap: 8, gridTemplateColumns: "1fr 1fr" }}>
+                <div style={{ display: "grid", gap: 6 }}>
+                  <div style={{ fontSize: 12, fontWeight: 900, color: "#0f172a" }}>Time (local)</div>
+                  <input value={editTime} onChange={(e) => setEditTime(e.target.value)} disabled={!canManageMembers} placeholder="HH:MM (e.g., 19:00)" style={{ border: "1px solid #cbd5e1", borderRadius: 10, padding: "8px 10px" }} />
+                </div>
+                <div style={{ display: "grid", gap: 6 }}>
+                  <div style={{ fontSize: 12, fontWeight: 900, color: "#0f172a" }}>Timezone</div>
+                  <input value={editTz} onChange={(e) => setEditTz(e.target.value)} disabled={!canManageMembers} placeholder="America/Denver" style={{ border: "1px solid #cbd5e1", borderRadius: 10, padding: "8px 10px" }} />
+                </div>
+              </div>
+
+              <div style={{ display: "grid", gap: 8 }}>
+                <div style={{ fontSize: 12, fontWeight: 900, color: "#0f172a" }}>Location</div>
+                <input value={editLocName} onChange={(e) => setEditLocName(e.target.value)} disabled={!canManageMembers} placeholder="Place name (optional)" style={{ border: "1px solid #cbd5e1", borderRadius: 10, padding: "8px 10px" }} />
+                <input value={editLocAddr} onChange={(e) => setEditLocAddr(e.target.value)} disabled={!canManageMembers} placeholder="Address / meeting link (optional)" style={{ border: "1px solid #cbd5e1", borderRadius: 10, padding: "8px 10px" }} />
+              </div>
             </section>
 
             <section style={{ background: "white", border: "1px solid #e2e8f0", borderRadius: 14, padding: 12, display: "grid", gap: 10 }}>
@@ -542,6 +694,7 @@ export function GroupsPanel(props: { identity: Identity; onClose: () => void }) 
                   style={{ border: "1px solid #cbd5e1", borderRadius: 10, padding: "8px 10px" }}
                 />
                 {inviteErr ? <div style={{ color: "#dc2626", fontSize: 12 }}>{inviteErr}</div> : null}
+                {inviteOk ? <div style={{ color: "#166534", fontSize: 12 }}>{inviteOk}</div> : null}
                 {inviteSearch.trim() ? (
                   <div style={{ display: "grid", gap: 6 }}>
                     {inviteHits.map((p) => {
@@ -565,6 +718,42 @@ export function GroupsPanel(props: { identity: Identity; onClose: () => void }) 
                 ) : (
                   <div style={{ fontSize: 12, color: "#64748b" }}>Type to search people already in this church database.</div>
                 )}
+              </div>
+
+              <div style={{ border: "1px solid #e2e8f0", borderRadius: 12, padding: 10, background: "#f8fafc", display: "grid", gap: 8 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10 }}>
+                  <div style={{ fontSize: 12, fontWeight: 900, color: "#0f172a" }}>Outgoing invites</div>
+                  <button type="button" style={smallBtn} onClick={() => void refreshOutgoingInvites()} disabled={outInvitesBusy}>
+                    Refresh
+                  </button>
+                </div>
+                {outInvitesErr ? <div style={{ color: "#dc2626", fontSize: 12 }}>{outInvitesErr}</div> : null}
+                {outInvitesBusy ? <div style={{ fontSize: 12, color: "#64748b" }}>Loading…</div> : null}
+                <div style={{ display: "grid", gap: 6 }}>
+                  {outInvites.map((iv) => {
+                    const who = `${iv.inviteeFirstName ?? ""} ${iv.inviteeLastName ?? ""}`.trim() || iv.inviteePersonId;
+                    const sent = iv.createdAt ? String(iv.createdAt).slice(0, 10) : "";
+                    const exp = iv.expiresAt ? String(iv.expiresAt).slice(0, 10) : "";
+                    return (
+                      <div key={iv.id} style={{ background: "white", border: "1px solid #e2e8f0", borderRadius: 10, padding: "8px 10px", display: "flex", justifyContent: "space-between", gap: 10 }}>
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ fontSize: 13, fontWeight: 900, color: "#0f172a" }}>{who}</div>
+                          <div style={{ fontSize: 12, color: "#64748b" }}>
+                            status={iv.status}
+                            {sent ? ` · sent ${sent}` : ""}
+                            {exp ? ` · expires ${exp}` : ""}
+                          </div>
+                        </div>
+                        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                          <button type="button" style={{ ...smallBtn, background: "#b91c1c" }} onClick={() => void cancelInvite(iv.id)} title="Cancel invite">
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {!outInvites.length ? <div style={{ fontSize: 12, color: "#64748b" }}>No pending outgoing invites.</div> : null}
+                </div>
               </div>
               <div style={{ display: "grid", gap: 8 }}>
                 {members.map((m) => (

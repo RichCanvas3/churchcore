@@ -727,6 +727,12 @@ CREATE TABLE IF NOT EXISTS groups (
   description TEXT,
   leader_person_id TEXT,
   meeting_details TEXT,
+  meeting_frequency TEXT,        -- weekly|biweekly|null
+  meeting_day_of_week INTEGER,   -- 0=Sun..6=Sat
+  meeting_time_local TEXT,       -- HH:MM (local)
+  meeting_timezone TEXT,         -- IANA tz (e.g. America/Denver)
+  meeting_location_name TEXT,
+  meeting_location_address TEXT,
   is_open INTEGER NOT NULL DEFAULT 1,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
@@ -754,7 +760,8 @@ CREATE TABLE IF NOT EXISTS group_invites (
   group_id TEXT NOT NULL,
   invited_by_person_id TEXT NOT NULL,
   invitee_person_id TEXT NOT NULL,
-  status TEXT NOT NULL DEFAULT 'pending', -- pending|accepted|declined|cancelled
+  status TEXT NOT NULL DEFAULT 'pending', -- pending|accepted|declined|cancelled|expired
+  expires_at TEXT, -- ISO timestamp (UTC)
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
   UNIQUE (church_id, group_id, invitee_person_id),
@@ -764,6 +771,8 @@ CREATE TABLE IF NOT EXISTS group_invites (
 );
 CREATE INDEX IF NOT EXISTS idx_group_invites_lookup ON group_invites(church_id, group_id, status, updated_at);
 CREATE INDEX IF NOT EXISTS idx_group_invites_invitee ON group_invites(church_id, invitee_person_id, status, updated_at);
+CREATE INDEX IF NOT EXISTS idx_group_invites_outgoing ON group_invites(church_id, group_id, status, created_at);
+CREATE INDEX IF NOT EXISTS idx_group_invites_expiry ON group_invites(church_id, status, expires_at);
 
 CREATE TABLE IF NOT EXISTS group_events (
   id TEXT PRIMARY KEY,

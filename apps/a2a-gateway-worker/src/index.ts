@@ -188,9 +188,12 @@ function agentCard(req: Request, env: Env) {
         group_my_list: `${baseUrl}a2a/group.my.list`,
         group_get: `${baseUrl}a2a/group.get`,
         group_create: `${baseUrl}a2a/group.create`,
+        group_update: `${baseUrl}a2a/group.update`,
         group_members_list: `${baseUrl}a2a/group.members.list`,
         group_invite_create: `${baseUrl}a2a/group.invite.create`,
         group_invite_respond: `${baseUrl}a2a/group.invite.respond`,
+        group_invites_sent_list: `${baseUrl}a2a/group.invites.sent.list`,
+        group_invite_cancel: `${baseUrl}a2a/group.invite.cancel`,
         group_invites_inbox_list: `${baseUrl}a2a/group.invites.inbox.list`,
         people_search: `${baseUrl}a2a/people.search`,
         group_member_remove: `${baseUrl}a2a/group.member.remove`,
@@ -1800,12 +1803,47 @@ const GroupInviteRespondSchema = z.object({
   action: z.enum(["accept", "decline"]),
 });
 
+const GroupInvitesSentListSchema = z.object({
+  identity: IdentitySchema,
+  group_id: z.string().min(1),
+  status: z.enum(["pending", "accepted", "declined", "cancelled", "expired"]).optional().nullable(),
+  limit: z.number().int().min(1).max(200).optional().nullable(),
+  offset: z.number().int().min(0).max(100000).optional().nullable(),
+});
+
+const GroupInviteCancelSchema = z.object({
+  identity: IdentitySchema,
+  invite_id: z.string().min(1),
+});
+
 const GroupCreateSchema = z.object({
   identity: IdentitySchema,
   campus_id: z.string().optional().nullable(),
   name: z.string().min(1),
   description: z.string().optional().nullable(),
   meeting_details: z.string().optional().nullable(),
+  meeting_frequency: z.enum(["weekly", "biweekly"]).optional().nullable(),
+  meeting_day_of_week: z.number().int().min(0).max(6).optional().nullable(),
+  meeting_time_local: z.string().regex(/^\d{2}:\d{2}$/).optional().nullable(),
+  meeting_timezone: z.string().optional().nullable(),
+  meeting_location_name: z.string().optional().nullable(),
+  meeting_location_address: z.string().optional().nullable(),
+  is_open: z.boolean().optional().nullable(),
+});
+
+const GroupUpdateSchema = z.object({
+  identity: IdentitySchema,
+  group_id: z.string().min(1),
+  campus_id: z.string().optional().nullable(),
+  name: z.string().min(1).optional().nullable(),
+  description: z.string().optional().nullable(),
+  meeting_details: z.string().optional().nullable(),
+  meeting_frequency: z.enum(["weekly", "biweekly"]).optional().nullable(),
+  meeting_day_of_week: z.number().int().min(0).max(6).optional().nullable(),
+  meeting_time_local: z.string().regex(/^\d{2}:\d{2}$/).optional().nullable(),
+  meeting_timezone: z.string().optional().nullable(),
+  meeting_location_name: z.string().optional().nullable(),
+  meeting_location_address: z.string().optional().nullable(),
   is_open: z.boolean().optional().nullable(),
 });
 
@@ -4592,7 +4630,19 @@ async function handleGroupMyList(req: Request, env: Env) {
     (
       await env.churchcore
         .prepare(
-          `SELECT g.id,g.campus_id AS campusId,g.name,g.description,g.leader_person_id AS leaderPersonId,g.meeting_details AS meetingDetails,g.is_open AS isOpen,
+          `SELECT g.id,
+                  g.campus_id AS campusId,
+                  g.name,
+                  g.description,
+                  g.leader_person_id AS leaderPersonId,
+                  g.meeting_details AS meetingDetails,
+                  g.meeting_frequency AS meetingFrequency,
+                  g.meeting_day_of_week AS meetingDayOfWeek,
+                  g.meeting_time_local AS meetingTimeLocal,
+                  g.meeting_timezone AS meetingTimezone,
+                  g.meeting_location_name AS meetingLocationName,
+                  g.meeting_location_address AS meetingLocationAddress,
+                  g.is_open AS isOpen,
                   gm.role AS myRole, gm.status AS myStatus, gm.joined_at AS joinedAt
            FROM group_memberships gm
            JOIN groups g ON g.id=gm.group_id
@@ -4617,7 +4667,21 @@ async function handleGroupGet(req: Request, env: Env) {
 
   const group = (await env.churchcore
     .prepare(
-      `SELECT id,campus_id AS campusId,name,description,leader_person_id AS leaderPersonId,meeting_details AS meetingDetails,is_open AS isOpen,created_at AS createdAt,updated_at AS updatedAt
+      `SELECT id,
+              campus_id AS campusId,
+              name,
+              description,
+              leader_person_id AS leaderPersonId,
+              meeting_details AS meetingDetails,
+              meeting_frequency AS meetingFrequency,
+              meeting_day_of_week AS meetingDayOfWeek,
+              meeting_time_local AS meetingTimeLocal,
+              meeting_timezone AS meetingTimezone,
+              meeting_location_name AS meetingLocationName,
+              meeting_location_address AS meetingLocationAddress,
+              is_open AS isOpen,
+              created_at AS createdAt,
+              updated_at AS updatedAt
        FROM groups WHERE church_id=?1 AND id=?2`,
     )
     .bind(churchId, groupId)
@@ -4637,6 +4701,59 @@ async function handleGroupGet(req: Request, env: Env) {
   for (const r of ((counts?.results ?? []) as any[]).filter(Boolean)) membershipCounts[String(r.status)] = Number(r.c ?? 0);
 
   return json({ ok: true, group, membershipCounts, actor: { userId, role } });
+}
+
+async function handleGroupUpdate(req: Request, env: Env) {
+  const parsed = GroupUpdateSchema.safeParse(await parseJson(req));
+  if (!parsed.success) return json({ error: "Invalid body", issues: parsed.error.issues }, { status: 400 });
+  const { identity } = parsed.data;
+  const churchId = identity.tenant_id;
+  const userId = identity.user_id;
+  const role = (identity.role ?? "seeker") as string;
+  const groupId = parsed.data.group_id.trim();
+
+  const { personId } = await resolvePerson(env, identity);
+  if (!personId) return json({ ok: false, error: "No personId" }, { status: 400 });
+  const ok = await canManageGroupMembers(env, { churchId, userId, identityRole: role, groupId, personId });
+  if (!ok) return json({ ok: false, error: "Forbidden" }, { status: 403 });
+
+  const now = nowIso();
+  await env.churchcore
+    .prepare(
+      `UPDATE groups
+       SET campus_id=COALESCE(?3, campus_id),
+           name=COALESCE(?4, name),
+           description=COALESCE(?5, description),
+           meeting_details=COALESCE(?6, meeting_details),
+           meeting_frequency=COALESCE(?7, meeting_frequency),
+           meeting_day_of_week=COALESCE(?8, meeting_day_of_week),
+           meeting_time_local=COALESCE(?9, meeting_time_local),
+           meeting_timezone=COALESCE(?10, meeting_timezone),
+           meeting_location_name=COALESCE(?11, meeting_location_name),
+           meeting_location_address=COALESCE(?12, meeting_location_address),
+           is_open=COALESCE(?13, is_open),
+           updated_at=?14
+       WHERE church_id=?1 AND id=?2`,
+    )
+    .bind(
+      churchId,
+      groupId,
+      parsed.data.campus_id ?? null,
+      parsed.data.name ?? null,
+      parsed.data.description ?? null,
+      parsed.data.meeting_details ?? null,
+      parsed.data.meeting_frequency ?? null,
+      parsed.data.meeting_day_of_week ?? null,
+      parsed.data.meeting_time_local ?? null,
+      parsed.data.meeting_timezone ?? null,
+      parsed.data.meeting_location_name ?? null,
+      parsed.data.meeting_location_address ?? null,
+      parsed.data.is_open == null ? null : parsed.data.is_open ? 1 : 0,
+      now,
+    )
+    .run();
+
+  return json({ ok: true, group_id: groupId, actor: { userId, role, personId } });
 }
 
 async function handleGroupMembersList(req: Request, env: Env) {
@@ -4696,22 +4813,24 @@ async function handleGroupInviteCreate(req: Request, env: Env) {
   if (existing && String(existing.status) !== "inactive") return json({ ok: true, invite: null, note: "Already a member", actor: { userId, role, personId } });
 
   const now = nowIso();
+  const expiresAt = new Date(Date.now() + 14 * 24 * 3600 * 1000).toISOString();
   const id = crypto.randomUUID();
   await env.churchcore
     .prepare(
-      `INSERT INTO group_invites (id, church_id, group_id, invited_by_person_id, invitee_person_id, status, created_at, updated_at)
-       VALUES (?1, ?2, ?3, ?4, ?5, 'pending', ?6, ?7)
+      `INSERT INTO group_invites (id, church_id, group_id, invited_by_person_id, invitee_person_id, status, expires_at, created_at, updated_at)
+       VALUES (?1, ?2, ?3, ?4, ?5, 'pending', ?6, ?7, ?8)
        ON CONFLICT(church_id, group_id, invitee_person_id) DO UPDATE
          SET invited_by_person_id=excluded.invited_by_person_id,
              status='pending',
+             expires_at=excluded.expires_at,
              updated_at=excluded.updated_at`,
     )
-    .bind(id, churchId, groupId, personId, inviteePersonId, now, now)
+    .bind(id, churchId, groupId, personId, inviteePersonId, expiresAt, now, now)
     .run();
 
   const invite = (await env.churchcore
     .prepare(
-      `SELECT id,group_id AS groupId,invited_by_person_id AS invitedByPersonId,invitee_person_id AS inviteePersonId,status,created_at AS createdAt,updated_at AS updatedAt
+      `SELECT id,group_id AS groupId,invited_by_person_id AS invitedByPersonId,invitee_person_id AS inviteePersonId,status,expires_at AS expiresAt,created_at AS createdAt,updated_at AS updatedAt
        FROM group_invites WHERE church_id=?1 AND group_id=?2 AND invitee_person_id=?3`,
     )
     .bind(churchId, groupId, inviteePersonId)
@@ -4735,7 +4854,7 @@ async function handleGroupInviteRespond(req: Request, env: Env) {
 
   const invite = (await env.churchcore
     .prepare(
-      `SELECT id,group_id AS groupId,invitee_person_id AS inviteePersonId,status
+      `SELECT id,group_id AS groupId,invitee_person_id AS inviteePersonId,status,expires_at AS expiresAt
        FROM group_invites WHERE church_id=?1 AND id=?2`,
     )
     .bind(churchId, inviteId)
@@ -4745,6 +4864,11 @@ async function handleGroupInviteRespond(req: Request, env: Env) {
   if (String(invite.status) !== "pending") return json({ ok: false, error: "Invite is not pending" }, { status: 400 });
 
   const now = nowIso();
+  const exp = typeof invite.expiresAt === "string" ? String(invite.expiresAt) : "";
+  if (exp && Date.parse(exp) && Date.parse(now) > Date.parse(exp)) {
+    await env.churchcore.prepare(`UPDATE group_invites SET status='expired', updated_at=?3 WHERE church_id=?1 AND id=?2`).bind(churchId, inviteId, now).run();
+    return json({ ok: false, error: "Invite expired" }, { status: 400 });
+  }
   const nextStatus = action === "accept" ? "accepted" : "declined";
   await env.churchcore.prepare(`UPDATE group_invites SET status=?4, updated_at=?3 WHERE church_id=?1 AND id=?2`).bind(churchId, inviteId, now, nextStatus).run();
   if (action === "accept") {
@@ -4767,6 +4891,84 @@ async function handleGroupInviteRespond(req: Request, env: Env) {
   return json({ ok: true, status: nextStatus, group_id: String(invite.groupId), actor: { userId, role, personId } });
 }
 
+async function handleGroupInvitesSentList(req: Request, env: Env) {
+  const parsed = GroupInvitesSentListSchema.safeParse(await parseJson(req));
+  if (!parsed.success) return json({ error: "Invalid body", issues: parsed.error.issues }, { status: 400 });
+  const { identity } = parsed.data;
+  const churchId = identity.tenant_id;
+  const userId = identity.user_id;
+  const role = (identity.role ?? "seeker") as string;
+  const groupId = parsed.data.group_id.trim();
+
+  const { personId } = await resolvePerson(env, identity);
+  if (!personId) return json({ ok: false, error: "No personId" }, { status: 400 });
+  const actor = await groupActorRole(env, { churchId, groupId, actorPersonId: personId });
+  if (actor.status !== "active") return json({ ok: false, error: "Not permitted" }, { status: 403 });
+
+  const status = (parsed.data.status ?? "pending") as string;
+  const limit = parsed.data.limit ?? 50;
+  const offset = parsed.data.offset ?? 0;
+
+  const rows =
+    (
+      await env.churchcore
+        .prepare(
+          `SELECT i.id,
+                  i.group_id AS groupId,
+                  i.invited_by_person_id AS invitedByPersonId,
+                  ib.first_name AS invitedByFirstName,
+                  ib.last_name AS invitedByLastName,
+                  i.invitee_person_id AS inviteePersonId,
+                  ie.first_name AS inviteeFirstName,
+                  ie.last_name AS inviteeLastName,
+                  i.status,
+                  i.expires_at AS expiresAt,
+                  i.created_at AS createdAt,
+                  i.updated_at AS updatedAt
+           FROM group_invites i
+           LEFT JOIN people ib ON ib.church_id=i.church_id AND ib.id=i.invited_by_person_id
+           LEFT JOIN people ie ON ie.church_id=i.church_id AND ie.id=i.invitee_person_id
+           WHERE i.church_id=?1 AND i.group_id=?2 AND i.status=?3
+           ORDER BY i.updated_at DESC
+           LIMIT ?4 OFFSET ?5`,
+        )
+        .bind(churchId, groupId, status, limit, offset)
+        .all()
+    ).results ?? [];
+
+  return json({ ok: true, invites: rows, actor: { userId, role, personId } });
+}
+
+async function handleGroupInviteCancel(req: Request, env: Env) {
+  const parsed = GroupInviteCancelSchema.safeParse(await parseJson(req));
+  if (!parsed.success) return json({ error: "Invalid body", issues: parsed.error.issues }, { status: 400 });
+  const { identity } = parsed.data;
+  const churchId = identity.tenant_id;
+  const userId = identity.user_id;
+  const role = (identity.role ?? "seeker") as string;
+  const inviteId = parsed.data.invite_id.trim();
+
+  const { personId } = await resolvePerson(env, identity);
+  if (!personId) return json({ ok: false, error: "No personId" }, { status: 400 });
+
+  const inv = (await env.churchcore
+    .prepare(`SELECT id, group_id AS groupId, invited_by_person_id AS invitedByPersonId, status FROM group_invites WHERE church_id=?1 AND id=?2`)
+    .bind(churchId, inviteId)
+    .first()) as any;
+  if (!inv) return json({ ok: false, error: "Invite not found" }, { status: 404 });
+  const groupId = String(inv.groupId);
+  const status = String(inv.status);
+  if (status !== "pending") return json({ ok: false, error: "Only pending invites can be cancelled" }, { status: 400 });
+
+  const isManager = await canManageGroupMembers(env, { churchId, userId, identityRole: role, groupId, personId });
+  const isInviter = String(inv.invitedByPersonId) === personId;
+  if (!isManager && !isInviter) return json({ ok: false, error: "Forbidden" }, { status: 403 });
+
+  const now = nowIso();
+  await env.churchcore.prepare(`UPDATE group_invites SET status='cancelled', updated_at=?3 WHERE church_id=?1 AND id=?2`).bind(churchId, inviteId, now).run();
+  return json({ ok: true, invite_id: inviteId, status: "cancelled", actor: { userId, role, personId } });
+}
+
 async function handleGroupCreate(req: Request, env: Env) {
   const parsed = GroupCreateSchema.safeParse(await parseJson(req));
   if (!parsed.success) return json({ error: "Invalid body", issues: parsed.error.issues }, { status: 400 });
@@ -4782,8 +4984,12 @@ async function handleGroupCreate(req: Request, env: Env) {
   const now = nowIso();
   await env.churchcore
     .prepare(
-      `INSERT INTO groups (id, church_id, campus_id, name, description, leader_person_id, meeting_details, is_open, created_at, updated_at)
-       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)`,
+      `INSERT INTO groups (
+         id, church_id, campus_id, name, description, leader_person_id,
+         meeting_details, meeting_frequency, meeting_day_of_week, meeting_time_local, meeting_timezone, meeting_location_name, meeting_location_address,
+         is_open, created_at, updated_at
+       )
+       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)`,
     )
     .bind(
       id,
@@ -4793,6 +4999,12 @@ async function handleGroupCreate(req: Request, env: Env) {
       parsed.data.description ?? null,
       personId,
       parsed.data.meeting_details ?? null,
+      parsed.data.meeting_frequency ?? null,
+      parsed.data.meeting_day_of_week ?? null,
+      parsed.data.meeting_time_local ?? null,
+      parsed.data.meeting_timezone ?? identity.timezone ?? null,
+      parsed.data.meeting_location_name ?? null,
+      parsed.data.meeting_location_address ?? null,
       parsed.data.is_open == null ? 1 : parsed.data.is_open ? 1 : 0,
       now,
       now,
@@ -5633,12 +5845,18 @@ export default {
         return handleGroupMyList(req, env);
       case "/a2a/group.get":
         return handleGroupGet(req, env);
+      case "/a2a/group.update":
+        return handleGroupUpdate(req, env);
       case "/a2a/group.members.list":
         return handleGroupMembersList(req, env);
       case "/a2a/group.invite.create":
         return handleGroupInviteCreate(req, env);
       case "/a2a/group.invite.respond":
         return handleGroupInviteRespond(req, env);
+      case "/a2a/group.invites.sent.list":
+        return handleGroupInvitesSentList(req, env);
+      case "/a2a/group.invite.cancel":
+        return handleGroupInviteCancel(req, env);
       case "/a2a/group.create":
         return handleGroupCreate(req, env);
       case "/a2a/group.invites.inbox.list":
