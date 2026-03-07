@@ -61,13 +61,54 @@ INSERT OR REPLACE INTO people (
 ) VALUES
 ('p_seeker_1','calvarybible','campus_boulder','Ava','Seeker','ava.seeker@example.com','+15550000001',datetime('now'),datetime('now')),
 ('p_seeker_2','calvarybible','campus_boulder','Noah','Seeker','noah.seeker@example.com','+15550000002',datetime('now'),datetime('now')),
-('p_leader_1','calvarybible','campus_boulder','Grace','Leader','grace.leader@example.com','+15550000003',datetime('now'),datetime('now'));
+('p_leader_1','calvarybible','campus_boulder','Grace','Leader','grace.leader@example.com','+15550000003',datetime('now'),datetime('now')),
+
+-- Demo adults (selectable users in the web app)
+('p_demo_01','calvarybible','campus_erie','Matt','Carter','matt.carter@example.com','+15550000101',datetime('now'),datetime('now')),
+('p_demo_02','calvarybible','campus_erie','Emily','Carter','emily.carter@example.com','+15550000102',datetime('now'),datetime('now')),
+('p_demo_03','calvarybible','campus_boulder','Daniel','Nguyen','daniel.nguyen@example.com','+15550000103',datetime('now'),datetime('now')),
+('p_demo_04','calvarybible','campus_boulder','Hannah','Nguyen','hannah.nguyen@example.com','+15550000104',datetime('now'),datetime('now')),
+('p_demo_05','calvarybible','campus_thornton','Jose','Ramirez','jose.ramirez@example.com','+15550000105',datetime('now'),datetime('now')),
+('p_demo_06','calvarybible','campus_thornton','Maria','Ramirez','maria.ramirez@example.com','+15550000106',datetime('now'),datetime('now')),
+('p_demo_07','calvarybible','campus_erie','Chris','Brooks','chris.brooks@example.com','+15550000107',datetime('now'),datetime('now')),
+('p_demo_08','calvarybible','campus_erie','Talia','Brooks','talia.brooks@example.com','+15550000108',datetime('now'),datetime('now')),
+('p_demo_09','calvarybible','campus_boulder','Raj','Patel','raj.patel@example.com','+15550000109',datetime('now'),datetime('now')),
+('p_demo_10','calvarybible','campus_boulder','Priya','Patel','priya.patel@example.com','+15550000110',datetime('now'),datetime('now')),
+('p_demo_11','calvarybible','campus_boulder','Jordan','Lee','jordan.lee@example.com','+15550000111',datetime('now'),datetime('now')),
+('p_demo_12','calvarybible','campus_boulder','Casey','Kim','casey.kim@example.com','+15550000112',datetime('now'),datetime('now')),
+('p_demo_13','calvarybible','campus_thornton','Tyler','Johnson','tyler.johnson@example.com','+15550000113',datetime('now'),datetime('now')),
+('p_demo_14','calvarybible','campus_thornton','Morgan','Wright','morgan.wright@example.com','+15550000114',datetime('now'),datetime('now')),
+('p_demo_15','calvarybible','campus_erie','Samir','Ali','samir.ali@example.com','+15550000115',datetime('now'),datetime('now')),
+('p_demo_16','calvarybible','campus_erie','Grace','Parker','grace.parker@example.com','+15550000116',datetime('now'),datetime('now')),
+('p_demo_17','calvarybible','campus_boulder','Olivia','Chen','olivia.chen@example.com','+15550000117',datetime('now'),datetime('now')),
+('p_demo_18','calvarybible','campus_boulder','Ethan','Davis','ethan.davis@example.com','+15550000118',datetime('now'),datetime('now')),
+('p_demo_19','calvarybible','campus_thornton','Bella','Martinez','bella.martinez@example.com','+15550000119',datetime('now'),datetime('now')),
+('p_demo_20','calvarybible','campus_thornton','Nate','Thompson','nate.thompson@example.com','+15550000120',datetime('now'),datetime('now')),
+('p_demo_21','calvarybible','campus_erie','Logan','Reed','logan.reed@example.com','+15550000121',datetime('now'),datetime('now')),
+('p_demo_22','calvarybible','campus_erie','Megan','Scott','megan.scott@example.com','+15550000122',datetime('now'),datetime('now')),
+('p_demo_23','calvarybible','campus_boulder','Caleb','Foster','caleb.foster@example.com','+15550000123',datetime('now'),datetime('now')),
+('p_demo_24','calvarybible','campus_boulder','Sierra','Price','sierra.price@example.com','+15550000124',datetime('now'),datetime('now')),
+('p_demo_25','calvarybible','campus_thornton','Derek','Hall','derek.hall@example.com','+15550000125',datetime('now'),datetime('now')),
+('p_demo_26','calvarybible','campus_thornton','Kara','Hall','kara.hall@example.com','+15550000126',datetime('now'),datetime('now')),
+('p_demo_27','calvarybible','campus_erie','Ben','Wallace','ben.wallace@example.com','+15550000127',datetime('now'),datetime('now')),
+('p_demo_28','calvarybible','campus_erie','Ruth','Wallace','ruth.wallace@example.com','+15550000128',datetime('now'),datetime('now')),
+('p_demo_29','calvarybible','campus_erie','Aiden','Brooks','aiden.brooks@example.com','+15550000129',datetime('now'),datetime('now')),
+('p_demo_30','calvarybible','campus_erie','Chloe','Brooks','chloe.brooks@example.com','+15550000130',datetime('now'),datetime('now'));
 
 INSERT OR REPLACE INTO people (
   id, church_id, campus_id, first_name, last_name, birthdate,
   created_at, updated_at
 ) VALUES
-('p_child_1','calvarybible','campus_boulder','Mia','Seeker','2021-06-01',datetime('now'),datetime('now'));
+('p_child_1','calvarybible','campus_boulder','Mia','Seeker','2021-06-01',datetime('now'),datetime('now')),
+('p_demo_k01','calvarybible','campus_erie','Liam','Carter','2016-05-10',datetime('now'),datetime('now')),
+('p_demo_k02','calvarybible','campus_erie','Sophie','Carter','2019-08-22',datetime('now'),datetime('now')),
+('p_demo_k03','calvarybible','campus_boulder','Ava','Nguyen','2017-03-15',datetime('now'),datetime('now')),
+('p_demo_k04','calvarybible','campus_thornton','Isabella','Ramirez','2014-11-02',datetime('now'),datetime('now')),
+('p_demo_k05','calvarybible','campus_thornton','Mateo','Ramirez','2018-02-19',datetime('now'),datetime('now')),
+('p_demo_k06','calvarybible','campus_thornton','Lucia','Ramirez','2020-07-30',datetime('now'),datetime('now')),
+('p_demo_k07','calvarybible','campus_erie','Harper','Brooks','2015-09-09',datetime('now'),datetime('now')),
+('p_demo_k08','calvarybible','campus_boulder','Neha','Patel','2013-04-01',datetime('now'),datetime('now')),
+('p_demo_k09','calvarybible','campus_boulder','Arjun','Patel','2016-12-12',datetime('now'),datetime('now'));
 
 -- Household for Noah + child (kids check-in demo)
 INSERT OR REPLACE INTO households (id, church_id, name, created_at, updated_at) VALUES
@@ -83,6 +124,74 @@ INSERT OR REPLACE INTO household_members (household_id, person_id, role) VALUES
 ('hh_noah_1','p_seeker_2','adult'),
 ('hh_noah_1','p_seeker_1','adult'),
 ('hh_noah_1','p_child_1','child');
+
+-- Additional demo households (families)
+INSERT OR REPLACE INTO households (id, church_id, name, created_at, updated_at) VALUES
+('hh_carter_1','calvarybible','Carter Household',datetime('now'),datetime('now')),
+('hh_nguyen_1','calvarybible','Nguyen Household',datetime('now'),datetime('now')),
+('hh_ramirez_1','calvarybible','Ramirez Household',datetime('now'),datetime('now')),
+('hh_brooks_1','calvarybible','Brooks Household',datetime('now'),datetime('now')),
+('hh_patel_1','calvarybible','Patel Household',datetime('now'),datetime('now')),
+('hh_hall_1','calvarybible','Hall Household',datetime('now'),datetime('now')),
+('hh_wallace_1','calvarybible','Wallace Household',datetime('now'),datetime('now'));
+
+INSERT OR REPLACE INTO household_contacts (id, church_id, household_id, contact_type, contact_value, is_primary, created_at, updated_at) VALUES
+('hc_carter_matt_phone','calvarybible','hh_carter_1','phone','+15550000101',1,datetime('now'),datetime('now')),
+('hc_carter_emily_phone','calvarybible','hh_carter_1','phone','+15550000102',0,datetime('now'),datetime('now')),
+('hc_nguyen_daniel_phone','calvarybible','hh_nguyen_1','phone','+15550000103',1,datetime('now'),datetime('now')),
+('hc_nguyen_hannah_phone','calvarybible','hh_nguyen_1','phone','+15550000104',0,datetime('now'),datetime('now')),
+('hc_ramirez_jose_phone','calvarybible','hh_ramirez_1','phone','+15550000105',1,datetime('now'),datetime('now')),
+('hc_ramirez_maria_phone','calvarybible','hh_ramirez_1','phone','+15550000106',0,datetime('now'),datetime('now')),
+('hc_brooks_chris_phone','calvarybible','hh_brooks_1','phone','+15550000107',1,datetime('now'),datetime('now')),
+('hc_brooks_talia_phone','calvarybible','hh_brooks_1','phone','+15550000108',0,datetime('now'),datetime('now')),
+('hc_patel_raj_phone','calvarybible','hh_patel_1','phone','+15550000109',1,datetime('now'),datetime('now')),
+('hc_patel_priya_phone','calvarybible','hh_patel_1','phone','+15550000110',0,datetime('now'),datetime('now')),
+('hc_hall_derek_phone','calvarybible','hh_hall_1','phone','+15550000125',1,datetime('now'),datetime('now')),
+('hc_hall_kara_phone','calvarybible','hh_hall_1','phone','+15550000126',0,datetime('now'),datetime('now')),
+('hc_wallace_ben_phone','calvarybible','hh_wallace_1','phone','+15550000127',1,datetime('now'),datetime('now')),
+('hc_wallace_ruth_phone','calvarybible','hh_wallace_1','phone','+15550000128',0,datetime('now'),datetime('now'));
+
+INSERT OR REPLACE INTO household_members (household_id, person_id, role) VALUES
+('hh_carter_1','p_demo_01','adult'),
+('hh_carter_1','p_demo_02','adult'),
+('hh_carter_1','p_demo_k01','child'),
+('hh_carter_1','p_demo_k02','child'),
+
+('hh_nguyen_1','p_demo_03','adult'),
+('hh_nguyen_1','p_demo_04','adult'),
+('hh_nguyen_1','p_demo_k03','child'),
+
+('hh_ramirez_1','p_demo_05','adult'),
+('hh_ramirez_1','p_demo_06','adult'),
+('hh_ramirez_1','p_demo_k04','child'),
+('hh_ramirez_1','p_demo_k05','child'),
+('hh_ramirez_1','p_demo_k06','child'),
+
+('hh_brooks_1','p_demo_07','adult'),
+('hh_brooks_1','p_demo_08','adult'),
+('hh_brooks_1','p_demo_k07','child'),
+
+('hh_patel_1','p_demo_09','adult'),
+('hh_patel_1','p_demo_10','adult'),
+('hh_patel_1','p_demo_k08','child'),
+('hh_patel_1','p_demo_k09','child'),
+
+('hh_hall_1','p_demo_25','adult'),
+('hh_hall_1','p_demo_26','adult'),
+
+('hh_wallace_1','p_demo_27','adult'),
+('hh_wallace_1','p_demo_28','adult');
+
+INSERT OR REPLACE INTO child_profiles (person_id, church_id, grade, allergies, medical_notes, special_needs, custody_notes, created_at, updated_at) VALUES
+('p_demo_k01','calvarybible','4',NULL,NULL,0,NULL,datetime('now'),datetime('now')),
+('p_demo_k02','calvarybible','1',NULL,NULL,0,NULL,datetime('now'),datetime('now')),
+('p_demo_k03','calvarybible','3',NULL,NULL,0,NULL,datetime('now'),datetime('now')),
+('p_demo_k04','calvarybible','6',NULL,NULL,0,NULL,datetime('now'),datetime('now')),
+('p_demo_k05','calvarybible','2',NULL,NULL,0,NULL,datetime('now'),datetime('now')),
+('p_demo_k06','calvarybible',NULL,'dairy',NULL,0,NULL,datetime('now'),datetime('now')),
+('p_demo_k07','calvarybible','5',NULL,NULL,0,NULL,datetime('now'),datetime('now')),
+('p_demo_k08','calvarybible','7',NULL,NULL,0,NULL,datetime('now'),datetime('now')),
+('p_demo_k09','calvarybible','4',NULL,NULL,0,NULL,datetime('now'),datetime('now'));
 
 INSERT OR REPLACE INTO person_relationships (id, church_id, from_person_id, to_person_id, relationship_type, status, notes, created_at, updated_at) VALUES
 ('rel_noah_guardian','calvarybible','p_seeker_2','p_child_1','guardian','active',NULL,datetime('now'),datetime('now')),
@@ -113,6 +222,39 @@ INSERT OR REPLACE INTO user_person_bindings (church_id, user_id, person_id, crea
 -- Default app-user -> person binding (Ava Seeker)
 INSERT OR REPLACE INTO user_person_bindings (church_id, user_id, person_id, created_at, updated_at) VALUES
 ('calvarybible','demo_user_ava','p_seeker_1',datetime('now'),datetime('now'));
+
+-- Demo app-user -> person bindings (30 selectable identities)
+INSERT OR REPLACE INTO user_person_bindings (church_id, user_id, person_id, created_at, updated_at) VALUES
+('calvarybible','demo_user_matt_carter','p_demo_01',datetime('now'),datetime('now')),
+('calvarybible','demo_user_emily_carter','p_demo_02',datetime('now'),datetime('now')),
+('calvarybible','demo_user_daniel_nguyen','p_demo_03',datetime('now'),datetime('now')),
+('calvarybible','demo_user_hannah_nguyen','p_demo_04',datetime('now'),datetime('now')),
+('calvarybible','demo_user_jose_ramirez','p_demo_05',datetime('now'),datetime('now')),
+('calvarybible','demo_user_maria_ramirez','p_demo_06',datetime('now'),datetime('now')),
+('calvarybible','demo_user_chris_brooks','p_demo_07',datetime('now'),datetime('now')),
+('calvarybible','demo_user_talia_brooks','p_demo_08',datetime('now'),datetime('now')),
+('calvarybible','demo_user_raj_patel','p_demo_09',datetime('now'),datetime('now')),
+('calvarybible','demo_user_priya_patel','p_demo_10',datetime('now'),datetime('now')),
+('calvarybible','demo_user_jordan_lee','p_demo_11',datetime('now'),datetime('now')),
+('calvarybible','demo_user_casey_kim','p_demo_12',datetime('now'),datetime('now')),
+('calvarybible','demo_user_tyler_johnson','p_demo_13',datetime('now'),datetime('now')),
+('calvarybible','demo_user_morgan_wright','p_demo_14',datetime('now'),datetime('now')),
+('calvarybible','demo_user_samir_ali','p_demo_15',datetime('now'),datetime('now')),
+('calvarybible','demo_user_grace_parker','p_demo_16',datetime('now'),datetime('now')),
+('calvarybible','demo_user_olivia_chen','p_demo_17',datetime('now'),datetime('now')),
+('calvarybible','demo_user_ethan_davis','p_demo_18',datetime('now'),datetime('now')),
+('calvarybible','demo_user_bella_martinez','p_demo_19',datetime('now'),datetime('now')),
+('calvarybible','demo_user_nate_thompson','p_demo_20',datetime('now'),datetime('now')),
+('calvarybible','demo_user_logan_reed','p_demo_21',datetime('now'),datetime('now')),
+('calvarybible','demo_user_megan_scott','p_demo_22',datetime('now'),datetime('now')),
+('calvarybible','demo_user_caleb_foster','p_demo_23',datetime('now'),datetime('now')),
+('calvarybible','demo_user_sierra_price','p_demo_24',datetime('now'),datetime('now')),
+('calvarybible','demo_user_derek_hall','p_demo_25',datetime('now'),datetime('now')),
+('calvarybible','demo_user_kara_hall','p_demo_26',datetime('now'),datetime('now')),
+('calvarybible','demo_user_ben_wallace','p_demo_27',datetime('now'),datetime('now')),
+('calvarybible','demo_user_ruth_wallace','p_demo_28',datetime('now'),datetime('now')),
+('calvarybible','demo_user_aiden_brooks','p_demo_29',datetime('now'),datetime('now')),
+('calvarybible','demo_user_chloe_brooks','p_demo_30',datetime('now'),datetime('now'));
 
 -- Seed chat topics for Noah
 INSERT OR REPLACE INTO chat_threads (id, church_id, user_id, title, status, created_at, updated_at) VALUES
@@ -349,11 +491,41 @@ INSERT OR REPLACE INTO groups (
   created_at, updated_at
 ) VALUES
 ('g1','calvarybible','campus_boulder','Adults & Groups','Community groups for connection and growth.','p_leader_1','See groups: https://calvarybible.com/connect/adults-groups/',1,datetime('now'),datetime('now')),
-('g2','calvarybible','campus_boulder','Parents & Families','Support for parents and families.','p_leader_1','See families: https://calvarybible.com/connect/parents-families/',1,datetime('now'),datetime('now'));
+('g2','calvarybible','campus_boulder','Parents & Families','Support for parents and families.','p_leader_1','See families: https://calvarybible.com/connect/parents-families/',1,datetime('now'),datetime('now')),
+('g_ai_faith_innovation','calvarybible','campus_boulder','AI Faith Innovation','A small relational group for builders exploring faith + AI for ministry.','p_leader_1','Tuesdays 7:00pm · Boulder · bring a laptop + one question',1,datetime('now'),datetime('now')),
+('g_joes_mens_bible_study','calvarybible','campus_thornton','Joe''s Men''s Bible Study','Men''s small group (under 15) for Scripture + prayer.','p_demo_05','Thursdays 6:30am · Thornton · coffee + Bible',1,datetime('now'),datetime('now')),
+('g_barbaras_womens_study','calvarybible','campus_erie','Barbara''s Women''s Bible Study','Women''s small group (under 15) for Scripture + prayer.','p_demo_16','Wednesdays 7:30pm · Erie · childcare rotates',1,datetime('now'),datetime('now')),
+('g_twilighters_lifegroup','calvarybible','campus_erie','Twilighters Life Group','LifeGroup for friendships, sermon discussion, and meals.','p_demo_07','Sundays 6:00pm · Erie · sermon discussion + dinner',1,datetime('now'),datetime('now'));
 
 INSERT OR REPLACE INTO group_memberships (church_id, group_id, person_id, role, status, joined_at) VALUES
 ('calvarybible','g1','p_seeker_1','member','active',datetime('now')),
-('calvarybible','g2','p_seeker_2','member','active',datetime('now'));
+('calvarybible','g2','p_seeker_2','member','active',datetime('now')),
+
+-- AI Faith Innovation (6 members)
+('calvarybible','g_ai_faith_innovation','p_demo_11','member','active',datetime('now')),
+('calvarybible','g_ai_faith_innovation','p_demo_12','member','active',datetime('now')),
+('calvarybible','g_ai_faith_innovation','p_demo_17','member','active',datetime('now')),
+('calvarybible','g_ai_faith_innovation','p_demo_18','member','active',datetime('now')),
+('calvarybible','g_ai_faith_innovation','p_demo_23','member','active',datetime('now')),
+('calvarybible','g_ai_faith_innovation','p_demo_24','member','active',datetime('now')),
+
+-- Other small groups
+('calvarybible','g_joes_mens_bible_study','p_demo_05','leader','active',datetime('now')),
+('calvarybible','g_joes_mens_bible_study','p_demo_13','member','active',datetime('now')),
+('calvarybible','g_joes_mens_bible_study','p_demo_20','member','active',datetime('now')),
+('calvarybible','g_joes_mens_bible_study','p_demo_25','member','active',datetime('now')),
+
+('calvarybible','g_barbaras_womens_study','p_demo_16','leader','active',datetime('now')),
+('calvarybible','g_barbaras_womens_study','p_demo_02','member','active',datetime('now')),
+('calvarybible','g_barbaras_womens_study','p_demo_08','member','active',datetime('now')),
+('calvarybible','g_barbaras_womens_study','p_demo_22','member','active',datetime('now')),
+('calvarybible','g_barbaras_womens_study','p_demo_28','member','active',datetime('now')),
+
+('calvarybible','g_twilighters_lifegroup','p_demo_07','leader','active',datetime('now')),
+('calvarybible','g_twilighters_lifegroup','p_demo_01','member','active',datetime('now')),
+('calvarybible','g_twilighters_lifegroup','p_demo_15','member','active',datetime('now')),
+('calvarybible','g_twilighters_lifegroup','p_demo_21','member','active',datetime('now')),
+('calvarybible','g_twilighters_lifegroup','p_demo_27','member','active',datetime('now'));
 
 -- Opportunities
 INSERT OR REPLACE INTO opportunities (
@@ -835,7 +1007,37 @@ INSERT OR REPLACE INTO journey_entity_link (link_id, church_id, node_id, entity_
 -- Person journey instance (seed)
 INSERT OR REPLACE INTO person_journey_state (church_id, person_id, current_stage_id, confidence, updated_at) VALUES
 ('calvarybible','p_seeker_1','stage_new_believer',0.5,datetime('now')),
-('calvarybible','p_seeker_2','stage_seeker',0.5,datetime('now'));
+('calvarybible','p_seeker_2','stage_seeker',0.5,datetime('now')),
+('calvarybible','p_demo_01','stage_connected',0.6,datetime('now')),
+('calvarybible','p_demo_02','stage_growing',0.55,datetime('now')),
+('calvarybible','p_demo_03','stage_gospel_clarity',0.55,datetime('now')),
+('calvarybible','p_demo_04','stage_new_believer',0.6,datetime('now')),
+('calvarybible','p_demo_05','stage_serving',0.65,datetime('now')),
+('calvarybible','p_demo_06','stage_connected',0.6,datetime('now')),
+('calvarybible','p_demo_07','stage_serving',0.7,datetime('now')),
+('calvarybible','p_demo_08','stage_growing',0.6,datetime('now')),
+('calvarybible','p_demo_09','stage_conversion',0.55,datetime('now')),
+('calvarybible','p_demo_10','stage_new_believer',0.55,datetime('now')),
+('calvarybible','p_demo_11','stage_seeker',0.55,datetime('now')),
+('calvarybible','p_demo_12','stage_gospel_clarity',0.55,datetime('now')),
+('calvarybible','p_demo_13','stage_connected',0.6,datetime('now')),
+('calvarybible','p_demo_14','stage_growing',0.6,datetime('now')),
+('calvarybible','p_demo_15','stage_seeker',0.55,datetime('now')),
+('calvarybible','p_demo_16','stage_leader',0.75,datetime('now')),
+('calvarybible','p_demo_17','stage_connected',0.6,datetime('now')),
+('calvarybible','p_demo_18','stage_growing',0.6,datetime('now')),
+('calvarybible','p_demo_19','stage_new_believer',0.55,datetime('now')),
+('calvarybible','p_demo_20','stage_connected',0.6,datetime('now')),
+('calvarybible','p_demo_21','stage_multiplying',0.7,datetime('now')),
+('calvarybible','p_demo_22','stage_growing',0.6,datetime('now')),
+('calvarybible','p_demo_23','stage_connected',0.6,datetime('now')),
+('calvarybible','p_demo_24','stage_growing',0.6,datetime('now')),
+('calvarybible','p_demo_25','stage_serving',0.65,datetime('now')),
+('calvarybible','p_demo_26','stage_connected',0.6,datetime('now')),
+('calvarybible','p_demo_27','stage_connected',0.6,datetime('now')),
+('calvarybible','p_demo_28','stage_growing',0.6,datetime('now')),
+('calvarybible','p_demo_29','stage_seeker',0.55,datetime('now')),
+('calvarybible','p_demo_30','stage_seeker',0.55,datetime('now'));
 
 -- Person memory (seed from journey_state)
 INSERT OR REPLACE INTO person_memory (church_id, person_id, memory_json, created_at, updated_at) VALUES

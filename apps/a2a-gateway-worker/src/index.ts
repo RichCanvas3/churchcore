@@ -631,6 +631,7 @@ function isAllowedMemoryPathForSeeker(path: string) {
   if (p.startsWith("identity.")) return true;
   if (p.startsWith("contact.")) return true;
   if (p.startsWith("communicationPreferences.")) return true;
+  if (p.startsWith("groups.")) return true;
   if (p.startsWith("community.")) return true;
   if (p.startsWith("spiritualJourney.")) return true;
   // Allow self-assessments/check-ins used by the Faith Journey tool.
@@ -933,6 +934,74 @@ async function auditMemoryOps(env: Env, args: { churchId: string; personId: stri
     .bind(id, args.churchId, args.personId, args.threadId, args.turnId ?? null, args.actorUserId, args.actorRole, JSON.stringify(args.ops ?? {}), nowIso())
     .run();
   return { ok: true, auditId: id };
+}
+
+async function syncPersonGroupsAndCommunityToMemory(
+  env: Env,
+  args: { churchId: string; personId: string; actorUserId: string; actorRole: string; threadId: string },
+) {
+  const groups =
+    (
+      await env.churchcore
+        .prepare(
+          `SELECT g.id,
+                  g.campus_id AS campusId,
+                  g.name,
+                  g.description,
+                  gm.role,
+                  gm.status,
+                  gm.joined_at AS joinedAt
+           FROM group_memberships gm
+           JOIN groups g ON g.id=gm.group_id AND g.church_id=gm.church_id
+           WHERE gm.church_id=?1 AND gm.person_id=?2 AND gm.status!='inactive'
+           ORDER BY gm.status DESC, gm.role DESC, g.name ASC`,
+        )
+        .bind(args.churchId, args.personId)
+        .all()
+    ).results ?? [];
+
+  const community =
+    (
+      await env.churchcore
+        .prepare(
+          `SELECT pc.community_id AS communityId,
+                  pc.status,
+                  pc.role,
+                  pc.joined_at AS joinedAt,
+                  pc.left_at AS leftAt,
+                  cc.kind,
+                  cc.title,
+                  cc.campus_id AS campusId
+           FROM person_community pc
+           JOIN community_catalog cc ON cc.id=pc.community_id
+           WHERE pc.church_id=?1 AND pc.person_id=?2 AND pc.status!='inactive'
+           ORDER BY pc.updated_at DESC`,
+        )
+        .bind(args.churchId, args.personId)
+        .all()
+    ).results ?? [];
+
+  const personMemory = await getPersonMemory(env, { churchId: args.churchId, personId: args.personId });
+  const base = personMemory.memory && typeof personMemory.memory === "object" ? personMemory.memory : {};
+  const next = JSON.parse(JSON.stringify(base));
+  setByPath(next, "groups.my", groups);
+  setByPath(next, "community.my", community);
+  setByPath(next, "groups.updatedAt", nowIso());
+  setByPath(next, "community.updatedAt", nowIso());
+
+  await upsertPersonMemory(env, { churchId: args.churchId, personId: args.personId, memory: next });
+  await auditMemoryOps(env, {
+    churchId: args.churchId,
+    personId: args.personId,
+    threadId: args.threadId || "thread_unknown",
+    actorUserId: args.actorUserId,
+    actorRole: args.actorRole,
+    ops: [
+      { op: "set", path: "groups.my", value: groups, visibility: "self" },
+      { op: "set", path: "community.my", value: community, visibility: "self" },
+    ],
+    turnId: null,
+  });
 }
 
 type JourneyStage = { id: string; title: string; summary: string | null };
@@ -2425,6 +2494,15 @@ async function handleChat(req: Request, env: Env) {
 
   const { personId } = await resolvePerson(env, identity);
 
+  // Keep cross-thread memory synced with relational membership tables (groups + community).
+  if (personId) {
+    try {
+      await syncPersonGroupsAndCommunityToMemory(env, { churchId, personId, actorUserId: userId, actorRole: role, threadId });
+    } catch {
+      // best-effort
+    }
+  }
+
   // Heuristic: only compute "next steps" when the user is asking for it (saves DB work).
   const msgLower = String(message ?? "").toLowerCase();
   const wantsNextSteps =
@@ -2687,6 +2765,13 @@ async function handleChatStream(req: Request, env: Env) {
         const langgraphThreadId = await getOrCreateLangGraphThreadId(env, { churchId, threadId });
 
         const { personId } = await resolvePerson(env, identity);
+        if (personId) {
+          try {
+            await syncPersonGroupsAndCommunityToMemory(env, { churchId, personId, actorUserId: userId, actorRole: role, threadId });
+          } catch {
+            // best-effort
+          }
+        }
         const msgLower = String(message ?? "").toLowerCase();
         const wantsNextSteps =
           skill !== "chat" ||
@@ -4408,6 +4493,7 @@ async function handleCommunityJoin(req: Request, env: Env) {
     .bind(churchId, personId, communityId, status, joinedAt, now)
     .run();
 
+  await syncPersonGroupsAndCommunityToMemory(env, { churchId, personId, actorUserId: userId, actorRole: role, threadId: (identity.thread_id ?? "").trim() || "thread_unknown" });
   return json({ ok: true, person_id: personId, community_id: communityId, status, actor: { userId, role } });
 }
 
@@ -4436,6 +4522,7 @@ async function handleCommunityLeave(req: Request, env: Env) {
     .bind(churchId, personId, communityId, now, now)
     .run();
 
+  await syncPersonGroupsAndCommunityToMemory(env, { churchId, personId, actorUserId: userId, actorRole: role, threadId: (identity.thread_id ?? "").trim() || "thread_unknown" });
   return json({ ok: true, person_id: personId, community_id: communityId, status: "inactive", actor: { userId, role } });
 }
 
@@ -4464,6 +4551,7 @@ async function handleCommunityMark(req: Request, env: Env) {
     .bind(churchId, personId, communityId, status, now, now)
     .run();
 
+  await syncPersonGroupsAndCommunityToMemory(env, { churchId, personId, actorUserId: userId, actorRole: role, threadId: (identity.thread_id ?? "").trim() || "thread_unknown" });
   return json({ ok: true, person_id: personId, community_id: communityId, status, actor: { userId, role } });
 }
 
@@ -4673,6 +4761,9 @@ async function handleGroupInviteRespond(req: Request, env: Env) {
       .run();
   }
 
+  if (action === "accept") {
+    await syncPersonGroupsAndCommunityToMemory(env, { churchId, personId, actorUserId: userId, actorRole: role, threadId: (identity.thread_id ?? "").trim() || "thread_unknown" });
+  }
   return json({ ok: true, status: nextStatus, group_id: String(invite.groupId), actor: { userId, role, personId } });
 }
 
@@ -4720,6 +4811,7 @@ async function handleGroupCreate(req: Request, env: Env) {
     .bind(churchId, id, personId, now)
     .run();
 
+  await syncPersonGroupsAndCommunityToMemory(env, { churchId, personId, actorUserId: userId, actorRole: role, threadId: (identity.thread_id ?? "").trim() || "thread_unknown" });
   return json({ ok: true, group_id: id, actor: { userId, role, personId } });
 }
 
@@ -4818,6 +4910,7 @@ async function handleGroupMemberRemove(req: Request, env: Env) {
   if (memberPersonId === personId) return json({ ok: false, error: "Cannot remove self" }, { status: 400 });
 
   await env.churchcore.prepare(`UPDATE group_memberships SET status='inactive' WHERE church_id=?1 AND group_id=?2 AND person_id=?3`).bind(churchId, groupId, memberPersonId).run();
+  await syncPersonGroupsAndCommunityToMemory(env, { churchId, personId: memberPersonId, actorUserId: userId, actorRole: role, threadId: (identity.thread_id ?? "").trim() || "thread_unknown" });
   return json({ ok: true, actor: { userId, role, personId } });
 }
 

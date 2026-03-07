@@ -14,26 +14,48 @@ export type DemoIdentity = {
 const STORAGE_KEY = "churchcore.demo_identity.v1";
 const CAMPUSES = new Set(["campus_boulder", "campus_erie", "campus_thornton"]);
 
-const Noah: DemoIdentity = {
-  tenant_id: "calvarybible",
-  user_id: "demo_user_noah",
-  role: "seeker",
-  campus_id: "campus_boulder",
-  persona_id: "p_seeker_2",
-};
+const ACCOUNTS: Array<{ label: string; identity: DemoIdentity }> = [
+  { label: "Noah Seeker", identity: { tenant_id: "calvarybible", user_id: "demo_user_noah", role: "seeker", campus_id: "campus_boulder", persona_id: "p_seeker_2" } },
+  { label: "Ava Seeker", identity: { tenant_id: "calvarybible", user_id: "demo_user_ava", role: "seeker", campus_id: "campus_boulder", persona_id: "p_seeker_1" } },
 
-const Ava: DemoIdentity = {
-  tenant_id: "calvarybible",
-  user_id: "demo_user_ava",
-  role: "seeker",
-  campus_id: "campus_boulder",
-  persona_id: "p_seeker_1",
-};
+  // Demo congregation (30 selectable people)
+  { label: "Matt Carter", identity: { tenant_id: "calvarybible", user_id: "demo_user_matt_carter", role: "seeker", campus_id: "campus_erie", persona_id: "p_demo_01" } },
+  { label: "Emily Carter", identity: { tenant_id: "calvarybible", user_id: "demo_user_emily_carter", role: "seeker", campus_id: "campus_erie", persona_id: "p_demo_02" } },
+  { label: "Daniel Nguyen", identity: { tenant_id: "calvarybible", user_id: "demo_user_daniel_nguyen", role: "seeker", campus_id: "campus_boulder", persona_id: "p_demo_03" } },
+  { label: "Hannah Nguyen", identity: { tenant_id: "calvarybible", user_id: "demo_user_hannah_nguyen", role: "seeker", campus_id: "campus_boulder", persona_id: "p_demo_04" } },
+  { label: "Jose Ramirez", identity: { tenant_id: "calvarybible", user_id: "demo_user_jose_ramirez", role: "seeker", campus_id: "campus_thornton", persona_id: "p_demo_05" } },
+  { label: "Maria Ramirez", identity: { tenant_id: "calvarybible", user_id: "demo_user_maria_ramirez", role: "seeker", campus_id: "campus_thornton", persona_id: "p_demo_06" } },
+  { label: "Chris Brooks", identity: { tenant_id: "calvarybible", user_id: "demo_user_chris_brooks", role: "seeker", campus_id: "campus_erie", persona_id: "p_demo_07" } },
+  { label: "Talia Brooks", identity: { tenant_id: "calvarybible", user_id: "demo_user_talia_brooks", role: "seeker", campus_id: "campus_erie", persona_id: "p_demo_08" } },
+  { label: "Raj Patel", identity: { tenant_id: "calvarybible", user_id: "demo_user_raj_patel", role: "seeker", campus_id: "campus_boulder", persona_id: "p_demo_09" } },
+  { label: "Priya Patel", identity: { tenant_id: "calvarybible", user_id: "demo_user_priya_patel", role: "seeker", campus_id: "campus_boulder", persona_id: "p_demo_10" } },
+  { label: "Jordan Lee", identity: { tenant_id: "calvarybible", user_id: "demo_user_jordan_lee", role: "seeker", campus_id: "campus_boulder", persona_id: "p_demo_11" } },
+  { label: "Casey Kim", identity: { tenant_id: "calvarybible", user_id: "demo_user_casey_kim", role: "seeker", campus_id: "campus_boulder", persona_id: "p_demo_12" } },
+  { label: "Tyler Johnson", identity: { tenant_id: "calvarybible", user_id: "demo_user_tyler_johnson", role: "seeker", campus_id: "campus_thornton", persona_id: "p_demo_13" } },
+  { label: "Morgan Wright", identity: { tenant_id: "calvarybible", user_id: "demo_user_morgan_wright", role: "seeker", campus_id: "campus_thornton", persona_id: "p_demo_14" } },
+  { label: "Samir Ali", identity: { tenant_id: "calvarybible", user_id: "demo_user_samir_ali", role: "seeker", campus_id: "campus_erie", persona_id: "p_demo_15" } },
+  { label: "Grace Parker", identity: { tenant_id: "calvarybible", user_id: "demo_user_grace_parker", role: "seeker", campus_id: "campus_erie", persona_id: "p_demo_16" } },
+  { label: "Olivia Chen", identity: { tenant_id: "calvarybible", user_id: "demo_user_olivia_chen", role: "seeker", campus_id: "campus_boulder", persona_id: "p_demo_17" } },
+  { label: "Ethan Davis", identity: { tenant_id: "calvarybible", user_id: "demo_user_ethan_davis", role: "seeker", campus_id: "campus_boulder", persona_id: "p_demo_18" } },
+  { label: "Bella Martinez", identity: { tenant_id: "calvarybible", user_id: "demo_user_bella_martinez", role: "seeker", campus_id: "campus_thornton", persona_id: "p_demo_19" } },
+  { label: "Nate Thompson", identity: { tenant_id: "calvarybible", user_id: "demo_user_nate_thompson", role: "seeker", campus_id: "campus_thornton", persona_id: "p_demo_20" } },
+  { label: "Logan Reed", identity: { tenant_id: "calvarybible", user_id: "demo_user_logan_reed", role: "seeker", campus_id: "campus_erie", persona_id: "p_demo_21" } },
+  { label: "Megan Scott", identity: { tenant_id: "calvarybible", user_id: "demo_user_megan_scott", role: "seeker", campus_id: "campus_erie", persona_id: "p_demo_22" } },
+  { label: "Caleb Foster", identity: { tenant_id: "calvarybible", user_id: "demo_user_caleb_foster", role: "seeker", campus_id: "campus_boulder", persona_id: "p_demo_23" } },
+  { label: "Sierra Price", identity: { tenant_id: "calvarybible", user_id: "demo_user_sierra_price", role: "seeker", campus_id: "campus_boulder", persona_id: "p_demo_24" } },
+  { label: "Derek Hall", identity: { tenant_id: "calvarybible", user_id: "demo_user_derek_hall", role: "seeker", campus_id: "campus_thornton", persona_id: "p_demo_25" } },
+  { label: "Kara Hall", identity: { tenant_id: "calvarybible", user_id: "demo_user_kara_hall", role: "seeker", campus_id: "campus_thornton", persona_id: "p_demo_26" } },
+  { label: "Ben Wallace", identity: { tenant_id: "calvarybible", user_id: "demo_user_ben_wallace", role: "seeker", campus_id: "campus_erie", persona_id: "p_demo_27" } },
+  { label: "Ruth Wallace", identity: { tenant_id: "calvarybible", user_id: "demo_user_ruth_wallace", role: "seeker", campus_id: "campus_erie", persona_id: "p_demo_28" } },
+  { label: "Aiden Brooks", identity: { tenant_id: "calvarybible", user_id: "demo_user_aiden_brooks", role: "seeker", campus_id: "campus_erie", persona_id: "p_demo_29" } },
+  { label: "Chloe Brooks", identity: { tenant_id: "calvarybible", user_id: "demo_user_chloe_brooks", role: "seeker", campus_id: "campus_erie", persona_id: "p_demo_30" } },
+];
 
-const PERSONA_BY_USER: Record<string, string> = {
-  [Noah.user_id]: "p_seeker_2",
-  [Ava.user_id]: "p_seeker_1",
-};
+const Noah: DemoIdentity = ACCOUNTS[0]!.identity;
+
+const PERSONA_BY_USER: Record<string, string> = Object.fromEntries(
+  ACCOUNTS.map((a) => [a.identity.user_id, a.identity.persona_id ?? ""]).filter(([, pid]) => Boolean(pid)),
+) as Record<string, string>;
 
 type Ctx = {
   identity: DemoIdentity;
@@ -49,8 +71,8 @@ function readStored(): DemoIdentity | null {
     if (!raw) return null;
     const j = JSON.parse(raw);
     if (!j || typeof j !== "object") return null;
-    if (j.user_id !== Noah.user_id && j.user_id !== Ava.user_id) return null;
     const uid = String(j.user_id);
+    if (!PERSONA_BY_USER[uid]) return null;
     const campusRaw = typeof (j as any).campus_id === "string" ? String((j as any).campus_id) : "";
     const campus_id = CAMPUSES.has(campusRaw) ? campusRaw : "campus_boulder";
     return {
@@ -111,7 +133,7 @@ export function DemoIdentityProvider(props: { children: React.ReactNode }) {
     };
   }, []);
 
-  const accounts = useMemo(() => [{ label: "Noah Seeker", identity: Noah }, { label: "Ava Seeker", identity: Ava }], []);
+  const accounts = useMemo(() => ACCOUNTS, []);
 
   return <DemoIdentityContext.Provider value={{ identity, setIdentity, accounts }}>{props.children}</DemoIdentityContext.Provider>;
 }
