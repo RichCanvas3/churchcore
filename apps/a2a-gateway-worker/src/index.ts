@@ -445,6 +445,8 @@ function redactMemoryForRole(identityRole: string, memory: any) {
     if (Array.isArray(pc.notes)) pc.notes = pc.notes.filter((n: any) => canViewVisibility(role, (n?.visibility ?? "restricted") as Visibility));
     if (Array.isArray(pc.prayerRequests))
       pc.prayerRequests = pc.prayerRequests.filter((n: any) => canViewVisibility(role, (n?.visibility ?? "restricted") as Visibility));
+    if (Array.isArray(pc.thanksgivings))
+      pc.thanksgivings = pc.thanksgivings.filter((n: any) => canViewVisibility(role, (n?.visibility ?? "restricted") as Visibility));
   }
   return copy;
 }
@@ -641,6 +643,7 @@ function isAllowedMemoryPathForSeeker(path: string) {
   if (p.startsWith("worldview.bdi.")) return true;
   if (p.startsWith("intentProfile.")) return true;
   if (p.startsWith("pastoralCare.prayerRequests")) return true;
+  if (p.startsWith("pastoralCare.thanksgivings")) return true;
   return false;
 }
 

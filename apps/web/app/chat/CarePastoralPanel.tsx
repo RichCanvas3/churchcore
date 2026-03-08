@@ -35,8 +35,10 @@ export function CarePastoralPanel(props: { identity: Identity; onClose: () => vo
   const canEdit = data?.can_edit?.care_pastoral !== false;
   const care = (data?.memory && typeof data.memory === "object" ? (data.memory as any).pastoralCare : null) as any;
   const prayerRequests = Array.isArray(care?.prayerRequests) ? care.prayerRequests : [];
+  const thanksgivings = Array.isArray(care?.thanksgivings) ? care.thanksgivings : [];
 
   const [newPrayer, setNewPrayer] = useState("");
+  const [newThanks, setNewThanks] = useState("");
 
   const btn = useMemo(
     () => ({
@@ -83,6 +85,25 @@ export function CarePastoralPanel(props: { identity: Identity; onClose: () => vo
         ops: [{ op: "append", path: "pastoralCare.prayerRequests", value: entry, visibility: "self" }],
       });
       setNewPrayer("");
+      await refresh();
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Failed to save");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function addThanksgiving() {
+    if (!canEdit || !newThanks.trim()) return;
+    const entry = { topic: newThanks.trim(), date: new Date().toISOString().slice(0, 10) };
+    setSaving(true);
+    setError(null);
+    try {
+      await postJson("/api/a2a/memory/apply_ops", {
+        identity,
+        ops: [{ op: "append", path: "pastoralCare.thanksgivings", value: entry, visibility: "self" }],
+      });
+      setNewThanks("");
       await refresh();
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Failed to save");
@@ -146,6 +167,43 @@ export function CarePastoralPanel(props: { identity: Identity; onClose: () => vo
               )}
 
               <div style={{ fontSize: 12, color: "#64748b" }}>Stored at `pastoralCare.prayerRequests`</div>
+            </section>
+
+            <section style={{ background: "white", border: "1px solid #e2e8f0", borderRadius: 14, padding: 12, display: "grid", gap: 10 }}>
+              <div style={{ fontSize: 12, fontWeight: 900, color: "#0f172a" }}>Give thanks</div>
+              {thanksgivings.length ? (
+                <ul style={{ margin: 0, paddingLeft: 20 }}>
+                  {thanksgivings.map((r: any, i: number) => (
+                    <li key={i} style={{ fontSize: 13, marginBottom: 4 }}>
+                      {typeof r === "string" ? r : String(r?.topic ?? r?.text ?? r?.note ?? JSON.stringify(r))}
+                      {r?.date ? ` (${String(r.date).slice(0, 10)})` : ""}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <div style={{ fontSize: 12, color: "#64748b" }}>No thanksgivings saved yet.</div>
+              )}
+
+              {canEdit ? (
+                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                  <input
+                    type="text"
+                    placeholder="Add a thanksgiving…"
+                    value={newThanks}
+                    onChange={(e) => setNewThanks(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && addThanksgiving()}
+                    disabled={saving}
+                    style={{ flex: 1, padding: "8px 10px", borderRadius: 10, border: "1px solid #e2e8f0" }}
+                  />
+                  <button type="button" onClick={() => void addThanksgiving()} disabled={saving || !newThanks.trim()} style={btn}>
+                    Add
+                  </button>
+                </div>
+              ) : (
+                <div style={{ fontSize: 12, color: "#64748b" }}>Read-only for your role.</div>
+              )}
+
+              <div style={{ fontSize: 12, color: "#64748b" }}>Stored at `pastoralCare.thanksgivings`</div>
             </section>
 
             <section style={{ background: "white", border: "1px solid #e2e8f0", borderRadius: 14, padding: 12, display: "grid", gap: 6 }}>
