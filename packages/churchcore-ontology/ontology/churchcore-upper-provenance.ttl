@@ -1,0 +1,29 @@
+@prefix cc: <https://ontology.churchcore.ai/cc#> .
+@prefix ccprov: <https://ontology.churchcore.ai/cc/prov#> .
+@prefix prov: <http://www.w3.org/ns/prov#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<https://ontology.churchcore.ai/cc/prov>
+  a owl:Ontology ;
+  rdfs:label "ChurchCore Upper Ontology (provenance)" ;
+  rdfs:comment "Minimal provenance layer for ChurchCore data flows (scrapes, extractions, summaries) aligned to Prov-O." ;
+  owl:imports <https://ontology.churchcore.ai/cc> ;
+  owl:imports <http://www.w3.org/ns/prov-o-20130430> .
+
+ccprov:hasSourceEntity a owl:ObjectProperty ;
+  rdfs:label "hasSourceEntity" ;
+  rdfs:domain cc:Resource ;
+  rdfs:range prov:Entity .
+
+ccprov:sourceUrl a owl:DatatypeProperty ;
+  rdfs:label "sourceUrl" ;
+  rdfs:domain cc:Resource ;
+  rdfs:range xsd:anyURI .
+
+ccprov:extractedAtTime a owl:DatatypeProperty ;
+  rdfs:label "extractedAtTime" ;
+  rdfs:domain cc:Resource ;
+  rdfs:range xsd:dateTime .
+

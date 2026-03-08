@@ -372,7 +372,7 @@ export function GroupsPanel(props: { identity: Identity; onClose: () => void }) 
       .catch((e) => setStudiesErr(String((e as any)?.message ?? e ?? "Failed to load Bible studies")));
 
     void refreshOutgoingInvites();
-  }, [activeGroupId, identity]);
+  }, [activeGroupId, identity, refreshOutgoingInvites]);
 
   useEffect(() => {
     setGroupSaveErr(null);

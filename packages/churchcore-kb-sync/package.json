@@ -1,0 +1,17 @@
+{
+  "name": "@churchcore/kb-sync",
+  "private": true,
+  "type": "module",
+  "version": "0.0.0",
+  "bin": {
+    "churchcore-kb-sync": "./src/cli.mjs"
+  },
+  "dependencies": {
+    "@churchcore/graphdb-client": "workspace:*",
+    "@churchcore/agentictrust-ontology": "workspace:*",
+    "@churchcore/churchcore-ontology": "workspace:*",
+    "@churchcore/churchcore-local-ontology": "workspace:*",
+    "better-sqlite3": "^11.10.0"
+  }
+}
+

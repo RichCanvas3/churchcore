@@ -15,6 +15,13 @@ export type Env = {
   OPENAI_MESSAGE_MODEL?: string; // e.g. gpt-5.2
   OPENAI_TRANSCRIBE_MODEL?: string; // e.g. gpt-4o-mini-transcribe|whisper-1
   TRANSCRIBE_MAX_BYTES?: string; // default ~20MB
+  // GraphDB (Ontotext) - optional read-only debug integration
+  GRAPHDB_BASE_URL?: string;
+  GRAPHDB_REPOSITORY?: string;
+  GRAPHDB_USERNAME?: string;
+  GRAPHDB_PASSWORD?: string;
+  GRAPHDB_CF_ACCESS_CLIENT_ID?: string;
+  GRAPHDB_CF_ACCESS_CLIENT_SECRET?: string;
 };
 
 function nowIso() {
@@ -73,6 +80,14 @@ function jsonText(obj: unknown) {
   };
 }
 
+function base64EncodeUtf8(input: string) {
+  const bytes = new TextEncoder().encode(String(input ?? ""));
+  let bin = "";
+  for (const b of bytes) bin += String.fromCharCode(b);
+  // Cloudflare Workers: btoa is available.
+  return btoa(bin);
+}
+
 function checkApiKey(request: Request, env: Env): Response | null {
   const expected = (env.MCP_API_KEY ?? "").trim();
   if (!expected) return null;
@@ -122,6 +137,60 @@ function createServer(env: Env) {
     churchId: z.string().min(1),
     campusId: z.string().min(1).optional().nullable(),
   });
+
+  server.tool(
+    "churchcore_graphdb_sparql_query",
+    "Run a read-only SPARQL query against the configured GraphDB repository (debug/validation).",
+    {
+      churchId: BaseSessionArgs.shape.churchId,
+      query: z.string().min(1),
+      accept: z.string().min(1).optional().nullable(),
+    },
+    async (args) => {
+      const baseUrl = String(env.GRAPHDB_BASE_URL ?? "").trim().replace(/\/+$/, "");
+      const repo = String(env.GRAPHDB_REPOSITORY ?? "").trim();
+      const username = String(env.GRAPHDB_USERNAME ?? "").trim();
+      const password = String(env.GRAPHDB_PASSWORD ?? "").trim();
+      const cfId = String(env.GRAPHDB_CF_ACCESS_CLIENT_ID ?? "").trim();
+      const cfSecret = String(env.GRAPHDB_CF_ACCESS_CLIENT_SECRET ?? "").trim();
+      const accept = typeof (args as any).accept === "string" && String((args as any).accept).trim() ? String((args as any).accept).trim() : "application/sparql-results+json";
+      const query = String((args as any).query ?? "").trim();
+
+      if (!baseUrl) throw new Error("GRAPHDB_BASE_URL not configured");
+      if (!repo) throw new Error("GRAPHDB_REPOSITORY not configured");
+      if (!query) throw new Error("query is required");
+
+      const url = `${baseUrl}/repositories/${encodeURIComponent(repo)}`;
+      const body = new URLSearchParams({ query });
+      const headers: Record<string, string> = {
+        accept,
+        "content-type": "application/x-www-form-urlencoded;charset=UTF-8",
+      };
+
+      if (username && password) {
+        headers.Authorization = `Basic ${base64EncodeUtf8(`${username}:${password}`)}`;
+      }
+      if (cfId && cfSecret) {
+        headers["CF-Access-Client-Id"] = cfId;
+        headers["CF-Access-Client-Secret"] = cfSecret;
+      }
+
+      const res = await fetch(url, { method: "POST", headers, body });
+      const text = await res.text().catch(() => "");
+      if (!res.ok) throw new Error(`GraphDB SPARQL query failed (${res.status}): ${text.slice(0, 1000)}`);
+
+      let result: any = text;
+      if (accept.includes("json")) {
+        try {
+          result = JSON.parse(text);
+        } catch {
+          result = { raw: text };
+        }
+      }
+
+      return jsonText({ ok: true, accept, result });
+    },
+  );
 
   server.tool(
     "churchcore_list_services",

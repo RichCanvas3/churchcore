@@ -1,0 +1,50 @@
+@prefix cc: <https://ontology.churchcore.ai/cc#> .
+@prefix cccomm: <https://ontology.churchcore.ai/cc/community#> .
+@prefix prov: <http://www.w3.org/ns/prov#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<https://ontology.churchcore.ai/cc/community>
+  a owl:Ontology ;
+  rdfs:label "ChurchCore Upper Ontology (community)" ;
+  rdfs:comment "Community layer for groups, membership, and participation (small groups vs broader ministries)." ;
+  owl:imports <https://ontology.churchcore.ai/cc> ;
+  owl:imports <http://www.w3.org/ns/prov-o-20130430> .
+
+cccomm:Group a owl:Class ;
+  rdfs:label "Group" ;
+  rdfs:subClassOf cc:Resource .
+
+cccomm:SmallGroup a owl:Class ;
+  rdfs:label "SmallGroup" ;
+  rdfs:subClassOf cccomm:Group .
+
+cccomm:CommunityGroup a owl:Class ;
+  rdfs:label "CommunityGroup" ;
+  rdfs:subClassOf cccomm:Group .
+
+cccomm:Membership a owl:Class ;
+  rdfs:label "Membership" ;
+  rdfs:subClassOf prov:Association .
+
+cccomm:member a owl:ObjectProperty ;
+  rdfs:label "member" ;
+  rdfs:domain cccomm:Membership ;
+  rdfs:range cc:Person .
+
+cccomm:inGroup a owl:ObjectProperty ;
+  rdfs:label "inGroup" ;
+  rdfs:domain cccomm:Membership ;
+  rdfs:range cccomm:Group .
+
+cccomm:membershipRole a owl:DatatypeProperty ;
+  rdfs:label "membershipRole" ;
+  rdfs:domain cccomm:Membership ;
+  rdfs:range xsd:string .
+
+cccomm:membershipStatus a owl:DatatypeProperty ;
+  rdfs:label "membershipStatus" ;
+  rdfs:domain cccomm:Membership ;
+  rdfs:range xsd:string .
+

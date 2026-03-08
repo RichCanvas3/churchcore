@@ -1,0 +1,43 @@
+@prefix cc: <https://ontology.churchcore.ai/cc#> .
+@prefix ccsit: <https://ontology.churchcore.ai/cc/situation#> .
+@prefix prov: <http://www.w3.org/ns/prov#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<https://ontology.churchcore.ai/cc/situation>
+  a owl:Ontology ;
+  rdfs:label "ChurchCore Upper Ontology (situations)" ;
+  rdfs:comment "Situation/membership modeling layer (RichCanvas: model 'being in' a context distinctly from events)." ;
+  owl:imports <https://ontology.churchcore.ai/cc> ;
+  owl:imports <http://www.w3.org/ns/prov-o-20130430> .
+
+ccsit:Situation a owl:Class ;
+  rdfs:label "Situation" ;
+  rdfs:subClassOf cc:Resource .
+
+ccsit:involvesAgent a owl:ObjectProperty ;
+  rdfs:label "involvesAgent" ;
+  rdfs:domain ccsit:Situation ;
+  rdfs:range prov:Agent .
+
+ccsit:involvesResource a owl:ObjectProperty ;
+  rdfs:label "involvesResource" ;
+  rdfs:domain ccsit:Situation ;
+  rdfs:range cc:Resource .
+
+ccsit:roleName a owl:DatatypeProperty ;
+  rdfs:label "roleName" ;
+  rdfs:domain ccsit:Situation ;
+  rdfs:range xsd:string .
+
+ccsit:validFrom a owl:DatatypeProperty ;
+  rdfs:label "validFrom" ;
+  rdfs:domain ccsit:Situation ;
+  rdfs:range xsd:dateTime .
+
+ccsit:validTo a owl:DatatypeProperty ;
+  rdfs:label "validTo" ;
+  rdfs:domain ccsit:Situation ;
+  rdfs:range xsd:dateTime .
+

@@ -1,0 +1,15 @@
+@prefix cc: <https://ontology.churchcore.ai/cc#> .
+@prefix lc: <https://ontology.churchcore.ai/local/calvary#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<https://ontology.churchcore.ai/local/calvary>
+  a owl:Ontology ;
+  rdfs:label "ChurchCore Local Ontology (Calvary Bible Church)" ;
+  rdfs:comment "Local/lower ontology for Calvary Bible Church (seed + DB mapping targets). Extends ChurchCore upper ontology." ;
+  owl:imports <https://ontology.churchcore.ai/cc/all> .
+
+lc:CalvaryBibleChurch a cc:Church ;
+  cc:name "Calvary Bible Church"^^xsd:string .
+
