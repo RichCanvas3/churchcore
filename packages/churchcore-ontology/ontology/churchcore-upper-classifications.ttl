@@ -156,10 +156,200 @@ ccclass:PersonRelationshipStatusScheme a skos:ConceptScheme ;
 ccclass:relstatus_active a skos:Concept ; skos:inScheme ccclass:PersonRelationshipStatusScheme ; skos:notation "active" ; skos:prefLabel "Active" .
 ccclass:relstatus_inactive a skos:Concept ; skos:inScheme ccclass:PersonRelationshipStatusScheme ; skos:notation "inactive" ; skos:prefLabel "Inactive" .
 
+### Classification types (mirrors ClassificationTypeEnum)
+
+ccclass:ClassificationTypeScheme a skos:ConceptScheme ;
+  skos:prefLabel "Classification types" .
+
+ccclass:classificationType_CHURCH_TYPE a skos:Concept ; skos:inScheme ccclass:ClassificationTypeScheme ; skos:notation "CHURCH_TYPE" ; skos:prefLabel "Church type" .
+ccclass:classificationType_DENOMINATION a skos:Concept ; skos:inScheme ccclass:ClassificationTypeScheme ; skos:notation "DENOMINATION" ; skos:prefLabel "Denomination" .
+ccclass:classificationType_MINISTRY_TYPE a skos:Concept ; skos:inScheme ccclass:ClassificationTypeScheme ; skos:notation "MINISTRY_TYPE" ; skos:prefLabel "Ministry type" .
+ccclass:classificationType_ORGANIZATION_TYPE a skos:Concept ; skos:inScheme ccclass:ClassificationTypeScheme ; skos:notation "ORGANIZATION_TYPE" ; skos:prefLabel "Organization type" .
+ccclass:classificationType_TOPIC_OF_INTEREST a skos:Concept ; skos:inScheme ccclass:ClassificationTypeScheme ; skos:notation "TOPIC_OF_INTEREST" ; skos:prefLabel "Topic of interest" .
+ccclass:classificationType_SERVICE_TYPE a skos:Concept ; skos:inScheme ccclass:ClassificationTypeScheme ; skos:notation "SERVICE_TYPE" ; skos:prefLabel "Service type" .
+ccclass:classificationType_EVENT_TYPE a skos:Concept ; skos:inScheme ccclass:ClassificationTypeScheme ; skos:notation "EVENT_TYPE" ; skos:prefLabel "Event type" .
+ccclass:classificationType_GEOGRAPHY a skos:Concept ; skos:inScheme ccclass:ClassificationTypeScheme ; skos:notation "GEOGRAPHY" ; skos:prefLabel "Geography" .
+ccclass:classificationType_LANGUAGE a skos:Concept ; skos:inScheme ccclass:ClassificationTypeScheme ; skos:notation "LANGUAGE" ; skos:prefLabel "Language" .
+ccclass:classificationType_AUDIENCE a skos:Concept ; skos:inScheme ccclass:ClassificationTypeScheme ; skos:notation "AUDIENCE" ; skos:prefLabel "Audience" .
+ccclass:classificationType_SPIRITUAL_GIFT a skos:Concept ; skos:inScheme ccclass:ClassificationTypeScheme ; skos:notation "SPIRITUAL_GIFT" ; skos:prefLabel "Spiritual gift" .
+ccclass:classificationType_ROLE a skos:Concept ; skos:inScheme ccclass:ClassificationTypeScheme ; skos:notation "ROLE" ; skos:prefLabel "Role" .
+ccclass:classificationType_THEOLOGY a skos:Concept ; skos:inScheme ccclass:ClassificationTypeScheme ; skos:notation "THEOLOGY" ; skos:prefLabel "Theology" .
+ccclass:classificationType_AGE_GROUP a skos:Concept ; skos:inScheme ccclass:ClassificationTypeScheme ; skos:notation "AGE_GROUP" ; skos:prefLabel "Age group" .
+ccclass:classificationType_DEMOGRAPHIC a skos:Concept ; skos:inScheme ccclass:ClassificationTypeScheme ; skos:notation "DEMOGRAPHIC" ; skos:prefLabel "Demographic" .
+ccclass:classificationType_MINISTRY_FOCUS a skos:Concept ; skos:inScheme ccclass:ClassificationTypeScheme ; skos:notation "MINISTRY_FOCUS" ; skos:prefLabel "Ministry focus" .
+ccclass:classificationType_GENDER a skos:Concept ; skos:inScheme ccclass:ClassificationTypeScheme ; skos:notation "GENDER" ; skos:prefLabel "Gender" .
+ccclass:classificationType_MARITAL_STATUS a skos:Concept ; skos:inScheme ccclass:ClassificationTypeScheme ; skos:notation "MARITAL_STATUS" ; skos:prefLabel "Marital status" .
+
+### Church type
+
+ccclass:ChurchTypeScheme a skos:ConceptScheme ; skos:prefLabel "Church types" .
+ccclass:church_type_local a skos:Concept ; skos:inScheme ccclass:ChurchTypeScheme ; skos:notation "local_church" ; skos:prefLabel "Local church" .
+ccclass:church_type_multisite a skos:Concept ; skos:inScheme ccclass:ChurchTypeScheme ; skos:notation "multi_site" ; skos:prefLabel "Multi-site church" .
+ccclass:church_type_house_church a skos:Concept ; skos:inScheme ccclass:ChurchTypeScheme ; skos:notation "house_church" ; skos:prefLabel "House church" .
+ccclass:church_type_campus a skos:Concept ; skos:inScheme ccclass:ChurchTypeScheme ; skos:notation "campus_church" ; skos:prefLabel "Campus church" .
+
+### Organization type
+
+ccclass:OrganizationTypeScheme a skos:ConceptScheme ; skos:prefLabel "Organization types" .
+ccclass:org_type_church a skos:Concept ; skos:inScheme ccclass:OrganizationTypeScheme ; skos:notation "church" ; skos:prefLabel "Church" .
+ccclass:org_type_parachurch a skos:Concept ; skos:inScheme ccclass:OrganizationTypeScheme ; skos:notation "parachurch" ; skos:prefLabel "Para-church ministry" .
+ccclass:org_type_nonprofit a skos:Concept ; skos:inScheme ccclass:OrganizationTypeScheme ; skos:notation "nonprofit" ; skos:prefLabel "Non-profit" .
+ccclass:org_type_mission_agency a skos:Concept ; skos:inScheme ccclass:OrganizationTypeScheme ; skos:notation "mission_agency" ; skos:prefLabel "Mission agency" .
+ccclass:org_type_seminary a skos:Concept ; skos:inScheme ccclass:OrganizationTypeScheme ; skos:notation "seminary" ; skos:prefLabel "Seminary" .
+ccclass:org_type_network a skos:Concept ; skos:inScheme ccclass:OrganizationTypeScheme ; skos:notation "network" ; skos:prefLabel "Network / association" .
+
+### Ministry type + focus
+
+ccclass:MinistryTypeScheme a skos:ConceptScheme ; skos:prefLabel "Ministry types" .
+ccclass:ministry_type_kids a skos:Concept ; skos:inScheme ccclass:MinistryTypeScheme ; skos:notation "kids" ; skos:prefLabel "Kids ministry" .
+ccclass:ministry_type_students a skos:Concept ; skos:inScheme ccclass:MinistryTypeScheme ; skos:notation "students" ; skos:prefLabel "Student ministry" .
+ccclass:ministry_type_young_adults a skos:Concept ; skos:inScheme ccclass:MinistryTypeScheme ; skos:notation "young_adults" ; skos:prefLabel "Young adults ministry" .
+ccclass:ministry_type_worship a skos:Concept ; skos:inScheme ccclass:MinistryTypeScheme ; skos:notation "worship" ; skos:prefLabel "Worship ministry" .
+ccclass:ministry_type_small_groups a skos:Concept ; skos:inScheme ccclass:MinistryTypeScheme ; skos:notation "small_groups" ; skos:prefLabel "Small groups" .
+ccclass:ministry_type_outreach a skos:Concept ; skos:inScheme ccclass:MinistryTypeScheme ; skos:notation "outreach" ; skos:prefLabel "Outreach ministry" .
+ccclass:ministry_type_care a skos:Concept ; skos:inScheme ccclass:MinistryTypeScheme ; skos:notation "care" ; skos:prefLabel "Care / pastoral support" .
+
+ccclass:MinistryFocusScheme a skos:ConceptScheme ; skos:prefLabel "Ministry focuses" .
+ccclass:ministry_focus_evangelism a skos:Concept ; skos:inScheme ccclass:MinistryFocusScheme ; skos:notation "evangelism" ; skos:prefLabel "Evangelism" .
+ccclass:ministry_focus_discipleship a skos:Concept ; skos:inScheme ccclass:MinistryFocusScheme ; skos:notation "discipleship" ; skos:prefLabel "Discipleship" .
+ccclass:ministry_focus_teaching a skos:Concept ; skos:inScheme ccclass:MinistryFocusScheme ; skos:notation "teaching" ; skos:prefLabel "Teaching" .
+ccclass:ministry_focus_prayer a skos:Concept ; skos:inScheme ccclass:MinistryFocusScheme ; skos:notation "prayer" ; skos:prefLabel "Prayer" .
+ccclass:ministry_focus_mercy a skos:Concept ; skos:inScheme ccclass:MinistryFocusScheme ; skos:notation "mercy_justice" ; skos:prefLabel "Mercy / justice" .
+ccclass:ministry_focus_community_service a skos:Concept ; skos:inScheme ccclass:MinistryFocusScheme ; skos:notation "community_service" ; skos:prefLabel "Community service" .
+ccclass:ministry_focus_missions a skos:Concept ; skos:inScheme ccclass:MinistryFocusScheme ; skos:notation "missions" ; skos:prefLabel "Missions" .
+
+### Topics of interest
+
+ccclass:TopicOfInterestScheme a skos:ConceptScheme ; skos:prefLabel "Topics of interest" .
+ccclass:topic_gospel a skos:Concept ; skos:inScheme ccclass:TopicOfInterestScheme ; skos:notation "gospel" ; skos:prefLabel "Gospel" .
+ccclass:topic_bible a skos:Concept ; skos:inScheme ccclass:TopicOfInterestScheme ; skos:notation "bible" ; skos:prefLabel "Bible / scripture" .
+ccclass:topic_prayer a skos:Concept ; skos:inScheme ccclass:TopicOfInterestScheme ; skos:notation "prayer" ; skos:prefLabel "Prayer" .
+ccclass:topic_parenting a skos:Concept ; skos:inScheme ccclass:TopicOfInterestScheme ; skos:notation "parenting" ; skos:prefLabel "Parenting" .
+ccclass:topic_marriage a skos:Concept ; skos:inScheme ccclass:TopicOfInterestScheme ; skos:notation "marriage" ; skos:prefLabel "Marriage" .
+ccclass:topic_anxiety a skos:Concept ; skos:inScheme ccclass:TopicOfInterestScheme ; skos:notation "anxiety" ; skos:prefLabel "Anxiety / depression" .
+ccclass:topic_addiction a skos:Concept ; skos:inScheme ccclass:TopicOfInterestScheme ; skos:notation "addiction" ; skos:prefLabel "Addiction / recovery" .
+ccclass:topic_apologetics a skos:Concept ; skos:inScheme ccclass:TopicOfInterestScheme ; skos:notation "apologetics" ; skos:prefLabel "Apologetics" .
+ccclass:topic_missions a skos:Concept ; skos:inScheme ccclass:TopicOfInterestScheme ; skos:notation "missions" ; skos:prefLabel "Missions" .
+
+### Service type
+
+ccclass:ServiceTypeScheme a skos:ConceptScheme ; skos:prefLabel "Service types" .
+ccclass:service_counseling a skos:Concept ; skos:inScheme ccclass:ServiceTypeScheme ; skos:notation "counseling" ; skos:prefLabel "Counseling" .
+ccclass:service_food_pantry a skos:Concept ; skos:inScheme ccclass:ServiceTypeScheme ; skos:notation "food_pantry" ; skos:prefLabel "Food pantry" .
+ccclass:service_education a skos:Concept ; skos:inScheme ccclass:ServiceTypeScheme ; skos:notation "education" ; skos:prefLabel "Education / classes" .
+ccclass:service_prayer_support a skos:Concept ; skos:inScheme ccclass:ServiceTypeScheme ; skos:notation "prayer_support" ; skos:prefLabel "Prayer support" .
+ccclass:service_benevolence a skos:Concept ; skos:inScheme ccclass:ServiceTypeScheme ; skos:notation "benevolence" ; skos:prefLabel "Benevolence" .
+
+### Event type
+
+ccclass:EventTypeScheme a skos:ConceptScheme ; skos:prefLabel "Event types" .
+ccclass:event_worship_service a skos:Concept ; skos:inScheme ccclass:EventTypeScheme ; skos:notation "worship_service" ; skos:prefLabel "Worship service" .
+ccclass:event_class a skos:Concept ; skos:inScheme ccclass:EventTypeScheme ; skos:notation "class" ; skos:prefLabel "Class / course" .
+ccclass:event_small_group a skos:Concept ; skos:inScheme ccclass:EventTypeScheme ; skos:notation "small_group" ; skos:prefLabel "Small group meeting" .
+ccclass:event_conference a skos:Concept ; skos:inScheme ccclass:EventTypeScheme ; skos:notation "conference" ; skos:prefLabel "Conference" .
+ccclass:event_workshop a skos:Concept ; skos:inScheme ccclass:EventTypeScheme ; skos:notation "workshop" ; skos:prefLabel "Workshop" .
+ccclass:event_concert a skos:Concept ; skos:inScheme ccclass:EventTypeScheme ; skos:notation "concert" ; skos:prefLabel "Concert" .
+ccclass:event_outreach a skos:Concept ; skos:inScheme ccclass:EventTypeScheme ; skos:notation "outreach" ; skos:prefLabel "Outreach event" .
+ccclass:event_volunteer a skos:Concept ; skos:inScheme ccclass:EventTypeScheme ; skos:notation "volunteer" ; skos:prefLabel "Volunteer opportunity" .
+
+### Geography + language
+
+ccclass:GeographyScheme a skos:ConceptScheme ; skos:prefLabel "Geography" .
+ccclass:geo_country_us a skos:Concept ; skos:inScheme ccclass:GeographyScheme ; skos:notation "country:US" ; skos:prefLabel "United States" .
+ccclass:geo_state_co a skos:Concept ; skos:inScheme ccclass:GeographyScheme ; skos:notation "state:US-CO" ; skos:prefLabel "Colorado" ; skos:broader ccclass:geo_country_us .
+ccclass:geo_city_boulder_co a skos:Concept ; skos:inScheme ccclass:GeographyScheme ; skos:notation "city:Boulder,CO" ; skos:prefLabel "Boulder, CO" ; skos:broader ccclass:geo_state_co .
+ccclass:geo_city_erie_co a skos:Concept ; skos:inScheme ccclass:GeographyScheme ; skos:notation "city:Erie,CO" ; skos:prefLabel "Erie, CO" ; skos:broader ccclass:geo_state_co .
+ccclass:geo_city_thornton_co a skos:Concept ; skos:inScheme ccclass:GeographyScheme ; skos:notation "city:Thornton,CO" ; skos:prefLabel "Thornton, CO" ; skos:broader ccclass:geo_state_co .
+
+ccclass:LanguageScheme a skos:ConceptScheme ; skos:prefLabel "Languages" .
+ccclass:lang_en a skos:Concept ; skos:inScheme ccclass:LanguageScheme ; skos:notation "en" ; skos:prefLabel "English" .
+ccclass:lang_es a skos:Concept ; skos:inScheme ccclass:LanguageScheme ; skos:notation "es" ; skos:prefLabel "Spanish" .
+
+### Audience + demographics
+
+ccclass:AudienceScheme a skos:ConceptScheme ; skos:prefLabel "Audiences" .
+ccclass:audience_kids a skos:Concept ; skos:inScheme ccclass:AudienceScheme ; skos:notation "kids" ; skos:prefLabel "Kids" .
+ccclass:audience_students a skos:Concept ; skos:inScheme ccclass:AudienceScheme ; skos:notation "students" ; skos:prefLabel "Students" .
+ccclass:audience_young_adults a skos:Concept ; skos:inScheme ccclass:AudienceScheme ; skos:notation "young_adults" ; skos:prefLabel "Young adults" .
+ccclass:audience_adults a skos:Concept ; skos:inScheme ccclass:AudienceScheme ; skos:notation "adults" ; skos:prefLabel "Adults" .
+ccclass:audience_seniors a skos:Concept ; skos:inScheme ccclass:AudienceScheme ; skos:notation "seniors" ; skos:prefLabel "Seniors" .
+ccclass:audience_parents_families a skos:Concept ; skos:inScheme ccclass:AudienceScheme ; skos:notation "parents_families" ; skos:prefLabel "Parents & families" .
+
+ccclass:AgeGroupScheme a skos:ConceptScheme ; skos:prefLabel "Age groups" .
+ccclass:age_child a skos:Concept ; skos:inScheme ccclass:AgeGroupScheme ; skos:notation "child" ; skos:prefLabel "Child" .
+ccclass:age_teen a skos:Concept ; skos:inScheme ccclass:AgeGroupScheme ; skos:notation "teen" ; skos:prefLabel "Teen" .
+ccclass:age_young_adult a skos:Concept ; skos:inScheme ccclass:AgeGroupScheme ; skos:notation "young_adult" ; skos:prefLabel "Young adult" .
+ccclass:age_adult a skos:Concept ; skos:inScheme ccclass:AgeGroupScheme ; skos:notation "adult" ; skos:prefLabel "Adult" .
+ccclass:age_senior a skos:Concept ; skos:inScheme ccclass:AgeGroupScheme ; skos:notation "senior" ; skos:prefLabel "Senior" .
+
+ccclass:DemographicScheme a skos:ConceptScheme ; skos:prefLabel "Demographics" .
+ccclass:demo_men a skos:Concept ; skos:inScheme ccclass:DemographicScheme ; skos:notation "men" ; skos:prefLabel "Men" .
+ccclass:demo_women a skos:Concept ; skos:inScheme ccclass:DemographicScheme ; skos:notation "women" ; skos:prefLabel "Women" .
+ccclass:demo_married_couples a skos:Concept ; skos:inScheme ccclass:DemographicScheme ; skos:notation "married_couples" ; skos:prefLabel "Married couples" .
+ccclass:demo_single_parents a skos:Concept ; skos:inScheme ccclass:DemographicScheme ; skos:notation "single_parents" ; skos:prefLabel "Single parents" .
+ccclass:demo_military a skos:Concept ; skos:inScheme ccclass:DemographicScheme ; skos:notation "military" ; skos:prefLabel "Military" .
+
+ccclass:GenderScheme a skos:ConceptScheme ; skos:prefLabel "Gender" .
+ccclass:gender_male a skos:Concept ; skos:inScheme ccclass:GenderScheme ; skos:notation "male" ; skos:prefLabel "Male" .
+ccclass:gender_female a skos:Concept ; skos:inScheme ccclass:GenderScheme ; skos:notation "female" ; skos:prefLabel "Female" .
+ccclass:gender_nonbinary a skos:Concept ; skos:inScheme ccclass:GenderScheme ; skos:notation "nonbinary" ; skos:prefLabel "Non-binary" .
+ccclass:gender_unspecified a skos:Concept ; skos:inScheme ccclass:GenderScheme ; skos:notation "unspecified" ; skos:prefLabel "Unspecified" .
+
+ccclass:MaritalStatusScheme a skos:ConceptScheme ; skos:prefLabel "Marital status" .
+ccclass:marital_single a skos:Concept ; skos:inScheme ccclass:MaritalStatusScheme ; skos:notation "single" ; skos:prefLabel "Single" .
+ccclass:marital_married a skos:Concept ; skos:inScheme ccclass:MaritalStatusScheme ; skos:notation "married" ; skos:prefLabel "Married" .
+ccclass:marital_divorced a skos:Concept ; skos:inScheme ccclass:MaritalStatusScheme ; skos:notation "divorced" ; skos:prefLabel "Divorced" .
+ccclass:marital_widowed a skos:Concept ; skos:inScheme ccclass:MaritalStatusScheme ; skos:notation "widowed" ; skos:prefLabel "Widowed" .
+ccclass:marital_separated a skos:Concept ; skos:inScheme ccclass:MaritalStatusScheme ; skos:notation "separated" ; skos:prefLabel "Separated" .
+
+### Spiritual gifts
+
+ccclass:SpiritualGiftScheme a skos:ConceptScheme ; skos:prefLabel "Spiritual gifts" .
+ccclass:gift_teaching a skos:Concept ; skos:inScheme ccclass:SpiritualGiftScheme ; skos:notation "teaching" ; skos:prefLabel "Teaching" .
+ccclass:gift_shepherding a skos:Concept ; skos:inScheme ccclass:SpiritualGiftScheme ; skos:notation "shepherding" ; skos:prefLabel "Shepherding" .
+ccclass:gift_evangelism a skos:Concept ; skos:inScheme ccclass:SpiritualGiftScheme ; skos:notation "evangelism" ; skos:prefLabel "Evangelism" .
+ccclass:gift_mercy a skos:Concept ; skos:inScheme ccclass:SpiritualGiftScheme ; skos:notation "mercy" ; skos:prefLabel "Mercy" .
+ccclass:gift_hospitality a skos:Concept ; skos:inScheme ccclass:SpiritualGiftScheme ; skos:notation "hospitality" ; skos:prefLabel "Hospitality" .
+ccclass:gift_administration a skos:Concept ; skos:inScheme ccclass:SpiritualGiftScheme ; skos:notation "administration" ; skos:prefLabel "Administration" .
+ccclass:gift_giving a skos:Concept ; skos:inScheme ccclass:SpiritualGiftScheme ; skos:notation "giving" ; skos:prefLabel "Giving" .
+ccclass:gift_exhortation a skos:Concept ; skos:inScheme ccclass:SpiritualGiftScheme ; skos:notation "exhortation" ; skos:prefLabel "Exhortation" .
+ccclass:gift_wisdom a skos:Concept ; skos:inScheme ccclass:SpiritualGiftScheme ; skos:notation "wisdom" ; skos:prefLabel "Wisdom" .
+ccclass:gift_knowledge a skos:Concept ; skos:inScheme ccclass:SpiritualGiftScheme ; skos:notation "knowledge" ; skos:prefLabel "Knowledge" .
+ccclass:gift_discernment a skos:Concept ; skos:inScheme ccclass:SpiritualGiftScheme ; skos:notation "discernment" ; skos:prefLabel "Discernment" .
+ccclass:gift_service a skos:Concept ; skos:inScheme ccclass:SpiritualGiftScheme ; skos:notation "service" ; skos:prefLabel "Service" .
+
+### Roles
+
+ccclass:RoleScheme a skos:ConceptScheme ; skos:prefLabel "Roles" .
+ccclass:role_pastor a skos:Concept ; skos:inScheme ccclass:RoleScheme ; skos:notation "pastor" ; skos:prefLabel "Pastor" .
+ccclass:role_elder a skos:Concept ; skos:inScheme ccclass:RoleScheme ; skos:notation "elder" ; skos:prefLabel "Elder" .
+ccclass:role_deacon a skos:Concept ; skos:inScheme ccclass:RoleScheme ; skos:notation "deacon" ; skos:prefLabel "Deacon" .
+ccclass:role_volunteer a skos:Concept ; skos:inScheme ccclass:RoleScheme ; skos:notation "volunteer" ; skos:prefLabel "Volunteer" .
+ccclass:role_group_leader a skos:Concept ; skos:inScheme ccclass:RoleScheme ; skos:notation "group_leader" ; skos:prefLabel "Group leader" .
+ccclass:role_group_host a skos:Concept ; skos:inScheme ccclass:RoleScheme ; skos:notation "group_host" ; skos:prefLabel "Group host" .
+ccclass:role_worship_leader a skos:Concept ; skos:inScheme ccclass:RoleScheme ; skos:notation "worship_leader" ; skos:prefLabel "Worship leader" .
+ccclass:role_kids_teacher a skos:Concept ; skos:inScheme ccclass:RoleScheme ; skos:notation "kids_teacher" ; skos:prefLabel "Kids teacher" .
+
+### Theology
+
+ccclass:TheologyScheme a skos:ConceptScheme ; skos:prefLabel "Theology" .
+ccclass:theology_reformed a skos:Concept ; skos:inScheme ccclass:TheologyScheme ; skos:notation "reformed" ; skos:prefLabel "Reformed / Calvinist" .
+ccclass:theology_arminian a skos:Concept ; skos:inScheme ccclass:TheologyScheme ; skos:notation "arminian" ; skos:prefLabel "Arminian / Wesleyan" .
+ccclass:theology_charismatic a skos:Concept ; skos:inScheme ccclass:TheologyScheme ; skos:notation "charismatic" ; skos:prefLabel "Charismatic" .
+ccclass:theology_cessationist a skos:Concept ; skos:inScheme ccclass:TheologyScheme ; skos:notation "cessationist" ; skos:prefLabel "Cessationist" .
+ccclass:theology_dispensational a skos:Concept ; skos:inScheme ccclass:TheologyScheme ; skos:notation "dispensational" ; skos:prefLabel "Dispensational" .
+ccclass:theology_covenantal a skos:Concept ; skos:inScheme ccclass:TheologyScheme ; skos:notation "covenantal" ; skos:prefLabel "Covenantal" .
+ccclass:theology_complementarian a skos:Concept ; skos:inScheme ccclass:TheologyScheme ; skos:notation "complementarian" ; skos:prefLabel "Complementarian" .
+ccclass:theology_egalitarian a skos:Concept ; skos:inScheme ccclass:TheologyScheme ; skos:notation "egalitarian" ; skos:prefLabel "Egalitarian" .
+
 ### Faith traditions / denominations (starter taxonomy; extend per church)
 
 ccclass:FaithTraditionScheme a skos:ConceptScheme ;
   skos:prefLabel "Faith traditions" .
+
+ccclass:tradition_eastern_christianity a skos:Concept ; skos:inScheme ccclass:FaithTraditionScheme ; skos:notation "eastern_christianity" ; skos:prefLabel "Eastern Christianity" .
+ccclass:tradition_western_christianity a skos:Concept ; skos:inScheme ccclass:FaithTraditionScheme ; skos:notation "western_christianity" ; skos:prefLabel "Western Christianity" .
+ccclass:tradition_protestant a skos:Concept ; skos:inScheme ccclass:FaithTraditionScheme ; skos:notation "protestant" ; skos:prefLabel "Protestant" ; skos:broader ccclass:tradition_western_christianity .
 
 ccclass:tradition_evangelical a skos:Concept ; skos:inScheme ccclass:FaithTraditionScheme ; skos:notation "evangelical" ; skos:prefLabel "Evangelical" .
 ccclass:tradition_mainline_protestant a skos:Concept ; skos:inScheme ccclass:FaithTraditionScheme ; skos:notation "mainline_protestant" ; skos:prefLabel "Mainline Protestant" .
@@ -172,10 +362,12 @@ ccclass:tradition_methodist a skos:Concept ; skos:inScheme ccclass:FaithTraditio
 ccclass:tradition_presbyterian a skos:Concept ; skos:inScheme ccclass:FaithTraditionScheme ; skos:notation "presbyterian" ; skos:prefLabel "Presbyterian" .
 ccclass:tradition_anabaptist a skos:Concept ; skos:inScheme ccclass:FaithTraditionScheme ; skos:notation "anabaptist" ; skos:prefLabel "Anabaptist" .
 ccclass:tradition_restorationist a skos:Concept ; skos:inScheme ccclass:FaithTraditionScheme ; skos:notation "restorationist" ; skos:prefLabel "Restorationist" .
-ccclass:tradition_catholic a skos:Concept ; skos:inScheme ccclass:FaithTraditionScheme ; skos:notation "catholic" ; skos:prefLabel "Catholic" .
-ccclass:tradition_eastern_orthodox a skos:Concept ; skos:inScheme ccclass:FaithTraditionScheme ; skos:notation "eastern_orthodox" ; skos:prefLabel "Eastern Orthodox" .
-ccclass:tradition_oriental_orthodox a skos:Concept ; skos:inScheme ccclass:FaithTraditionScheme ; skos:notation "oriental_orthodox" ; skos:prefLabel "Oriental Orthodox" .
+ccclass:tradition_catholic a skos:Concept ; skos:inScheme ccclass:FaithTraditionScheme ; skos:notation "catholic" ; skos:prefLabel "Catholic" ; skos:broader ccclass:tradition_western_christianity .
+ccclass:tradition_eastern_orthodox a skos:Concept ; skos:inScheme ccclass:FaithTraditionScheme ; skos:notation "eastern_orthodox" ; skos:prefLabel "Eastern Orthodox" ; skos:broader ccclass:tradition_eastern_christianity .
+ccclass:tradition_oriental_orthodox a skos:Concept ; skos:inScheme ccclass:FaithTraditionScheme ; skos:notation "oriental_orthodox" ; skos:prefLabel "Oriental Orthodox" ; skos:broader ccclass:tradition_eastern_christianity .
+ccclass:tradition_assyrian_church_of_east a skos:Concept ; skos:inScheme ccclass:FaithTraditionScheme ; skos:notation "assyrian_church_of_east" ; skos:prefLabel "Assyrian Church of the East" ; skos:broader ccclass:tradition_eastern_christianity .
 ccclass:tradition_non_denom a skos:Concept ; skos:inScheme ccclass:FaithTraditionScheme ; skos:notation "non_denom" ; skos:prefLabel "Non-denominational" .
+ccclass:tradition_non_trinitarian a skos:Concept ; skos:inScheme ccclass:FaithTraditionScheme ; skos:notation "non_trinitarian" ; skos:prefLabel "Non-trinitarian (outside Nicene orthodoxy)" ; skos:broader ccclass:tradition_other .
 ccclass:tradition_other a skos:Concept ; skos:inScheme ccclass:FaithTraditionScheme ; skos:notation "other" ; skos:prefLabel "Other / unspecified" .
 
 ccclass:DenominationScheme a skos:ConceptScheme ;
@@ -183,9 +375,12 @@ ccclass:DenominationScheme a skos:ConceptScheme ;
 
 ccclass:denom_sbc a skos:Concept ; skos:inScheme ccclass:DenominationScheme ; skos:notation "southern_baptist_convention" ; skos:prefLabel "Southern Baptist Convention" ; skos:broader ccclass:tradition_baptist .
 ccclass:denom_abcusa a skos:Concept ; skos:inScheme ccclass:DenominationScheme ; skos:notation "american_baptist_churches_usa" ; skos:prefLabel "American Baptist Churches USA" ; skos:broader ccclass:tradition_baptist .
+ccclass:denom_national_baptist_convention_usa a skos:Concept ; skos:inScheme ccclass:DenominationScheme ; skos:notation "national_baptist_convention_usa" ; skos:prefLabel "National Baptist Convention, USA, Inc." ; skos:broader ccclass:tradition_baptist .
 ccclass:denom_pca a skos:Concept ; skos:inScheme ccclass:DenominationScheme ; skos:notation "presbyterian_church_in_america" ; skos:prefLabel "Presbyterian Church in America (PCA)" ; skos:broader ccclass:tradition_presbyterian .
 ccclass:denom_pcusa a skos:Concept ; skos:inScheme ccclass:DenominationScheme ; skos:notation "presbyterian_church_usa" ; skos:prefLabel "Presbyterian Church (USA)" ; skos:broader ccclass:tradition_presbyterian .
 ccclass:denom_umc a skos:Concept ; skos:inScheme ccclass:DenominationScheme ; skos:notation "united_methodist_church" ; skos:prefLabel "United Methodist Church" ; skos:broader ccclass:tradition_methodist .
+ccclass:denom_ame a skos:Concept ; skos:inScheme ccclass:DenominationScheme ; skos:notation "african_methodist_episcopal" ; skos:prefLabel "African Methodist Episcopal Church (AME)" ; skos:broader ccclass:tradition_methodist .
+ccclass:denom_wesleyan_church a skos:Concept ; skos:inScheme ccclass:DenominationScheme ; skos:notation "wesleyan_church" ; skos:prefLabel "Wesleyan Church" ; skos:broader ccclass:tradition_methodist .
 ccclass:denom_nazarene a skos:Concept ; skos:inScheme ccclass:DenominationScheme ; skos:notation "church_of_the_nazarene" ; skos:prefLabel "Church of the Nazarene" ; skos:broader ccclass:tradition_methodist .
 ccclass:denom_elca a skos:Concept ; skos:inScheme ccclass:DenominationScheme ; skos:notation "elca" ; skos:prefLabel "Evangelical Lutheran Church in America (ELCA)" ; skos:broader ccclass:tradition_lutheran .
 ccclass:denom_lcms a skos:Concept ; skos:inScheme ccclass:DenominationScheme ; skos:notation "lcms" ; skos:prefLabel "Lutheran Church—Missouri Synod (LCMS)" ; skos:broader ccclass:tradition_lutheran .
@@ -195,6 +390,106 @@ ccclass:denom_episcopal a skos:Concept ; skos:inScheme ccclass:DenominationSchem
 ccclass:denom_anglican_church_in_north_america a skos:Concept ; skos:inScheme ccclass:DenominationScheme ; skos:notation "acna" ; skos:prefLabel "Anglican Church in North America (ACNA)" ; skos:broader ccclass:tradition_anglican .
 ccclass:denom_roman_catholic a skos:Concept ; skos:inScheme ccclass:DenominationScheme ; skos:notation "roman_catholic" ; skos:prefLabel "Roman Catholic Church" ; skos:broader ccclass:tradition_catholic .
 ccclass:denom_greek_orthodox a skos:Concept ; skos:inScheme ccclass:DenominationScheme ; skos:notation "greek_orthodox" ; skos:prefLabel "Greek Orthodox" ; skos:broader ccclass:tradition_eastern_orthodox .
+ccclass:denom_antiochian_orthodox a skos:Concept ; skos:inScheme ccclass:DenominationScheme ; skos:notation "antiochian_orthodox" ; skos:prefLabel "Antiochian Orthodox Christian Archdiocese" ; skos:broader ccclass:tradition_eastern_orthodox .
+ccclass:denom_serbian_orthodox a skos:Concept ; skos:inScheme ccclass:DenominationScheme ; skos:notation "serbian_orthodox" ; skos:prefLabel "Serbian Orthodox Church" ; skos:broader ccclass:tradition_eastern_orthodox .
+ccclass:denom_russian_orthodox a skos:Concept ; skos:inScheme ccclass:DenominationScheme ; skos:notation "russian_orthodox" ; skos:prefLabel "Russian Orthodox Church" ; skos:broader ccclass:tradition_eastern_orthodox .
 ccclass:denom_oca a skos:Concept ; skos:inScheme ccclass:DenominationScheme ; skos:notation "orthodox_church_in_america" ; skos:prefLabel "Orthodox Church in America (OCA)" ; skos:broader ccclass:tradition_eastern_orthodox .
+ccclass:denom_coptic_orthodox a skos:Concept ; skos:inScheme ccclass:DenominationScheme ; skos:notation "coptic_orthodox" ; skos:prefLabel "Coptic Orthodox Church" ; skos:broader ccclass:tradition_oriental_orthodox .
+ccclass:denom_ethiopian_orthodox_tewahedo a skos:Concept ; skos:inScheme ccclass:DenominationScheme ; skos:notation "ethiopian_orthodox_tewahedo" ; skos:prefLabel "Ethiopian Orthodox Tewahedo Church" ; skos:broader ccclass:tradition_oriental_orthodox .
+ccclass:denom_armenian_apostolic a skos:Concept ; skos:inScheme ccclass:DenominationScheme ; skos:notation "armenian_apostolic" ; skos:prefLabel "Armenian Apostolic Church" ; skos:broader ccclass:tradition_oriental_orthodox .
+ccclass:denom_syriac_orthodox a skos:Concept ; skos:inScheme ccclass:DenominationScheme ; skos:notation "syriac_orthodox" ; skos:prefLabel "Syriac Orthodox Church" ; skos:broader ccclass:tradition_oriental_orthodox .
+ccclass:denom_assyrian_church_of_east a skos:Concept ; skos:inScheme ccclass:DenominationScheme ; skos:notation "assyrian_church_of_the_east" ; skos:prefLabel "Assyrian Church of the East" ; skos:broader ccclass:tradition_assyrian_church_of_east .
 ccclass:denom_non_denom a skos:Concept ; skos:inScheme ccclass:DenominationScheme ; skos:notation "non_denom" ; skos:prefLabel "Non-denominational" ; skos:broader ccclass:tradition_non_denom .
+
+ccclass:denom_wels a skos:Concept ; skos:inScheme ccclass:DenominationScheme ; skos:notation "wels" ; skos:prefLabel "Wisconsin Evangelical Lutheran Synod (WELS)" ; skos:broader ccclass:tradition_lutheran .
+ccclass:denom_efca a skos:Concept ; skos:inScheme ccclass:DenominationScheme ; skos:notation "efca" ; skos:prefLabel "Evangelical Free Church of America (EFCA)" ; skos:broader ccclass:tradition_evangelical .
+ccclass:denom_cma a skos:Concept ; skos:inScheme ccclass:DenominationScheme ; skos:notation "christian_and_missionary_alliance" ; skos:prefLabel "Christian and Missionary Alliance" ; skos:broader ccclass:tradition_evangelical .
+ccclass:denom_crcna a skos:Concept ; skos:inScheme ccclass:DenominationScheme ; skos:notation "christian_reformed_church_in_north_america" ; skos:prefLabel "Christian Reformed Church in North America (CRCNA)" ; skos:broader ccclass:tradition_reformed .
+ccclass:denom_rca a skos:Concept ; skos:inScheme ccclass:DenominationScheme ; skos:notation "reformed_church_in_america" ; skos:prefLabel "Reformed Church in America (RCA)" ; skos:broader ccclass:tradition_reformed .
+ccclass:denom_opc a skos:Concept ; skos:inScheme ccclass:DenominationScheme ; skos:notation "orthodox_presbyterian_church" ; skos:prefLabel "Orthodox Presbyterian Church (OPC)" ; skos:broader ccclass:tradition_presbyterian .
+ccclass:denom_epc a skos:Concept ; skos:inScheme ccclass:DenominationScheme ; skos:notation "evangelical_presbyterian_church" ; skos:prefLabel "Evangelical Presbyterian Church (EPC)" ; skos:broader ccclass:tradition_presbyterian .
+ccclass:denom_uca a skos:Concept ; skos:inScheme ccclass:DenominationScheme ; skos:notation "united_church_of_christ" ; skos:prefLabel "United Church of Christ (UCC)" ; skos:broader ccclass:tradition_mainline_protestant .
+ccclass:denom_disciples a skos:Concept ; skos:inScheme ccclass:DenominationScheme ; skos:notation "christian_church_disciples_of_christ" ; skos:prefLabel "Christian Church (Disciples of Christ)" ; skos:broader ccclass:tradition_mainline_protestant .
+ccclass:denom_churches_of_christ a skos:Concept ; skos:inScheme ccclass:DenominationScheme ; skos:notation "churches_of_christ" ; skos:prefLabel "Churches of Christ" ; skos:broader ccclass:tradition_restorationist .
+ccclass:denom_usa_quakers a skos:Concept ; skos:inScheme ccclass:DenominationScheme ; skos:notation "friends_quakers" ; skos:prefLabel "Religious Society of Friends (Quakers)" ; skos:broader ccclass:tradition_other .
+ccclass:denom_salvation_army a skos:Concept ; skos:inScheme ccclass:DenominationScheme ; skos:notation "salvation_army" ; skos:prefLabel "The Salvation Army" ; skos:broader ccclass:tradition_other .
+ccclass:denom_amosa a skos:Concept ; skos:inScheme ccclass:DenominationScheme ; skos:notation "amish_mennonite_anabaptist" ; skos:prefLabel "Anabaptist (Amish/Mennonite families)" ; skos:broader ccclass:tradition_anabaptist .
+ccclass:denom_cogic a skos:Concept ; skos:inScheme ccclass:DenominationScheme ; skos:notation "church_of_god_in_christ" ; skos:prefLabel "Church of God in Christ (COGIC)" ; skos:broader ccclass:tradition_pentecostal_charismatic .
+ccclass:denom_cog_cleveland a skos:Concept ; skos:inScheme ccclass:DenominationScheme ; skos:notation "church_of_god_cleveland" ; skos:prefLabel "Church of God (Cleveland, TN)" ; skos:broader ccclass:tradition_pentecostal_charismatic .
+ccclass:denom_calvary_chapel a skos:Concept ; skos:inScheme ccclass:DenominationScheme ; skos:notation "calvary_chapel" ; skos:prefLabel "Calvary Chapel (movement)" ; skos:broader ccclass:tradition_evangelical .
+ccclass:denom_vineyard a skos:Concept ; skos:inScheme ccclass:DenominationScheme ; skos:notation "vineyard" ; skos:prefLabel "Vineyard (movement)" ; skos:broader ccclass:tradition_pentecostal_charismatic .
+ccclass:denom_sda a skos:Concept ; skos:inScheme ccclass:DenominationScheme ; skos:notation "seventh_day_adventist" ; skos:prefLabel "Seventh-day Adventist Church" ; skos:broader ccclass:tradition_restorationist .
+ccclass:denom_lds a skos:Concept ; skos:inScheme ccclass:DenominationScheme ; skos:notation "lds" ; skos:prefLabel "The Church of Jesus Christ of Latter-day Saints (LDS)" ; skos:broader ccclass:tradition_restorationist .
+ccclass:denom_jehovahs_witnesses a skos:Concept ; skos:inScheme ccclass:DenominationScheme ; skos:notation "jehovahs_witnesses" ; skos:prefLabel "Jehovah's Witnesses" ; skos:broader ccclass:tradition_non_trinitarian .
+
+### Operational statuses/types (mirrors D1 enums)
+
+ccclass:ChatThreadStatusScheme a skos:ConceptScheme ; skos:prefLabel "Chat thread statuses" .
+ccclass:thread_status_active a skos:Concept ; skos:inScheme ccclass:ChatThreadStatusScheme ; skos:notation "active" ; skos:prefLabel "Active" .
+ccclass:thread_status_archived a skos:Concept ; skos:inScheme ccclass:ChatThreadStatusScheme ; skos:notation "archived" ; skos:prefLabel "Archived" .
+
+ccclass:ChatMessageSenderTypeScheme a skos:ConceptScheme ; skos:prefLabel "Chat message sender types" .
+ccclass:sender_user a skos:Concept ; skos:inScheme ccclass:ChatMessageSenderTypeScheme ; skos:notation "user" ; skos:prefLabel "User" .
+ccclass:sender_assistant a skos:Concept ; skos:inScheme ccclass:ChatMessageSenderTypeScheme ; skos:notation "assistant" ; skos:prefLabel "Assistant" .
+ccclass:sender_system a skos:Concept ; skos:inScheme ccclass:ChatMessageSenderTypeScheme ; skos:notation "system" ; skos:prefLabel "System" .
+
+ccclass:PhoneVerificationStatusScheme a skos:ConceptScheme ; skos:prefLabel "Phone verification statuses" .
+ccclass:phone_status_pending a skos:Concept ; skos:inScheme ccclass:PhoneVerificationStatusScheme ; skos:notation "pending" ; skos:prefLabel "Pending" .
+ccclass:phone_status_verified a skos:Concept ; skos:inScheme ccclass:PhoneVerificationStatusScheme ; skos:notation "verified" ; skos:prefLabel "Verified" .
+ccclass:phone_status_expired a skos:Concept ; skos:inScheme ccclass:PhoneVerificationStatusScheme ; skos:notation "expired" ; skos:prefLabel "Expired" .
+
+ccclass:CheckinSessionStatusScheme a skos:ConceptScheme ; skos:prefLabel "Check-in session statuses" .
+ccclass:checkin_session_open a skos:Concept ; skos:inScheme ccclass:CheckinSessionStatusScheme ; skos:notation "open" ; skos:prefLabel "Open" .
+ccclass:checkin_session_complete a skos:Concept ; skos:inScheme ccclass:CheckinSessionStatusScheme ; skos:notation "complete" ; skos:prefLabel "Complete" .
+ccclass:checkin_session_cancelled a skos:Concept ; skos:inScheme ccclass:CheckinSessionStatusScheme ; skos:notation "cancelled" ; skos:prefLabel "Cancelled" .
+
+ccclass:CheckinItemStatusScheme a skos:ConceptScheme ; skos:prefLabel "Check-in item statuses" .
+ccclass:checkin_item_checked_in a skos:Concept ; skos:inScheme ccclass:CheckinItemStatusScheme ; skos:notation "checked_in" ; skos:prefLabel "Checked in" .
+ccclass:checkin_item_checked_out a skos:Concept ; skos:inScheme ccclass:CheckinItemStatusScheme ; skos:notation "checked_out" ; skos:prefLabel "Checked out" .
+
+ccclass:CheckinPassStatusScheme a skos:ConceptScheme ; skos:prefLabel "Check-in pass token statuses" .
+ccclass:pass_status_active a skos:Concept ; skos:inScheme ccclass:CheckinPassStatusScheme ; skos:notation "active" ; skos:prefLabel "Active" .
+ccclass:pass_status_revoked a skos:Concept ; skos:inScheme ccclass:CheckinPassStatusScheme ; skos:notation "revoked" ; skos:prefLabel "Revoked" .
+ccclass:pass_status_expired a skos:Concept ; skos:inScheme ccclass:CheckinPassStatusScheme ; skos:notation "expired" ; skos:prefLabel "Expired" .
+
+ccclass:EventRegistrationStatusScheme a skos:ConceptScheme ; skos:prefLabel "Event registration statuses" .
+ccclass:registration_registered a skos:Concept ; skos:inScheme ccclass:EventRegistrationStatusScheme ; skos:notation "registered" ; skos:prefLabel "Registered" .
+ccclass:registration_cancelled a skos:Concept ; skos:inScheme ccclass:EventRegistrationStatusScheme ; skos:notation "cancelled" ; skos:prefLabel "Cancelled" .
+ccclass:registration_attended a skos:Concept ; skos:inScheme ccclass:EventRegistrationStatusScheme ; skos:notation "attended" ; skos:prefLabel "Attended" .
+
+ccclass:OutreachCampaignStatusScheme a skos:ConceptScheme ; skos:prefLabel "Outreach campaign statuses" .
+ccclass:outreach_active a skos:Concept ; skos:inScheme ccclass:OutreachCampaignStatusScheme ; skos:notation "active" ; skos:prefLabel "Active" .
+ccclass:outreach_paused a skos:Concept ; skos:inScheme ccclass:OutreachCampaignStatusScheme ; skos:notation "paused" ; skos:prefLabel "Paused" .
+ccclass:outreach_completed a skos:Concept ; skos:inScheme ccclass:OutreachCampaignStatusScheme ; skos:notation "completed" ; skos:prefLabel "Completed" .
+
+ccclass:TranscriptionProviderScheme a skos:ConceptScheme ; skos:prefLabel "Transcription providers" .
+ccclass:provider_assemblyai a skos:Concept ; skos:inScheme ccclass:TranscriptionProviderScheme ; skos:notation "assemblyai" ; skos:prefLabel "AssemblyAI" .
+ccclass:provider_openai a skos:Concept ; skos:inScheme ccclass:TranscriptionProviderScheme ; skos:notation "openai" ; skos:prefLabel "OpenAI" .
+ccclass:provider_other a skos:Concept ; skos:inScheme ccclass:TranscriptionProviderScheme ; skos:notation "other" ; skos:prefLabel "Other" .
+
+ccclass:TranscriptionJobStatusScheme a skos:ConceptScheme ; skos:prefLabel "Transcription job statuses" .
+ccclass:job_queued a skos:Concept ; skos:inScheme ccclass:TranscriptionJobStatusScheme ; skos:notation "queued" ; skos:prefLabel "Queued" .
+ccclass:job_processing a skos:Concept ; skos:inScheme ccclass:TranscriptionJobStatusScheme ; skos:notation "processing" ; skos:prefLabel "Processing" .
+ccclass:job_completed a skos:Concept ; skos:inScheme ccclass:TranscriptionJobStatusScheme ; skos:notation "completed" ; skos:prefLabel "Completed" .
+ccclass:job_failed a skos:Concept ; skos:inScheme ccclass:TranscriptionJobStatusScheme ; skos:notation "failed" ; skos:prefLabel "Failed" .
+
+ccclass:BibleReadingItemKindScheme a skos:ConceptScheme ; skos:prefLabel "Bible reading item kinds" .
+ccclass:br_kind_reading a skos:Concept ; skos:inScheme ccclass:BibleReadingItemKindScheme ; skos:notation "reading" ; skos:prefLabel "Reading" .
+ccclass:br_kind_daily_verse a skos:Concept ; skos:inScheme ccclass:BibleReadingItemKindScheme ; skos:notation "daily_verse" ; skos:prefLabel "Daily verse" .
+ccclass:br_kind_reflection a skos:Concept ; skos:inScheme ccclass:BibleReadingItemKindScheme ; skos:notation "reflection" ; skos:prefLabel "Reflection" .
+
+ccclass:BibleReadingProgressStatusScheme a skos:ConceptScheme ; skos:prefLabel "Bible reading progress statuses" .
+ccclass:br_status_started a skos:Concept ; skos:inScheme ccclass:BibleReadingProgressStatusScheme ; skos:notation "started" ; skos:prefLabel "Started" .
+ccclass:br_status_completed a skos:Concept ; skos:inScheme ccclass:BibleReadingProgressStatusScheme ; skos:notation "completed" ; skos:prefLabel "Completed" .
+
+ccclass:RequestStatusScheme a skos:ConceptScheme ; skos:prefLabel "Request statuses" .
+ccclass:req_open a skos:Concept ; skos:inScheme ccclass:RequestStatusScheme ; skos:notation "open" ; skos:prefLabel "Open" .
+ccclass:req_assigned a skos:Concept ; skos:inScheme ccclass:RequestStatusScheme ; skos:notation "assigned" ; skos:prefLabel "Assigned" .
+ccclass:req_escalated a skos:Concept ; skos:inScheme ccclass:RequestStatusScheme ; skos:notation "escalated" ; skos:prefLabel "Escalated" .
+ccclass:req_closed a skos:Concept ; skos:inScheme ccclass:RequestStatusScheme ; skos:notation "closed" ; skos:prefLabel "Closed" .
+
+ccclass:FollowupStatusScheme a skos:ConceptScheme ; skos:prefLabel "Followup statuses" .
+ccclass:followup_open a skos:Concept ; skos:inScheme ccclass:FollowupStatusScheme ; skos:notation "open" ; skos:prefLabel "Open" .
+ccclass:followup_done a skos:Concept ; skos:inScheme ccclass:FollowupStatusScheme ; skos:notation "done" ; skos:prefLabel "Done" .
+ccclass:followup_cancelled a skos:Concept ; skos:inScheme ccclass:FollowupStatusScheme ; skos:notation "cancelled" ; skos:prefLabel "Cancelled" .
 
