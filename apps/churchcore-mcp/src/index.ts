@@ -22,6 +22,11 @@ export type Env = {
   GRAPHDB_PASSWORD?: string;
   GRAPHDB_CF_ACCESS_CLIENT_ID?: string;
   GRAPHDB_CF_ACCESS_CLIENT_SECRET?: string;
+  // GraphDB sync job (D1 -> GraphDB)
+  GRAPHDB_SYNC_ENABLED?: string; // "1" to enable scheduled sync
+  GRAPHDB_CONTEXT_BASE?: string; // default https://churchcore.ai/graph/d1
+  GRAPHDB_ID_BASE?: string; // default https://id.churchcore.ai
+  GRAPHDB_SYNC_BATCH?: string; // default 200
 };
 
 function nowIso() {
@@ -4378,6 +4383,459 @@ function parseBookChapterRef(passage: string | null) {
   return `${book} ${ch}`;
 }
 
+function ttlEscapeString(s: string) {
+  // Turtle string literal escaping (minimal)
+  return String(s)
+    .replace(/\\/g, "\\\\")
+    .replace(/"/g, '\\"')
+    .replace(/\r/g, "\\r")
+    .replace(/\n/g, "\\n")
+    .replace(/\t/g, "\\t");
+}
+
+function ttlLitString(s: any) {
+  const v = String(s ?? "").trim();
+  return `"${ttlEscapeString(v)}"`;
+}
+
+function ttlLitDate(s: any) {
+  const v = String(s ?? "").trim();
+  return /^\d{4}-\d{2}-\d{2}$/.test(v) ? `"${v}"^^xsd:date` : ttlLitString(v);
+}
+
+function ttlLitDateTime(s: any) {
+  const v = String(s ?? "").trim();
+  // allow ISO-ish; fallback to string
+  return /^\d{4}-\d{2}-\d{2}T/.test(v) ? `"${v}"^^xsd:dateTime` : ttlLitString(v);
+}
+
+function ttlIri(s: string) {
+  const v = String(s ?? "").trim();
+  if (!v) return "<>";
+  // assumes v is already a valid absolute IRI
+  return `<${v.replace(/[\s<>"]/g, "")}>`;
+}
+
+function graphDbHeaders(env: Env, accept?: string) {
+  const username = String(env.GRAPHDB_USERNAME ?? "").trim();
+  const password = String(env.GRAPHDB_PASSWORD ?? "").trim();
+  const cfId = String(env.GRAPHDB_CF_ACCESS_CLIENT_ID ?? "").trim();
+  const cfSecret = String(env.GRAPHDB_CF_ACCESS_CLIENT_SECRET ?? "").trim();
+  const headers: Record<string, string> = {};
+  if (accept) headers.accept = accept;
+  if (username && password) headers.Authorization = `Basic ${base64EncodeUtf8(`${username}:${password}`)}`;
+  if (cfId && cfSecret) {
+    headers["CF-Access-Client-Id"] = cfId;
+    headers["CF-Access-Client-Secret"] = cfSecret;
+  }
+  return headers;
+}
+
+function graphDbConfig(env: Env) {
+  const baseUrl = String(env.GRAPHDB_BASE_URL ?? "").trim().replace(/\/+$/, "");
+  const repo = String(env.GRAPHDB_REPOSITORY ?? "").trim();
+  if (!baseUrl) throw new Error("GRAPHDB_BASE_URL not configured");
+  if (!repo) throw new Error("GRAPHDB_REPOSITORY not configured");
+  return { baseUrl, repo };
+}
+
+async function graphDbClearGraph(env: Env, args: { contextIri: string }) {
+  const { baseUrl, repo } = graphDbConfig(env);
+  const url = `${baseUrl}/repositories/${encodeURIComponent(repo)}/statements?context=${encodeURIComponent(`<${args.contextIri}>`)}`;
+  const res = await fetch(url, { method: "DELETE", headers: graphDbHeaders(env) });
+  const text = await res.text().catch(() => "");
+  if (!res.ok) throw new Error(`GraphDB clear graph failed (${res.status}): ${text.slice(0, 1000)}`);
+  return { ok: true };
+}
+
+async function graphDbUploadTurtle(env: Env, args: { contextIri: string; turtle: string }) {
+  const { baseUrl, repo } = graphDbConfig(env);
+  const url = `${baseUrl}/repositories/${encodeURIComponent(repo)}/statements?context=${encodeURIComponent(`<${args.contextIri}>`)}`;
+  const headers: Record<string, string> = {
+    ...graphDbHeaders(env, "application/json"),
+    "content-type": "text/turtle;charset=UTF-8",
+  };
+  const res = await fetch(url, { method: "POST", headers, body: args.turtle });
+  const text = await res.text().catch(() => "");
+  if (!res.ok) throw new Error(`GraphDB upload failed (${res.status}): ${text.slice(0, 1000)}`);
+  return { ok: true };
+}
+
+async function d1All(env: Env, sql: string, binds: any[] = []) {
+  const stmt = env.churchcore.prepare(sql);
+  const out = await (binds.length ? stmt.bind(...binds) : stmt).all();
+  const rows = (out as any)?.results;
+  return Array.isArray(rows) ? rows : [];
+}
+
+function sanitizeSqlIdent(name: string) {
+  const n = String(name ?? "").trim();
+  if (!/^[A-Za-z0-9_]+$/.test(n)) throw new Error("invalid_sql_identifier");
+  return n;
+}
+
+async function d1TableColumns(env: Env, table: string) {
+  const t = sanitizeSqlIdent(table);
+  try {
+    const rows = await d1All(env, `PRAGMA table_info(${t})`);
+    const cols = new Set<string>();
+    for (const r of rows as any[]) {
+      if (r && typeof r.name === "string") cols.add(r.name);
+    }
+    return cols;
+  } catch {
+    return new Set<string>();
+  }
+}
+
+function pickCol(cols: Set<string>, candidates: string[]) {
+  for (const c of candidates) if (cols.has(c)) return c;
+  return null;
+}
+
+function ttlPrefixes() {
+  return [
+    `@prefix cc: <https://ontology.churchcore.ai/cc#> .`,
+    `@prefix cccomm: <https://ontology.churchcore.ai/cc/community#> .`,
+    `@prefix ccprov: <https://ontology.churchcore.ai/cc/prov#> .`,
+    `@prefix ccsit: <https://ontology.churchcore.ai/cc/situation#> .`,
+    `@prefix prov: <http://www.w3.org/ns/prov#> .`,
+    `@prefix at: <https://agentictrust.io/ontology/core#> .`,
+    `@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .`,
+    ``,
+  ].join("\n");
+}
+
+async function syncGraphDbFromD1(env: Env, args: { churchId: string; mode: "full" | "append" }) {
+  const churchId = String(args.churchId ?? "").trim();
+  if (!churchId) throw new Error("churchId is required");
+
+  const enabled = String(env.GRAPHDB_SYNC_ENABLED ?? "").trim() === "1";
+  if (!enabled) return { ok: false, reason: "GRAPHDB_SYNC_ENABLED_not_set" as const };
+
+  const contextBase = String(env.GRAPHDB_CONTEXT_BASE ?? "https://churchcore.ai/graph/d1").trim().replace(/\/+$/, "");
+  const idBase = String(env.GRAPHDB_ID_BASE ?? "https://id.churchcore.ai").trim().replace(/\/+$/, "");
+  const batch = clampInt(env.GRAPHDB_SYNC_BATCH, 200, 25, 1000);
+  const contextIri = `${contextBase}/${encodeURIComponent(churchId)}`;
+
+  // NOTE: GraphDB statements POST appends; for correctness we clear-by-graph on full sync.
+  if (args.mode === "full") await graphDbClearGraph(env, { contextIri });
+
+  let uploaded = 0;
+
+  async function uploadChunk(lines: string[]) {
+    if (!lines.length) return;
+    const turtle = `${ttlPrefixes()}\n${lines.join("\n")}\n`;
+    await graphDbUploadTurtle(env, { contextIri, turtle });
+    uploaded += lines.length;
+  }
+
+  // churches
+  {
+    const cols = await d1TableColumns(env, "churches");
+    const idCol = pickCol(cols, ["id", "church_id"]);
+    const nameCol = pickCol(cols, ["name", "church_name", "title"]);
+    const websiteCol = pickCol(cols, ["website", "website_url", "url"]);
+    const createdCol = pickCol(cols, ["created_at", "createdAt", "created"]);
+    const updatedCol = pickCol(cols, ["updated_at", "updatedAt", "updated"]);
+    const selectCols = [
+      idCol ? `${idCol} AS id` : null,
+      nameCol ? `${nameCol} AS name` : null,
+      websiteCol ? `${websiteCol} AS websiteUrl` : null,
+      createdCol ? `${createdCol} AS createdAt` : null,
+      updatedCol ? `${updatedCol} AS updatedAt` : null,
+    ]
+      .filter(Boolean)
+      .join(", ");
+    const where = idCol ? `WHERE ${idCol}=?1` : "";
+    const rows = selectCols
+      ? await d1All(env, `SELECT ${selectCols} FROM churches ${where} LIMIT 1`, idCol ? [churchId] : [])
+      : [];
+    const lines: string[] = [];
+    for (const r of rows as any[]) {
+      const s = `${idBase}/church/${encodeURIComponent(String(r.id))}`;
+      const parts: string[] = [`${ttlIri(s)} a cc:Church ; cc:name ${ttlLitString(r.name ?? "")}`];
+      if (String(r.websiteUrl ?? "").trim()) parts.push(`; ccprov:sourceUrl ${ttlLitString(r.websiteUrl)}`);
+      parts.push(`; prov:generatedAtTime ${ttlLitDateTime(r.updatedAt ?? r.createdAt ?? nowIso())} .`);
+      lines.push(parts.join(" "));
+    }
+    await uploadChunk(lines);
+  }
+
+  // campuses
+  {
+    const cols = await d1TableColumns(env, "campuses");
+    const idCol = pickCol(cols, ["id", "campus_id"]);
+    const churchCol = pickCol(cols, ["church_id", "churchId"]);
+    const nameCol = pickCol(cols, ["name", "campus_name", "title"]);
+    const cityCol = pickCol(cols, ["city"]);
+    const regionCol = pickCol(cols, ["region", "state"]);
+    const createdCol = pickCol(cols, ["created_at", "createdAt"]);
+    const updatedCol = pickCol(cols, ["updated_at", "updatedAt"]);
+
+    const selectCols = [
+      idCol ? `${idCol} AS id` : null,
+      nameCol ? `${nameCol} AS name` : null,
+      cityCol ? `${cityCol} AS city` : null,
+      regionCol ? `${regionCol} AS region` : null,
+      createdCol ? `${createdCol} AS createdAt` : null,
+      updatedCol ? `${updatedCol} AS updatedAt` : null,
+    ]
+      .filter(Boolean)
+      .join(", ");
+
+    if (selectCols && idCol) {
+      for (let offset = 0; ; offset += batch) {
+        const where = churchCol ? `WHERE ${churchCol}=?1` : "";
+        const sql = `SELECT ${selectCols} FROM campuses ${where} ORDER BY ${idCol} LIMIT ?2 OFFSET ?3`;
+        const binds = churchCol ? [churchId, batch, offset] : [batch, offset];
+        const rows = await d1All(env, sql, binds as any[]);
+        if (!rows.length) break;
+        const lines: string[] = [];
+        for (const r of rows as any[]) {
+          const s = `${idBase}/campus/${encodeURIComponent(String(r.id))}`;
+          const church = `${idBase}/church/${encodeURIComponent(churchId)}`;
+          const parts: string[] = [
+            `${ttlIri(s)} a cc:Resource ; cc:name ${ttlLitString(r.name ?? "")} ; cc:inChurch ${ttlIri(church)}`,
+          ];
+          if (r.city) parts.push(`; cc:city ${ttlLitString(r.city)}`);
+          if (r.region) parts.push(`; cc:region ${ttlLitString(r.region)}`);
+          parts.push(`; prov:generatedAtTime ${ttlLitDateTime(r.updatedAt ?? r.createdAt ?? nowIso())} .`);
+          lines.push(parts.join(" "));
+        }
+        await uploadChunk(lines);
+        if (rows.length < batch) break;
+      }
+    }
+  }
+
+  // people
+  {
+    const cols = await d1TableColumns(env, "people");
+    const idCol = pickCol(cols, ["id", "person_id"]);
+    const churchCol = pickCol(cols, ["church_id", "churchId"]);
+    const firstCol = pickCol(cols, ["first_name", "firstName"]);
+    const lastCol = pickCol(cols, ["last_name", "lastName"]);
+    const emailCol = pickCol(cols, ["email"]);
+    const phoneCol = pickCol(cols, ["phone"]);
+    const createdCol = pickCol(cols, ["created_at", "createdAt"]);
+    const updatedCol = pickCol(cols, ["updated_at", "updatedAt"]);
+
+    const selectCols = [
+      idCol ? `${idCol} AS id` : null,
+      firstCol ? `${firstCol} AS firstName` : null,
+      lastCol ? `${lastCol} AS lastName` : null,
+      emailCol ? `${emailCol} AS email` : null,
+      phoneCol ? `${phoneCol} AS phone` : null,
+      createdCol ? `${createdCol} AS createdAt` : null,
+      updatedCol ? `${updatedCol} AS updatedAt` : null,
+    ]
+      .filter(Boolean)
+      .join(", ");
+
+    if (selectCols && idCol) {
+      for (let offset = 0; ; offset += batch) {
+        const where = churchCol ? `WHERE ${churchCol}=?1` : "";
+        const sql = `SELECT ${selectCols} FROM people ${where} ORDER BY ${idCol} LIMIT ?2 OFFSET ?3`;
+        const binds = churchCol ? [churchId, batch, offset] : [batch, offset];
+        const rows = await d1All(env, sql, binds as any[]);
+        if (!rows.length) break;
+        const lines: string[] = [];
+        for (const r of rows as any[]) {
+          const s = `${idBase}/person/${encodeURIComponent(String(r.id))}`;
+          const name = [r.firstName, r.lastName].filter(Boolean).join(" ").trim() || String(r.id);
+          const parts: string[] = [`${ttlIri(s)} a cc:Person ; cc:name ${ttlLitString(name)}`];
+          if (r.email) parts.push(`; cc:email ${ttlLitString(r.email)}`);
+          if (r.phone) parts.push(`; cc:phone ${ttlLitString(r.phone)}`);
+          parts.push(`; prov:generatedAtTime ${ttlLitDateTime(r.updatedAt ?? r.createdAt ?? nowIso())} .`);
+          lines.push(parts.join(" "));
+        }
+        await uploadChunk(lines);
+        if (rows.length < batch) break;
+      }
+    }
+  }
+
+  // groups
+  {
+    const cols = await d1TableColumns(env, "groups");
+    const idCol = pickCol(cols, ["id", "group_id"]);
+    const churchCol = pickCol(cols, ["church_id", "churchId"]);
+    const nameCol = pickCol(cols, ["name", "group_name", "title"]);
+    const descCol = pickCol(cols, ["description", "notes"]);
+    const createdCol = pickCol(cols, ["created_at", "createdAt"]);
+    const updatedCol = pickCol(cols, ["updated_at", "updatedAt"]);
+
+    const selectCols = [
+      idCol ? `${idCol} AS id` : null,
+      nameCol ? `${nameCol} AS name` : null,
+      descCol ? `${descCol} AS description` : null,
+      createdCol ? `${createdCol} AS createdAt` : null,
+      updatedCol ? `${updatedCol} AS updatedAt` : null,
+    ]
+      .filter(Boolean)
+      .join(", ");
+
+    if (selectCols && idCol) {
+      for (let offset = 0; ; offset += batch) {
+        const where = churchCol ? `WHERE ${churchCol}=?1` : "";
+        const sql = `SELECT ${selectCols} FROM groups ${where} ORDER BY ${idCol} LIMIT ?2 OFFSET ?3`;
+        const binds = churchCol ? [churchId, batch, offset] : [batch, offset];
+        const rows = await d1All(env, sql, binds as any[]);
+        if (!rows.length) break;
+        const lines: string[] = [];
+        for (const r of rows as any[]) {
+          const s = `${idBase}/group/${encodeURIComponent(String(r.id))}`;
+          const parts: string[] = [`${ttlIri(s)} a cccomm:SmallGroup ; cc:name ${ttlLitString(r.name ?? "")}`];
+          if (r.description) parts.push(`; cc:description ${ttlLitString(r.description)}`);
+          parts.push(`; prov:generatedAtTime ${ttlLitDateTime(r.updatedAt ?? r.createdAt ?? nowIso())} .`);
+          lines.push(parts.join(" "));
+        }
+        await uploadChunk(lines);
+        if (rows.length < batch) break;
+      }
+    }
+  }
+
+  // group memberships -> situation
+  for (let offset = 0; ; offset += batch) {
+    const rows = await d1All(
+      env,
+      `SELECT group_id AS groupId, person_id AS personId, role, status
+       FROM group_memberships WHERE church_id=?1 ORDER BY group_id, person_id LIMIT ?2 OFFSET ?3`,
+      [churchId, batch, offset],
+    );
+    if (!rows.length) break;
+    const lines: string[] = [];
+    for (const r of rows as any[]) {
+      const sid = `${idBase}/situation/group_membership/${encodeURIComponent(String(r.groupId))}:${encodeURIComponent(String(r.personId))}`;
+      const person = `${idBase}/person/${encodeURIComponent(String(r.personId))}`;
+      const group = `${idBase}/group/${encodeURIComponent(String(r.groupId))}`;
+      const parts: string[] = [
+        `${ttlIri(sid)} a cccomm:GroupMembershipSituation ; cccomm:membershipPerson ${ttlIri(person)} ; cccomm:membershipGroup ${ttlIri(group)}`,
+      ];
+      if (r.status) parts.push(`; cccomm:membershipStatus ${ttlLitString(r.status)}`);
+      if (r.role) parts.push(`; cc:roleName ${ttlLitString(r.role)}`);
+      parts.push(`; ccsit:validFrom ${ttlLitDateTime(r.createdAt ?? nowIso())} ; prov:generatedAtTime ${ttlLitDateTime(r.updatedAt ?? r.createdAt ?? nowIso())} .`);
+      lines.push(parts.join(" "));
+    }
+    await uploadChunk(lines);
+    if (rows.length < batch) break;
+  }
+
+  // journey graph
+  {
+    const cols = await d1TableColumns(env, "journey_node");
+    const idCol = pickCol(cols, ["id", "node_id"]);
+    const churchCol = pickCol(cols, ["church_id", "churchId"]);
+    const typeCol = pickCol(cols, ["type", "node_type"]);
+    const titleCol = pickCol(cols, ["title", "name"]);
+    const summaryCol = pickCol(cols, ["summary", "description"]);
+    const stageOrderCol = pickCol(cols, ["stage_order", "stageOrder", "sort_order"]);
+    const accessCol = pickCol(cols, ["access_level", "accessLevel"]);
+    const createdCol = pickCol(cols, ["created_at", "createdAt"]);
+    const updatedCol = pickCol(cols, ["updated_at", "updatedAt"]);
+
+    const selectCols = [
+      idCol ? `${idCol} AS id` : null,
+      typeCol ? `${typeCol} AS type` : null,
+      titleCol ? `${titleCol} AS title` : null,
+      summaryCol ? `${summaryCol} AS summary` : null,
+      stageOrderCol ? `${stageOrderCol} AS stageOrder` : null,
+      accessCol ? `${accessCol} AS accessLevel` : null,
+      createdCol ? `${createdCol} AS createdAt` : null,
+      updatedCol ? `${updatedCol} AS updatedAt` : null,
+    ]
+      .filter(Boolean)
+      .join(", ");
+
+    if (selectCols && idCol) {
+      for (let offset = 0; ; offset += batch) {
+        const where = churchCol ? `WHERE ${churchCol}=?1` : "";
+        const sql = `SELECT ${selectCols} FROM journey_node ${where} ORDER BY ${idCol} LIMIT ?2 OFFSET ?3`;
+        const binds = churchCol ? [churchId, batch, offset] : [batch, offset];
+        const rows = await d1All(env, sql, binds as any[]);
+        if (!rows.length) break;
+        const lines: string[] = [];
+        for (const r of rows as any[]) {
+          const s = `${idBase}/journey/node/${encodeURIComponent(String(r.id))}`;
+          const parts: string[] = [`${ttlIri(s)} a cc:Resource ; cc:name ${ttlLitString(r.title ?? "")}`];
+          if (r.type) parts.push(`; cc:nodeType ${ttlLitString(r.type)}`);
+          if (r.summary) parts.push(`; cc:summary ${ttlLitString(r.summary)}`);
+          if (typeof r.stageOrder === "number") parts.push(`; cc:stageOrder ${String(r.stageOrder)}`);
+          if (r.accessLevel) parts.push(`; cc:accessLevel ${ttlLitString(r.accessLevel)}`);
+          parts.push(`; prov:generatedAtTime ${ttlLitDateTime(r.updatedAt ?? r.createdAt ?? nowIso())} .`);
+          lines.push(parts.join(" "));
+        }
+        await uploadChunk(lines);
+        if (rows.length < batch) break;
+      }
+    }
+  }
+
+  {
+    const cols = await d1TableColumns(env, "journey_edge");
+    const idCol = pickCol(cols, ["id", "edge_id"]);
+    const churchCol = pickCol(cols, ["church_id", "churchId"]);
+    const typeCol = pickCol(cols, ["type", "edge_type"]);
+    const fromCol = pickCol(cols, ["from_node_id", "fromNodeId", "from_id"]);
+    const toCol = pickCol(cols, ["to_node_id", "toNodeId", "to_id"]);
+    const titleCol = pickCol(cols, ["title", "name"]);
+    const summaryCol = pickCol(cols, ["summary", "description"]);
+    const createdCol = pickCol(cols, ["created_at", "createdAt"]);
+    const updatedCol = pickCol(cols, ["updated_at", "updatedAt"]);
+
+    const selectCols = [
+      idCol ? `${idCol} AS id` : null,
+      typeCol ? `${typeCol} AS type` : null,
+      fromCol ? `${fromCol} AS fromNodeId` : null,
+      toCol ? `${toCol} AS toNodeId` : null,
+      titleCol ? `${titleCol} AS title` : null,
+      summaryCol ? `${summaryCol} AS summary` : null,
+      createdCol ? `${createdCol} AS createdAt` : null,
+      updatedCol ? `${updatedCol} AS updatedAt` : null,
+    ]
+      .filter(Boolean)
+      .join(", ");
+
+    if (selectCols && idCol && fromCol && toCol) {
+      for (let offset = 0; ; offset += batch) {
+        const where = churchCol ? `WHERE ${churchCol}=?1` : "";
+        const sql = `SELECT ${selectCols} FROM journey_edge ${where} ORDER BY ${idCol} LIMIT ?2 OFFSET ?3`;
+        const binds = churchCol ? [churchId, batch, offset] : [batch, offset];
+        const rows = await d1All(env, sql, binds as any[]);
+        if (!rows.length) break;
+        const lines: string[] = [];
+        for (const r of rows as any[]) {
+          const s = `${idBase}/journey/edge/${encodeURIComponent(String(r.id))}`;
+          const from = `${idBase}/journey/node/${encodeURIComponent(String(r.fromNodeId))}`;
+          const to = `${idBase}/journey/node/${encodeURIComponent(String(r.toNodeId))}`;
+          const parts: string[] = [
+            `${ttlIri(s)} a cc:Resource ; cc:edgeType ${ttlLitString(r.type ?? "")} ; cc:fromNode ${ttlIri(from)} ; cc:toNode ${ttlIri(to)}`,
+          ];
+          if (r.title) parts.push(`; cc:name ${ttlLitString(r.title)}`);
+          if (r.summary) parts.push(`; cc:summary ${ttlLitString(r.summary)}`);
+          parts.push(`; prov:generatedAtTime ${ttlLitDateTime(r.updatedAt ?? r.createdAt ?? nowIso())} .`);
+          lines.push(parts.join(" "));
+        }
+        await uploadChunk(lines);
+        if (rows.length < batch) break;
+      }
+    }
+  }
+
+  await auditAppend(env, {
+    churchId,
+    actorUserId: null,
+    action: "graphdb.sync",
+    entityType: "graphdb",
+    entityId: contextIri,
+    payload: { mode: args.mode, uploadedLines: uploaded, batch },
+  });
+
+  return { ok: true, churchId, contextIri, mode: args.mode, uploadedLines: uploaded, batch };
+}
+
 async function upsertBibleReadingWeek(
   env: Env,
   args: {
@@ -4709,6 +5167,19 @@ export default {
       return Response.json(result, { status: 200 });
     }
 
+    // POST /admin/graphdb-sync  body: { mode?: "full"|"append", churchId?: string }
+    if (u.pathname === "/admin/graphdb-sync" && request.method.toUpperCase() === "POST") {
+      try {
+        const body = (await request.json().catch(() => ({}))) as any;
+        const churchId = String(body?.churchId ?? env.CRAWL_CHURCH_ID ?? "calvarybible").trim() || "calvarybible";
+        const mode = String(body?.mode ?? "full").toLowerCase() === "append" ? ("append" as const) : ("full" as const);
+        const result = await syncGraphDbFromD1(env, { churchId, mode });
+        return Response.json(result, { status: 200 });
+      } catch (e: any) {
+        return Response.json({ ok: false, error: String(e?.message ?? e ?? "graphdb_sync_failed") }, { status: 500 });
+      }
+    }
+
     if (u.pathname === "/admin/transcribe-message" && request.method.toUpperCase() === "POST") {
       try {
         const now = nowIso();
@@ -4857,6 +5328,10 @@ export default {
     const churchId = (env.CRAWL_CHURCH_ID ?? "calvarybible").trim() || "calvarybible";
     ctx.waitUntil(runScheduledCrawl(env, cron));
     ctx.waitUntil(processAssemblyAiJobs(env, { churchId, limit: 2 }));
+    // Daily GraphDB sync (opt-in via GRAPHDB_SYNC_ENABLED=1)
+    if (String(env.GRAPHDB_SYNC_ENABLED ?? "").trim() === "1" && cron.includes("15 3")) {
+      ctx.waitUntil(syncGraphDbFromD1(env, { churchId, mode: "full" }));
+    }
   },
 };
 
