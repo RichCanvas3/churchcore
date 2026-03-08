@@ -1,6 +1,7 @@
 @prefix cc: <https://ontology.churchcore.ai/cc#> .
 @prefix ccprov: <https://ontology.churchcore.ai/cc/prov#> .
 @prefix prov: <http://www.w3.org/ns/prov#> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
 @prefix owl: <http://www.w3.org/2002/07/owl#> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
@@ -15,15 +16,18 @@
 ccprov:hasSourceEntity a owl:ObjectProperty ;
   rdfs:label "hasSourceEntity" ;
   rdfs:domain cc:Resource ;
-  rdfs:range prov:Entity .
+  rdfs:range prov:Entity ;
+  rdfs:subPropertyOf prov:hadPrimarySource .
 
 ccprov:sourceUrl a owl:DatatypeProperty ;
   rdfs:label "sourceUrl" ;
   rdfs:domain cc:Resource ;
-  rdfs:range xsd:anyURI .
+  rdfs:range xsd:anyURI ;
+  rdfs:subPropertyOf dcterms:source .
 
 ccprov:extractedAtTime a owl:DatatypeProperty ;
   rdfs:label "extractedAtTime" ;
   rdfs:domain cc:Resource ;
-  rdfs:range xsd:dateTime .
+  rdfs:range xsd:dateTime ;
+  rdfs:subPropertyOf prov:generatedAtTime .
 

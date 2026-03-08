@@ -10,10 +10,12 @@ const required = [
   'ontology/churchcore-upper-core.ttl',
   'ontology/churchcore-upper-planning.ttl',
   'ontology/churchcore-upper-provenance.ttl',
+  'ontology/churchcore-upper-classifications.ttl',
   'ontology/churchcore-upper-situations.ttl',
   'ontology/churchcore-upper-community.ttl',
   'ontology/churchcore-upper-bible.ttl',
   'ontology/churchcore-upper-discipleship.ttl',
+  'ontology/churchcore-upper-commerce.ttl',
   'ontology/churchcore-all.ttl',
 ];
 

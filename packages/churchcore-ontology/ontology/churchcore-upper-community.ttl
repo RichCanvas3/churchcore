@@ -1,5 +1,7 @@
 @prefix cc: <https://ontology.churchcore.ai/cc#> .
 @prefix cccomm: <https://ontology.churchcore.ai/cc/community#> .
+@prefix ccsit: <https://ontology.churchcore.ai/cc/situation#> .
+@prefix at: <https://agentictrust.io/ontology/core#> .
 @prefix prov: <http://www.w3.org/ns/prov#> .
 @prefix owl: <http://www.w3.org/2002/07/owl#> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
@@ -10,11 +12,14 @@
   rdfs:label "ChurchCore Upper Ontology (community)" ;
   rdfs:comment "Community layer for groups, membership, and participation (small groups vs broader ministries)." ;
   owl:imports <https://ontology.churchcore.ai/cc> ;
+  owl:imports <https://ontology.churchcore.ai/cc/situation> ;
+  owl:imports <https://agentictrust.io/ontology/core/trust> ;
   owl:imports <http://www.w3.org/ns/prov-o-20130430> .
 
 cccomm:Group a owl:Class ;
   rdfs:label "Group" ;
-  rdfs:subClassOf cc:Resource .
+  rdfs:comment "A group is modeled as an Organization (Agent) so it can participate in membership situations." ;
+  rdfs:subClassOf cc:Organization .
 
 cccomm:SmallGroup a owl:Class ;
   rdfs:label "SmallGroup" ;
@@ -24,27 +29,44 @@ cccomm:CommunityGroup a owl:Class ;
   rdfs:label "CommunityGroup" ;
   rdfs:subClassOf cccomm:Group .
 
-cccomm:Membership a owl:Class ;
-  rdfs:label "Membership" ;
-  rdfs:subClassOf prov:Association .
+cccomm:GroupMembershipSituation a owl:Class ;
+  rdfs:label "GroupMembershipSituation" ;
+  rdfs:comment "Reified membership context (DnS-style). Use qualifiedSituationParticipation to state who participates and in what role." ;
+  rdfs:subClassOf ccsit:MembershipSituation .
 
-cccomm:member a owl:ObjectProperty ;
-  rdfs:label "member" ;
-  rdfs:domain cccomm:Membership ;
-  rdfs:range cc:Person .
+cccomm:MemberRole a owl:Class ;
+  rdfs:label "MemberRole" ;
+  rdfs:subClassOf at:Role .
 
-cccomm:inGroup a owl:ObjectProperty ;
-  rdfs:label "inGroup" ;
-  rdfs:domain cccomm:Membership ;
-  rdfs:range cccomm:Group .
+cccomm:HostRole a owl:Class ;
+  rdfs:label "HostRole" ;
+  rdfs:subClassOf at:Role .
 
-cccomm:membershipRole a owl:DatatypeProperty ;
-  rdfs:label "membershipRole" ;
-  rdfs:domain cccomm:Membership ;
-  rdfs:range xsd:string .
+cccomm:LeaderRole a owl:Class ;
+  rdfs:label "LeaderRole" ;
+  rdfs:subClassOf at:Role .
+
+cccomm:StaffRole a owl:Class ;
+  rdfs:label "StaffRole" ;
+  rdfs:subClassOf at:Role .
+
+cccomm:membershipPerson a owl:ObjectProperty ;
+  rdfs:label "membershipPerson" ;
+  rdfs:comment "Convenience link to the person this membership is about." ;
+  rdfs:domain cccomm:GroupMembershipSituation ;
+  rdfs:range cc:Person ;
+  rdfs:subPropertyOf at:isAboutAgent .
+
+cccomm:membershipGroup a owl:ObjectProperty ;
+  rdfs:label "membershipGroup" ;
+  rdfs:comment "Convenience link to the group this membership is about." ;
+  rdfs:domain cccomm:GroupMembershipSituation ;
+  rdfs:range cccomm:Group ;
+  rdfs:subPropertyOf at:isAboutAgent .
 
 cccomm:membershipStatus a owl:DatatypeProperty ;
   rdfs:label "membershipStatus" ;
-  rdfs:domain cccomm:Membership ;
+  rdfs:comment "Implementation-friendly status string (e.g. active, invited, inactive). Prefer role-qualified participation for semantics." ;
+  rdfs:domain cccomm:GroupMembershipSituation ;
   rdfs:range xsd:string .
 

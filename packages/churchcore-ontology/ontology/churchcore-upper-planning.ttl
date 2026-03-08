@@ -1,5 +1,6 @@
 @prefix cc: <https://ontology.churchcore.ai/cc#> .
 @prefix ccplan: <https://ontology.churchcore.ai/cc/plan#> .
+@prefix ep-plan: <https://w3id.org/ep-plan#> .
 @prefix prov: <http://www.w3.org/ns/prov#> .
 @prefix p-plan: <http://purl.org/net/p-plan#> .
 @prefix owl: <http://www.w3.org/2002/07/owl#> .
@@ -11,19 +12,22 @@
   rdfs:label "ChurchCore Upper Ontology (planning)" ;
   rdfs:comment "Planning layer aligned to EP-PLAN concepts used in RichCanvas principles (as-planned flows)." ;
   owl:imports <https://ontology.churchcore.ai/cc> ;
+  owl:imports <https://w3id.org/ep-plan> ;
   owl:imports <http://purl.org/net/p-plan> .
 
 ccplan:Plan a owl:Class ;
   rdfs:label "Plan" ;
-  rdfs:subClassOf p-plan:Plan .
+  rdfs:subClassOf p-plan:Plan, ep-plan:Plan .
 
 ccplan:Step a owl:Class ;
   rdfs:label "Step" ;
-  rdfs:subClassOf p-plan:Step .
+  rdfs:comment "Compatibility alias for cc:ActivityRole (planned step/specification)." ;
+  owl:equivalentClass cc:ActivityRole ;
+  rdfs:subClassOf p-plan:Step, ep-plan:Step .
 
 ccplan:Variable a owl:Class ;
   rdfs:label "Variable" ;
-  rdfs:subClassOf p-plan:Variable .
+  rdfs:subClassOf p-plan:Variable, ep-plan:Variable .
 
 ccplan:hasPlannedStep a owl:ObjectProperty ;
   rdfs:label "hasPlannedStep" ;
@@ -45,5 +49,6 @@ ccplan:scheduledAt a owl:DatatypeProperty ;
 ccplan:correspondsToActivityRole a owl:ObjectProperty ;
   rdfs:label "correspondsToActivityRole" ;
   rdfs:domain ccplan:Step ;
-  rdfs:range cc:ActivityRole .
+  rdfs:range cc:ActivityRole ;
+  owl:deprecated true .
 

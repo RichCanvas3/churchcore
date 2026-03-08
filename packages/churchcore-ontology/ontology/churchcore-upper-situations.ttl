@@ -1,5 +1,6 @@
 @prefix cc: <https://ontology.churchcore.ai/cc#> .
 @prefix ccsit: <https://ontology.churchcore.ai/cc/situation#> .
+@prefix at: <https://agentictrust.io/ontology/core#> .
 @prefix prov: <http://www.w3.org/ns/prov#> .
 @prefix owl: <http://www.w3.org/2002/07/owl#> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
@@ -8,36 +9,31 @@
 <https://ontology.churchcore.ai/cc/situation>
   a owl:Ontology ;
   rdfs:label "ChurchCore Upper Ontology (situations)" ;
-  rdfs:comment "Situation/membership modeling layer (RichCanvas: model 'being in' a context distinctly from events)." ;
+  rdfs:comment "Situation/membership modeling layer (RichCanvas: model 'being in' a context distinctly from events). Reuses AgenticTrust DnS-style Situation primitives." ;
   owl:imports <https://ontology.churchcore.ai/cc> ;
+  owl:imports <https://agentictrust.io/ontology/core/trust> ;
   owl:imports <http://www.w3.org/ns/prov-o-20130430> .
 
-ccsit:Situation a owl:Class ;
-  rdfs:label "Situation" ;
-  rdfs:subClassOf cc:Resource .
+ccsit:ChurchSituation a owl:Class ;
+  rdfs:label "ChurchSituation" ;
+  rdfs:comment "Church-domain situation (membership, relationship, participation), modeled as a reified context (Entity) not an event." ;
+  rdfs:subClassOf at:Situation .
 
-ccsit:involvesAgent a owl:ObjectProperty ;
-  rdfs:label "involvesAgent" ;
-  rdfs:domain ccsit:Situation ;
-  rdfs:range prov:Agent .
+ccsit:MembershipSituation a owl:Class ;
+  rdfs:label "MembershipSituation" ;
+  rdfs:subClassOf ccsit:ChurchSituation .
 
-ccsit:involvesResource a owl:ObjectProperty ;
-  rdfs:label "involvesResource" ;
-  rdfs:domain ccsit:Situation ;
-  rdfs:range cc:Resource .
-
-ccsit:roleName a owl:DatatypeProperty ;
-  rdfs:label "roleName" ;
-  rdfs:domain ccsit:Situation ;
-  rdfs:range xsd:string .
+ccsit:RelationshipSituation a owl:Class ;
+  rdfs:label "RelationshipSituation" ;
+  rdfs:subClassOf ccsit:ChurchSituation, at:RelationshipSituation .
 
 ccsit:validFrom a owl:DatatypeProperty ;
   rdfs:label "validFrom" ;
-  rdfs:domain ccsit:Situation ;
+  rdfs:domain at:Situation ;
   rdfs:range xsd:dateTime .
 
 ccsit:validTo a owl:DatatypeProperty ;
   rdfs:label "validTo" ;
-  rdfs:domain ccsit:Situation ;
+  rdfs:domain at:Situation ;
   rdfs:range xsd:dateTime .
 
