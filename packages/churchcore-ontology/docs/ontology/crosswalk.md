@@ -35,7 +35,7 @@ It also indicates where concepts belong (T-Box / C-Box / A-Box):
 This is the **shared grammar** used everywhere.
 
 - **T-Box**:
-  - `cc:Activity` (execution) and `cc:ActivityRole` (specification)
+  - `cc:Activity` (execution) and `cc:Step` (specification)
   - `ccsit:*Situation` (reified contexts with optional validity bounds)
   - journey graph vs per-person journey state/events
   - provenance hooks for derived/inferred statements
@@ -71,7 +71,7 @@ This is the **shared grammar** used everywhere.
 ### p-plan / EP-PLAN (specification + correspondence)
 
 - **Steps / variables**: reusable *roles/specifications* for how activities are done.
-- **Correspondence**: connect an executed `cc:Activity` to its `cc:ActivityRole`.
+- **Correspondence**: connect an executed `cc:Activity` to its `cc:Step`.
 
 ### AgenticTrust (situations/roles/participation)
 

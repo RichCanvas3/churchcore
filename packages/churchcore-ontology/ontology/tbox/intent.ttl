@@ -60,11 +60,11 @@ ccintent:aboutSituation a owl:ObjectProperty ;
   rdfs:domain ccintent:Intent ;
   rdfs:range ccsit:ChurchSituation .
 
-ccintent:relatesToActivityRole a owl:ObjectProperty ;
-  rdfs:label "relatesToActivityRole" ;
-  rdfs:comment "Links an intent to an ActivityRole (specification-side: the way things are done)." ;
+ccintent:relatesToStep a owl:ObjectProperty ;
+  rdfs:label "relatesToStep" ;
+  rdfs:comment "Links an intent to a Step (specification-side: the way things are done)." ;
   rdfs:domain ccintent:Intent ;
-  rdfs:range cc:ActivityRole .
+  rdfs:range cc:Step .
 
 ccintent:relatesToActivity a owl:ObjectProperty ;
   rdfs:label "relatesToActivity" ;

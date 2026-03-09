@@ -7,7 +7,7 @@
 <https://ontology.churchcore.ai/cc/state/tbox>
   a owl:Ontology ;
   rdfs:label "ChurchCore T-Box (state)" ;
-  rdfs:comment "State-based behavioristics primitives: time-varying concepts, manifestations, and state categories. Designed to pair with ActivityRole vs Activity and with Effect/Enablement situations." ;
+  rdfs:comment "State-based behavioristics primitives: time-varying concepts, manifestations, and state categories. Designed to pair with Step vs Activity and with Effect/Enablement situations." ;
   owl:imports <https://ontology.churchcore.ai/cc> ;
   owl:imports <http://www.w3.org/ns/prov-o-20130430> .
 

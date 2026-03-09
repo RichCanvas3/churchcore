@@ -9,7 +9,7 @@ Sources:
 
 RichCanvas-style separation:
 
-- **Specification / template**: `cc:ActivityRole` (a Step in a plan)
+- **Specification / template**: `cc:Step` (a Step in a plan)
 - **Execution / occurrence**: `cc:Activity` (a PROV Activity)
 
 This is the backbone for “plans vs actuals”, and for connecting church processes to outcomes.
@@ -33,7 +33,7 @@ class cc_Church["cc:Church"]
 class cc_Campus["cc:Campus"]
 class cc_Resource["cc:Resource"]
 class cc_Activity["cc:Activity"]
-class cc_ActivityRole["cc:ActivityRole"]
+class cc_Step["cc:Step"]
 
 prov_Person <|-- cc_Person
 prov_Organization <|-- cc_Organization
@@ -41,8 +41,8 @@ cc_Organization <|-- cc_Church
 cc_Organization <|-- cc_Campus
 prov_Entity <|-- cc_Resource
 prov_Activity <|-- cc_Activity
-pplan_Step <|-- cc_ActivityRole
-epplan_Step <|-- cc_ActivityRole
+pplan_Step <|-- cc_Step
+epplan_Step <|-- cc_Step
 ```
 
 ## Core relationships
@@ -52,9 +52,9 @@ classDiagram
 direction LR
 
 class cc_Activity["cc:Activity"]
-class cc_ActivityRole["cc:ActivityRole"]
+class cc_Step["cc:Step"]
 
-cc_Activity --> cc_ActivityRole : correspondsToRole
+cc_Activity --> cc_Step : correspondsToStep
 ```
 
 ## Data-facing properties (currently used by sync/export)

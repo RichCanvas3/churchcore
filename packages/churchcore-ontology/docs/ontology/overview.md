@@ -50,7 +50,7 @@ See `crosswalk.md` for a mapping of:
 
 ChurchCore uses a strict separation between:
 
-- **Specification**: `cc:ActivityRole` (a *step-type* / “the way things are done”)
+- **Specification**: `cc:Step` (a step-type / “the way things are done”)
 - **Execution**: `cc:Activity` (a PROV activity occurrence)
 
 Relationship:
@@ -60,9 +60,9 @@ classDiagram
 direction LR
 
 class cc_Activity["cc:Activity"]
-class cc_ActivityRole["cc:ActivityRole"]
+class cc_Step["cc:Step"]
 
-cc_Activity --> cc_ActivityRole : correspondsToRole
+cc_Activity --> cc_Step : correspondsToStep
 ```
 
 ### 2) Situations for “being in” a context (not events)

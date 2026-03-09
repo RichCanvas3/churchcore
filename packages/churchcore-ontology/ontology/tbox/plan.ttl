@@ -20,8 +20,8 @@ ccplan:Plan a owl:Class ;
 
 ccplan:Step a owl:Class ;
   rdfs:label "Step" ;
-  rdfs:comment "Compatibility alias for cc:ActivityRole (planned step/specification)." ;
-  owl:equivalentClass cc:ActivityRole ;
+  rdfs:comment "Alias for the ChurchCore specification-side Step." ;
+  owl:equivalentClass cc:Step ;
   rdfs:subClassOf p-plan:Step, ep-plan:Step .
 
 ccplan:Variable a owl:Class ;
@@ -44,10 +44,4 @@ ccplan:scheduledAt a owl:DatatypeProperty ;
   rdfs:label "scheduledAt" ;
   rdfs:domain ccplan:Step ;
   rdfs:range xsd:dateTime .
-
-ccplan:correspondsToActivityRole a owl:ObjectProperty ;
-  rdfs:label "correspondsToActivityRole" ;
-  rdfs:domain ccplan:Step ;
-  rdfs:range cc:ActivityRole ;
-  owl:deprecated true .
 

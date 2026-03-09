@@ -14,7 +14,7 @@ The upper ontology provides the shared grammar aligned to:
 
 Key modules:
 
-- `cc` (core: people/orgs/resources/activities + ActivityRole)
+- `cc` (core: people/orgs/resources/activities + Step)
 - `cc/situation` (situation family + spec/occ split)
 - `cc/state` (time-varying concepts + manifestations + state categories)
 - `cc/process` (ProcessRole vs Process)

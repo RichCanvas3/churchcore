@@ -40,13 +40,13 @@ direction LR
 class ccintent_Intent["ccintent:Intent"]
 class prov_Agent["prov:Agent"]
 class ccsit_ChurchSituation["ccsit:ChurchSituation"]
-class cc_ActivityRole["cc:ActivityRole"]
+class cc_Step["cc:Step"]
 class prov_Activity["prov:Activity"]
 class cc_State["cc:State"]
 
 ccintent_Intent --> prov_Agent : aboutAgent
 ccintent_Intent --> ccsit_ChurchSituation : aboutSituation
-ccintent_Intent --> cc_ActivityRole : relatesToActivityRole
+ccintent_Intent --> cc_Step : relatesToStep
 ccintent_Intent --> prov_Activity : relatesToActivity
 ccintent_Intent --> cc_State : targetsState
 ```

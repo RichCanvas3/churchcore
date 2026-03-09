@@ -8,7 +8,7 @@ Sources:
 ChurchCore aligns:
 
 - `ccplan:Plan` with `p-plan:Plan` and `ep-plan:Plan`
-- `cc:ActivityRole` with `p-plan:Step` and `ep-plan:Step`
+- `cc:Step` with `p-plan:Step` and `ep-plan:Step`
 - `cc:Activity` with `prov:Activity` and `ep-plan:Activity`
 
 ## Diagram: plan/execution correspondence
@@ -19,12 +19,12 @@ direction LR
 
 class pplan_Plan["p-plan:Plan"]
 class ccplan_Plan["ccplan:Plan"]
-class cc_ActivityRole["cc:ActivityRole"]
+class cc_Step["cc:Step"]
 class cc_Activity["cc:Activity"]
 
 pplan_Plan <|-- ccplan_Plan
-ccplan_Plan --> cc_ActivityRole : hasPlannedStep
-cc_Activity --> cc_ActivityRole : correspondsToRole
+ccplan_Plan --> cc_Step : hasPlannedStep
+cc_Activity --> cc_Step : correspondsToStep
 ```
 
 ## Practical query idea
@@ -41,7 +41,7 @@ Then query “what’s missing” by finding planned steps with no corresponding
 
 The website’s “ProcessRole vs Process” framing is modeled explicitly in `cc/process`:
 
-- **ProcessRole**: a plan-level bundle of steps (`cc:ActivityRole`) and state categories (preconditions/effects)
+- **ProcessRole**: a plan-level bundle of steps (`cc:Step`) and state categories (preconditions/effects)
 - **Process**: an execution-level bundle of activities and entities (including `cc:Manifestation`)
 
 See `process.md` for diagrams and query patterns.

@@ -50,16 +50,16 @@ cc:Activity a owl:Class ;
 ### “Way things are done” vs “Doing of things”
 ### (separate specification/template from operational execution)
 
-cc:ActivityRole a owl:Class ;
-  rdfs:label "ActivityRole" ;
-  rdfs:comment "Specification of a type of activity (the way things are done), distinct from an executed Activity occurrence." ;
+cc:Step a owl:Class ;
+  rdfs:label "Step" ;
+  rdfs:comment "Specification-side step-type (the way things are done), distinct from an executed Activity occurrence." ;
   rdfs:subClassOf p-plan:Step, ep-plan:Step .
 
-cc:correspondsToRole a owl:ObjectProperty ;
-  rdfs:label "correspondsToRole" ;
+cc:correspondsToStep a owl:ObjectProperty ;
+  rdfs:label "correspondsToStep" ;
   rdfs:domain cc:Activity ;
-  rdfs:range cc:ActivityRole ;
-  rdfs:comment "Links an executed Activity to its ActivityRole (specification)." ;
+  rdfs:range cc:Step ;
+  rdfs:comment "Links an executed Activity to its specification-side Step." ;
   rdfs:subPropertyOf ep-plan:correspondsToStep .
 
 ### Common descriptive properties

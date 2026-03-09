@@ -14,7 +14,7 @@ ChurchCore adds a church-domain upper ontology on top of:
 
 - `overview.md`: design patterns + layering + query patterns
 - `crosswalk.md`: website → repo mapping (concept → package → T/C box → overlap model)
-- `core.md`: core classes + “specification vs execution” (ActivityRole)
+- `core.md`: core classes + “specification vs execution” (Step vs Activity)
 - `situations.md`: ChurchSituation / MembershipSituation / RelationshipSituation
 - `state.md`: TimeVaryingConcept / Manifestation / State (terminal vs non-terminal)
 - `process.md`: ProcessRole / Process (plan bundles vs execution bundles)

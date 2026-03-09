@@ -9,7 +9,7 @@
 <https://ontology.churchcore.ai/cc/process/tbox>
   a owl:Ontology ;
   rdfs:label "ChurchCore T-Box (process)" ;
-  rdfs:comment "ProcessRole (specification) vs Process (execution) vocabulary aligned to p-plan and PROV-O, and designed to compose with ActivityRole/Activity and State/Manifestation." ;
+  rdfs:comment "ProcessRole (specification) vs Process (execution) vocabulary aligned to p-plan and PROV-O, and designed to compose with Step/Activity and State/Manifestation." ;
   owl:imports <https://ontology.churchcore.ai/cc> ;
   owl:imports <https://ontology.churchcore.ai/cc/plan/tbox> ;
   owl:imports <https://ontology.churchcore.ai/cc/state/tbox> ;
@@ -18,7 +18,7 @@
 
 ccproc:ProcessRole a owl:Class ;
   rdfs:label "ProcessRole" ;
-  rdfs:comment "Specification of a process: a plan that bundles ActivityRoles (steps) and relevant State categories (preconditions/effects)." ;
+  rdfs:comment "Specification of a process: a plan that bundles Steps and relevant State categories (preconditions/effects)." ;
   rdfs:subClassOf ccplan:Plan .
 
 ccproc:Process a owl:Class ;
@@ -32,11 +32,11 @@ ccproc:correspondsToProcessRole a owl:ObjectProperty ;
   rdfs:domain ccproc:Process ;
   rdfs:range ccproc:ProcessRole .
 
-ccproc:hasActivityRole a owl:ObjectProperty ;
-  rdfs:label "hasActivityRole" ;
-  rdfs:comment "Convenience: links a ProcessRole to a member ActivityRole (step-type). Equivalent information can be expressed using p-plan:hasStep." ;
+ccproc:hasStep a owl:ObjectProperty ;
+  rdfs:label "hasStep" ;
+  rdfs:comment "Convenience: links a ProcessRole to a member Step (specification-side step-type). Equivalent information can be expressed using p-plan:hasStep." ;
   rdfs:domain ccproc:ProcessRole ;
-  rdfs:range cc:ActivityRole ;
+  rdfs:range cc:Step ;
   rdfs:subPropertyOf p-plan:hasStep .
 
 ccproc:hasRequiredState a owl:ObjectProperty ;
@@ -62,58 +62,3 @@ ccproc:hasManifestation a owl:ObjectProperty ;
   rdfs:comment "Convenience: links a Process bundle to an included Manifestation snapshot." ;
   rdfs:domain ccproc:Process ;
   rdfs:range cc:Manifestation .
-
-@prefix cc: <https://ontology.churchcore.ai/cc#> .
-@prefix ccplan: <https://ontology.churchcore.ai/cc/plan#> .
-@prefix ccproc: <https://ontology.churchcore.ai/cc/process#> .
-@prefix prov: <http://www.w3.org/ns/prov#> .
-@prefix owl: <http://www.w3.org/2002/07/owl#> .
-@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
-
-<https://ontology.churchcore.ai/cc/process/tbox>
-  a owl:Ontology ;
-  rdfs:label "ChurchCore T-Box (process)" ;
-  rdfs:comment "ProcessRole (specification) vs Process (execution) vocabulary that composes ActivityRole/Activity with State/Manifestation, aligned to p-plan/EP-PLAN and PROV-O." ;
-  owl:imports <https://ontology.churchcore.ai/cc> ;
-  owl:imports <https://ontology.churchcore.ai/cc/plan/tbox> ;
-  owl:imports <https://ontology.churchcore.ai/cc/state/tbox> ;
-  owl:imports <http://www.w3.org/ns/prov-o-20130430> .
-
-ccproc:ProcessRole a owl:Class ;
-  rdfs:label "ProcessRole" ;
-  rdfs:comment "Specification of a process: a structured collection of ActivityRoles (steps) and States (preconditions/effects), distinct from any particular execution." ;
-  rdfs:subClassOf ccplan:Plan .
-
-ccproc:Process a owl:Class ;
-  rdfs:label "Process" ;
-  rdfs:comment "Execution of a process: a structured collection of Activities and Manifestations, typically corresponding to a ProcessRole." ;
-  rdfs:subClassOf prov:Bundle .
-
-ccproc:correspondsToProcessRole a owl:ObjectProperty ;
-  rdfs:label "correspondsToProcessRole" ;
-  rdfs:comment "Links a Process execution bundle to the ProcessRole (specification) it realizes." ;
-  rdfs:domain ccproc:Process ;
-  rdfs:range ccproc:ProcessRole .
-
-ccproc:hasActivity a owl:ObjectProperty ;
-  rdfs:label "hasActivity" ;
-  rdfs:domain ccproc:Process ;
-  rdfs:range prov:Activity .
-
-ccproc:hasManifestation a owl:ObjectProperty ;
-  rdfs:label "hasManifestation" ;
-  rdfs:domain ccproc:Process ;
-  rdfs:range cc:Manifestation .
-
-ccproc:hasActivityRole a owl:ObjectProperty ;
-  rdfs:label "hasActivityRole" ;
-  rdfs:domain ccproc:ProcessRole ;
-  rdfs:range cc:ActivityRole ;
-  rdfs:comment "Associates a ProcessRole with the ActivityRole step-types it contains." .
-
-ccproc:hasPlannedState a owl:ObjectProperty ;
-  rdfs:label "hasPlannedState" ;
-  rdfs:domain ccproc:ProcessRole ;
-  rdfs:range cc:State ;
-  rdfs:comment "Associates a ProcessRole with state categories it uses (e.g. as preconditions/effects)." .
-
