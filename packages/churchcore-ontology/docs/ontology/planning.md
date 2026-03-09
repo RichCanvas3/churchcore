@@ -23,8 +23,8 @@ class cc_ActivityRole["cc:ActivityRole"]
 class cc_Activity["cc:Activity"]
 
 pplan_Plan <|-- ccplan_Plan
-ccplan_Plan --> cc_ActivityRole : ccplan:hasPlannedStep
-cc_Activity --> cc_ActivityRole : cc:correspondsToRole
+ccplan_Plan --> cc_ActivityRole : hasPlannedStep
+cc_Activity --> cc_ActivityRole : correspondsToRole
 ```
 
 ## Practical query idea

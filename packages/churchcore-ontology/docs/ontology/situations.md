@@ -63,8 +63,8 @@ classDiagram
 direction LR
 
 class at_Situation["at:Situation"]
-at_Situation --> "0..1" xsd_dateTime["xsd:dateTime"] : ccsit:validFrom
-at_Situation --> "0..1" xsd_dateTime2["xsd:dateTime"] : ccsit:validTo
+at_Situation --> "0..1" xsd_dateTime["xsd:dateTime"] : validFrom
+at_Situation --> "0..1" xsd_dateTime2["xsd:dateTime"] : validTo
 ```
 
 ## Core link patterns (occurrence)
@@ -80,16 +80,16 @@ class prov_Agent["prov:Agent"]
 class prov_Activity["prov:Activity"]
 class prov_Entity["prov:Entity"]
 
-ccsit_ParticipationSituation --> prov_Agent : ccsit:participationAgent
-ccsit_ParticipationSituation --> prov_Activity : ccsit:participationActivity
+ccsit_ParticipationSituation --> prov_Agent : participationAgent
+ccsit_ParticipationSituation --> prov_Activity : participationActivity
 
 class ccsit_EffectSituation["ccsit:EffectSituation"]
-ccsit_EffectSituation --> prov_Activity : ccsit:effectActivity
-ccsit_EffectSituation --> prov_Entity : ccsit:effectEntity
+ccsit_EffectSituation --> prov_Activity : effectActivity
+ccsit_EffectSituation --> prov_Entity : effectEntity
 
 class ccsit_EnablementSituation["ccsit:EnablementSituation"]
-ccsit_EnablementSituation --> prov_Entity : ccsit:enablingEntity
-ccsit_EnablementSituation --> prov_Activity : ccsit:enabledActivity
+ccsit_EnablementSituation --> prov_Entity : enablingEntity
+ccsit_EnablementSituation --> prov_Activity : enabledActivity
 ```
 
 ## SPARQL: list all situations + bounds

@@ -20,7 +20,7 @@ direction LR
 class prov_Entity["prov:Entity"]
 class cccong_AudienceSegment["cccong:AudienceSegment"]
 
-prov_Entity --> "0..*" cccong_AudienceSegment : cccong:hasAudienceSegment
+prov_Entity --> "0..*" cccong_AudienceSegment : hasAudienceSegment
 ```
 
 ## SPARQL: list all congregation audience segments

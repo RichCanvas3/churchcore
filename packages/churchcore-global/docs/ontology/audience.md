@@ -19,7 +19,7 @@ direction LR
 class prov_Entity["prov:Entity"]
 class ccglobal_AudienceSegment["ccglobal:AudienceSegment"]
 
-prov_Entity --> "0..*" ccglobal_AudienceSegment : ccglobal:hasAudienceSegment
+prov_Entity --> "0..*" ccglobal_AudienceSegment : hasAudienceSegment
 ```
 
 ## SPARQL: list all global audience segments

@@ -27,10 +27,10 @@ class ccglobal_AssessmentRun["ccglobal:AssessmentRun"]
 class ccglobal_Metric["ccglobal:Metric"]
 class ccglobal_Dimension["ccglobal:Dimension"]
 
-ccglobal_Circle --> cc_Organization : ccglobal:memberOrganization
-cc_Organization --> ccglobal_BenchmarkCohort : ccglobal:inCohort
-ccglobal_AssessmentRun --> ccglobal_Metric : ccglobal:producedMetric
-ccglobal_Metric --> ccglobal_Dimension : ccglobal:measuresDimension
+ccglobal_Circle --> cc_Organization : memberOrganization
+cc_Organization --> ccglobal_BenchmarkCohort : inCohort
+ccglobal_AssessmentRun --> ccglobal_Metric : producedMetric
+ccglobal_Metric --> ccglobal_Dimension : measuresDimension
 ```
 
 ## SPARQL: metrics for a church grouped by dimension

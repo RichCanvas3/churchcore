@@ -34,9 +34,9 @@ class cccomm_GroupMembershipSituation["cccomm:GroupMembershipSituation"]
 class cc_Person["cc:Person"]
 class cccomm_Group["cccomm:Group"]
 
-cccomm_GroupMembershipSituation --> cc_Person : cccomm:membershipPerson
-cccomm_GroupMembershipSituation --> cccomm_Group : cccomm:membershipGroup
-cccomm_GroupMembershipSituation --> xsd_string["xsd:string"] : cccomm:membershipStatus
+cccomm_GroupMembershipSituation --> cc_Person : membershipPerson
+cccomm_GroupMembershipSituation --> cccomm_Group : membershipGroup
+cccomm_GroupMembershipSituation --> xsd_string["xsd:string"] : membershipStatus
 ```
 
 ## SPARQL: one row per person with groups (aggregated)

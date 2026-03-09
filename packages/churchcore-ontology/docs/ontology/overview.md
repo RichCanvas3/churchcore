@@ -62,7 +62,7 @@ direction LR
 class cc_Activity["cc:Activity"]
 class cc_ActivityRole["cc:ActivityRole"]
 
-cc_Activity --> cc_ActivityRole : cc:correspondsToRole
+cc_Activity --> cc_ActivityRole : correspondsToRole
 ```
 
 ### 2) Situations for “being in” a context (not events)

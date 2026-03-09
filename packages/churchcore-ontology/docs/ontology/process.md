@@ -38,14 +38,14 @@ class cc_State["cc:State"]
 class prov_Activity["prov:Activity"]
 class cc_Manifestation["cc:Manifestation"]
 
-ccproc_Process --> ccproc_ProcessRole : ccproc:correspondsToProcessRole
+ccproc_Process --> ccproc_ProcessRole : correspondsToProcessRole
 
-ccproc_ProcessRole --> cc_ActivityRole : ccproc:hasActivityRole
-ccproc_ProcessRole --> cc_State : ccproc:hasRequiredState
-ccproc_ProcessRole --> cc_State : ccproc:hasTargetState
+ccproc_ProcessRole --> cc_ActivityRole : hasActivityRole
+ccproc_ProcessRole --> cc_State : hasRequiredState
+ccproc_ProcessRole --> cc_State : hasTargetState
 
-ccproc_Process --> prov_Activity : ccproc:hasActivity
-ccproc_Process --> cc_Manifestation : ccproc:hasManifestation
+ccproc_Process --> prov_Activity : hasActivity
+ccproc_Process --> cc_Manifestation : hasManifestation
 ```
 
 ## SPARQL: list processes and their roles
@@ -114,17 +114,17 @@ class ccproc_ProcessRole["ccproc:ProcessRole"]
 class cc_ActivityRole["cc:ActivityRole"]
 class cc_State["cc:State"]
 
-ccproc_ProcessRole --> "0..*" cc_ActivityRole : ccproc:hasActivityRole
-ccproc_ProcessRole --> "0..*" cc_State : ccproc:hasRequiredState
-ccproc_ProcessRole --> "0..*" cc_State : ccproc:hasTargetState
+ccproc_ProcessRole --> "0..*" cc_ActivityRole : hasActivityRole
+ccproc_ProcessRole --> "0..*" cc_State : hasRequiredState
+ccproc_ProcessRole --> "0..*" cc_State : hasTargetState
 
 class ccproc_Process["ccproc:Process"]
 class prov_Activity["prov:Activity"]
 class cc_Manifestation["cc:Manifestation"]
 
-ccproc_Process --> "0..1" ccproc_ProcessRole : ccproc:correspondsToProcessRole
-ccproc_Process --> "0..*" prov_Activity : ccproc:hasActivity
-ccproc_Process --> "0..*" cc_Manifestation : ccproc:hasManifestation
+ccproc_Process --> "0..1" ccproc_ProcessRole : correspondsToProcessRole
+ccproc_Process --> "0..*" prov_Activity : hasActivity
+ccproc_Process --> "0..*" cc_Manifestation : hasManifestation
 ```
 
 ## SPARQL: find processes and their process roles

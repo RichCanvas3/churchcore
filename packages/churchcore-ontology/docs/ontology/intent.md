@@ -44,11 +44,11 @@ class cc_ActivityRole["cc:ActivityRole"]
 class prov_Activity["prov:Activity"]
 class cc_State["cc:State"]
 
-ccintent_Intent --> prov_Agent : ccintent:aboutAgent
-ccintent_Intent --> ccsit_ChurchSituation : ccintent:aboutSituation
-ccintent_Intent --> cc_ActivityRole : ccintent:relatesToActivityRole
-ccintent_Intent --> prov_Activity : ccintent:relatesToActivity
-ccintent_Intent --> cc_State : ccintent:targetsState
+ccintent_Intent --> prov_Agent : aboutAgent
+ccintent_Intent --> ccsit_ChurchSituation : aboutSituation
+ccintent_Intent --> cc_ActivityRole : relatesToActivityRole
+ccintent_Intent --> prov_Activity : relatesToActivity
+ccintent_Intent --> cc_State : targetsState
 ```
 
 ## How this uses C-Box

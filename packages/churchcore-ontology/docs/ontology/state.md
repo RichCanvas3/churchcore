@@ -44,10 +44,10 @@ class cc_Manifestation["cc:Manifestation"]
 class cc_State["cc:State"]
 class xsd_dateTime["xsd:dateTime"]
 
-cc_TimeVaryingConcept --> "0..*" cc_Manifestation : cc:hasManifestation
-cc_Manifestation --> "1" cc_TimeVaryingConcept : cc:manifestationOf
-cc_Manifestation --> "0..*" cc_State : cc:hasState
-cc_Manifestation --> "0..1" xsd_dateTime : cc:manifestedAtTime
+cc_TimeVaryingConcept --> "0..*" cc_Manifestation : hasManifestation
+cc_Manifestation --> "1" cc_TimeVaryingConcept : manifestationOf
+cc_Manifestation --> "0..*" cc_State : hasState
+cc_Manifestation --> "0..1" xsd_dateTime : manifestedAtTime
 ```
 
 ## How this connects to situations

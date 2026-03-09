@@ -19,8 +19,8 @@ direction LR
 class ccjourney_JourneyNode["ccjourney:JourneyNode"]
 class ccjourney_JourneyEdge["ccjourney:JourneyEdge"]
 
-ccjourney_JourneyEdge --> ccjourney_JourneyNode : ccjourney:fromNode
-ccjourney_JourneyEdge --> ccjourney_JourneyNode : ccjourney:toNode
+ccjourney_JourneyEdge --> ccjourney_JourneyNode : fromNode
+ccjourney_JourneyEdge --> ccjourney_JourneyNode : toNode
 ```
 
 ## Per-person state
@@ -33,8 +33,8 @@ class ccjourney_PersonJourneyState["ccjourney:PersonJourneyState"]
 class cc_Person["cc:Person"]
 class ccjourney_JourneyNode["ccjourney:JourneyNode"]
 
-ccjourney_PersonJourneyState --> cc_Person : ccjourney:forPerson
-ccjourney_PersonJourneyState --> ccjourney_JourneyNode : ccjourney:currentNode
+ccjourney_PersonJourneyState --> cc_Person : forPerson
+ccjourney_PersonJourneyState --> ccjourney_JourneyNode : currentNode
 ```
 
 ## SPARQL: list journey nodes + their outgoing edges

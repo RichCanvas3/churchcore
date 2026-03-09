@@ -54,7 +54,7 @@ direction LR
 class cc_Activity["cc:Activity"]
 class cc_ActivityRole["cc:ActivityRole"]
 
-cc_Activity --> cc_ActivityRole : cc:correspondsToRole
+cc_Activity --> cc_ActivityRole : correspondsToRole
 ```
 
 ## Data-facing properties (currently used by sync/export)

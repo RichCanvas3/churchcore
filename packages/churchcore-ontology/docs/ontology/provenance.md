@@ -26,9 +26,9 @@ direction LR
 class cc_Resource["cc:Resource"]
 class prov_Entity["prov:Entity"]
 
-cc_Resource --> prov_Entity : ccprov:hasSourceEntity
-cc_Resource --> xsd_anyURI["xsd:anyURI"] : ccprov:sourceUrl
-cc_Resource --> xsd_dateTime["xsd:dateTime"] : ccprov:extractedAtTime
+cc_Resource --> prov_Entity : hasSourceEntity
+cc_Resource --> xsd_anyURI["xsd:anyURI"] : sourceUrl
+cc_Resource --> xsd_dateTime["xsd:dateTime"] : extractedAtTime
 ```
 
 ## SPARQL: find resources with a source URL
