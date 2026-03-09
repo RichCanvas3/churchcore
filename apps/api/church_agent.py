@@ -485,6 +485,37 @@ def _ui_handoff_for_user_text(user_text: str) -> list[dict[str, Any]]:
     return []
 
 
+def _wants_sparql_journey(user_text: str) -> bool:
+    u = (user_text or "").strip().lower()
+    if not u:
+        return False
+    # Keep this narrow: only trigger SPARQL journey reasoning for explicit journey/salvation questions.
+    return any(
+        k in u
+        for k in [
+            "be saved",
+            "saved",
+            "salvation",
+            "become a disciple",
+            "become disciple",
+            "disciple",
+            "repent",
+            "repentance",
+            "faith in jesus",
+            "faith in christ",
+            "gospel",
+            "baptism",
+            "baptize",
+            "next step",
+            "next steps",
+            "what should i do next",
+            "faith journey",
+            "journey stage",
+            "my stage",
+        ]
+    )
+
+
 def _should_fetch_church_export(user_text: str) -> bool:
     u = (user_text or "").strip().lower()
     if not u:
@@ -1133,61 +1164,15 @@ async def _predict_journey_flows_with_sparql(
                 name = f"q{len(qclean)+1}"
             qclean.append({"name": name, "purpose": purpose, "query": query})
 
-    # Fallback to defaults if the model still couldn't produce SPARQL.
     if not qclean:
-        qclean = [
-            {
-                "name": "graphs",
-                "purpose": "List canonical journey graphs (ontology graph).",
-                "query": "\n".join(
-                    [
-                        "SELECT ?g ?name",
-                        "WHERE {",
-                        "  GRAPH <https://churchcore.ai/graph/ontology> {",
-                        "    ?g a <https://ontology.churchcore.ai/cc/journey#JourneyGraph> .",
-                        "    OPTIONAL { ?g <https://ontology.churchcore.ai/cc#name> ?name }",
-                        "  }",
-                        "}",
-                        "LIMIT 200",
-                    ]
-                ),
+        return OutputEnvelope(
+            message="Could not generate SPARQL queries.",
+            data={
+                "ok": False,
+                "reason": "sparql_generation_failed",
+                "raw_model_output": raw1[:4000],
             },
-            {
-                "name": "nodes",
-                "purpose": "List journey nodes and represented states (sample).",
-                "query": "\n".join(
-                    [
-                        "SELECT ?node ?name ?state",
-                        "WHERE {",
-                        "  GRAPH <https://churchcore.ai/graph/ontology> {",
-                        "    ?node a <https://ontology.churchcore.ai/cc/journey#JourneyNode> .",
-                        "    OPTIONAL { ?node <https://ontology.churchcore.ai/cc#name> ?name }",
-                        "    OPTIONAL { ?node <https://ontology.churchcore.ai/cc/journey#representsState> ?state }",
-                        "  }",
-                        "}",
-                        "LIMIT 500",
-                    ]
-                ),
-            },
-            {
-                "name": "edges",
-                "purpose": "List journey edges (sample).",
-                "query": "\n".join(
-                    [
-                        "SELECT ?edge ?from ?to ?kind",
-                        "WHERE {",
-                        "  GRAPH <https://churchcore.ai/graph/ontology> {",
-                        "    ?edge a <https://ontology.churchcore.ai/cc/journey#JourneyEdge> ;",
-                        "          <https://ontology.churchcore.ai/cc/journey#fromNode> ?from ;",
-                        "          <https://ontology.churchcore.ai/cc/journey#toNode> ?to .",
-                        "    OPTIONAL { ?edge <https://ontology.churchcore.ai/cc/journey#edgeKind> ?kind }",
-                        "  }",
-                        "}",
-                        "LIMIT 500",
-                    ]
-                ),
-            },
-        ]
+        )
 
     # Step 2: execute SPARQL via MCP
     results: dict[str, Any] = {}
@@ -1198,6 +1183,29 @@ async def _predict_journey_flows_with_sparql(
             {"churchId": session.churchId, "query": q["query"], "accept": "application/sparql-results+json"},
         )
         results[q["name"]] = {"purpose": q.get("purpose"), "ok": bool(res and res.get("ok")), "result": res}
+
+    failed = [name for name, r in results.items() if not (isinstance(r, dict) and r.get("ok") is True)]
+    if failed:
+        # Hard fail if SPARQL isn't working so it's visible in tracing/UI.
+        brief: dict[str, Any] = {}
+        for name in failed[:6]:
+            r = results.get(name) if isinstance(results.get(name), dict) else {}
+            rr = (r or {}).get("result") if isinstance(r, dict) else None
+            if isinstance(rr, dict):
+                brief[name] = {
+                    "reason": rr.get("reason") or rr.get("error") or rr.get("message"),
+                }
+            else:
+                brief[name] = {"reason": "no_result"}
+        return OutputEnvelope(
+            message=f"SPARQL query failed for: {', '.join(failed[:6])}",
+            data={
+                "ok": False,
+                "reason": "sparql_execution_failed",
+                "failed": failed,
+                "failed_brief": brief,
+            },
+        )
 
     # Step 3: synthesize predictions
     sys2 = (
@@ -1236,7 +1244,12 @@ async def _predict_journey_flows_with_sparql(
     if "sparqlUsed" not in j2:
         j2["sparqlUsed"] = [q["name"] for q in qclean]
 
-    return OutputEnvelope(message="", data={"journey_prediction": j2})
+    preds = j2.get("predictions")
+    n_preds = len(preds) if isinstance(preds, list) else 0
+    return OutputEnvelope(
+        message=f"SPARQL grounded journey prediction generated. graphs={n_preds}",
+        data={"ok": True, "journey_prediction": j2},
+    )
 
 
 async def _propose_memory_ops(
@@ -1586,6 +1599,48 @@ async def handle_seeker_skill(
         journey, journey_summary = _journey_context_from_args(args)
         identity_contact_summary = _identity_contact_context_from_args(args)
         weekly, weekly_summary = _weekly_context_from_args(args)
+
+        # If the user is asking an explicit faith-journey / salvation / "next steps" question,
+        # ground the answer with GraphDB via SPARQL (canonical journey graphs + edges),
+        # then render a short actionable response.
+        if user and _wants_sparql_journey(user):
+            pred_env = await _predict_journey_flows_with_sparql(model=model, tools=tools, session=session, args=args)
+            # Bubble up SPARQL errors loudly so we don't silently fall back to generic chat.
+            if isinstance(getattr(pred_env, "data", None), dict) and pred_env.data.get("ok") is False:
+                return pred_env
+            pred = None
+            if isinstance(getattr(pred_env, "data", None), dict):
+                pred = pred_env.data.get("journey_prediction")
+            if isinstance(pred, dict) and isinstance(pred.get("predictions"), list):
+                lines: list[str] = []
+                lines.append("Recommended next steps (grounded in the canonical journey graphs):")
+                preds = [p for p in (pred.get("predictions") or []) if isinstance(p, dict)]
+                for p in preds[:6]:
+                    gname = str(p.get("graphName") or p.get("graphId") or "Journey").strip()
+                    cur = p.get("current") if isinstance(p.get("current"), dict) else {}
+                    cur_title = str((cur or {}).get("title") or "").strip()
+                    header = gname
+                    if cur_title:
+                        header = f"{gname} — current: {cur_title}"
+                    lines.append(f"\n{header}")
+                    recs = p.get("recommendedNextActions") if isinstance(p.get("recommendedNextActions"), list) else []
+                    rec_items = [a for a in recs if isinstance(a, dict)]
+                    for a in rec_items[:4]:
+                        title = str(a.get("title") or a.get("nodeTitle") or a.get("nodeId") or "").strip()
+                        if title:
+                            lines.append(f"- {title}")
+                out_text = "\n".join([l for l in lines if l.strip()]).strip()
+                return OutputEnvelope(
+                    message=out_text,
+                    handoff=[{"type": "ui_tool", "tool_id": "faith_journey", "title": "Faith journey"}],
+                    data={"journey_prediction": pred},
+                )
+            # If the prediction came back but didn't include the expected structure, fail loudly.
+            if isinstance(pred, dict):
+                return OutputEnvelope(
+                    message="Journey prediction ran, but did not return any predicted next steps.",
+                    data={"ok": False, "reason": "journey_prediction_missing_predictions", "journey_prediction": pred},
+                )
 
         # Deterministic: if the user asks for weather, use weather MCP directly.
         u = user.lower()
