@@ -241,6 +241,7 @@ function agentCard(req: Request, env: Env) {
         bible_passage: `${baseUrl}a2a/bible.passage`,
         journey_get_state: `${baseUrl}a2a/journey.get_state`,
         journey_next_steps: `${baseUrl}a2a/journey.next_steps`,
+        journey_predict_flows: `${baseUrl}a2a/journey.predict_flows`,
       },
       authentication: authRequired ? { type: "api_key", header: "x-api-key", instructions: "Send x-api-key with the gateway API key." } : { type: "none" },
       langgraph: { assistant_id: assistantId },
@@ -601,6 +602,12 @@ const JourneyCompleteStepSchema = z.object({
   access_level: z.enum(["self", "staff", "pastoral", "restricted"]).optional().nullable(),
 });
 
+const JourneyPredictFlowsSchema = z.object({
+  identity: IdentitySchema,
+  person_id: z.string().min(1).optional().nullable(),
+  horizon_days: z.number().int().min(1).max(180).optional().nullable(),
+});
+
 function applyMemoryOps(baseMemory: any, ops: MemoryOp[], identityRole: string) {
   const role = (identityRole || "seeker").toLowerCase();
   const mem = baseMemory && typeof baseMemory === "object" ? baseMemory : {};
@@ -930,6 +937,63 @@ async function handleJourneyCompleteStep(req: Request, env: Env) {
     accessLevel,
   });
   return json({ ok: true, person_id: personId, node_id: node.id, event_type: eventType });
+}
+
+async function handleJourneyPredictFlows(req: Request, env: Env) {
+  const parsed = JourneyPredictFlowsSchema.safeParse(await parseJson(req));
+  if (!parsed.success) return json({ error: "Invalid body", issues: parsed.error.issues }, { status: 400 });
+  const { identity } = parsed.data;
+  const churchId = identity.tenant_id;
+  const userId = identity.user_id;
+  const role = (identity.role ?? "seeker") as string;
+
+  const resolved = await resolvePerson(env, identity);
+  const personId = (parsed.data.person_id ?? "").trim() || resolved.personId;
+  if (!personId) return json({ ok: false, error: "No personId" }, { status: 400 });
+
+  const personMemory = await getPersonMemory(env, { churchId, personId });
+  const redactedMemory = redactMemoryForRole(role, (personMemory as any).memory);
+
+  const journeyState = await ensurePersonJourneyState(env, { churchId, personId, personMemory: (personMemory as any).memory ?? {} });
+  const currentStageId = journeyState.currentStageId ?? "stage_seeker";
+  const journeyCurrentStage = await getJourneyNode(env, { churchId, nodeId: currentStageId });
+  const journeyNextSteps = await computeJourneyNextSteps(env, { churchId, personId, currentStageId, limit: 5, personMemory: (personMemory as any).memory ?? {} });
+
+  const memCampusIdRaw = (personMemory as any)?.memory?.identity?.campusId;
+  const memCampusId = typeof memCampusIdRaw === "string" && /^campus_[a-z0-9_]+$/i.test(memCampusIdRaw.trim()) ? memCampusIdRaw.trim() : null;
+  const effectiveCampusId = memCampusId ?? identity.campus_id ?? "campus_boulder";
+  const weekly = await getWeeklySermonPlanContext(env, { churchId, campusId: effectiveCampusId, personId });
+
+  const horizonDays = parsed.data.horizon_days ?? 30;
+
+  const envelope = await runAgent(env, {
+    threadId: crypto.randomUUID(),
+    inputPayload: {
+      skill: "journey.predict_flows",
+      args: {
+        horizon_days: horizonDays,
+        __context: {
+          person_memory: redactedMemory,
+          person_memory_updated_at: (personMemory as any).updatedAt,
+          journey: { current_stage: journeyCurrentStage, next_steps: journeyNextSteps },
+          weekly,
+          policy: { role },
+        },
+      },
+      session: {
+        churchId,
+        campusId: effectiveCampusId,
+        timezone: identity.timezone ?? "UTC",
+        userId,
+        personId,
+        role,
+        auth: { isAuthenticated: false, roles: [] },
+        threadId: null,
+      },
+    },
+  });
+
+  return json({ ok: true, person_id: personId, horizon_days: horizonDays, output: envelope });
 }
 
 async function auditMemoryOps(env: Env, args: { churchId: string; personId: string; threadId: string; actorUserId: string; actorRole: string; ops: unknown; turnId?: string | null }) {
@@ -5920,6 +5984,8 @@ export default {
         return handleJourneyNextSteps(req, env);
       case "/a2a/journey.complete_step":
         return handleJourneyCompleteStep(req, env);
+      case "/a2a/journey.predict_flows":
+        return handleJourneyPredictFlows(req, env);
       case "/a2a/church.get_overview":
         return handleChurchGetOverview(req, env);
       case "/a2a/church.strategic_intent.list":

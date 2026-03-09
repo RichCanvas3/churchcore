@@ -33,6 +33,14 @@ type JourneyNextStepsResponse = {
   error?: string;
 };
 
+type JourneyPredictFlowsResponse = {
+  ok?: boolean;
+  person_id?: string;
+  horizon_days?: number;
+  output?: any;
+  error?: string;
+};
+
 type MemoryGetResponse = {
   ok?: boolean;
   memory?: any;
@@ -62,6 +70,8 @@ export function FaithJourneyPanel(props: { identity: Identity; onClose: () => vo
   const [belief, setBelief] = useState<string[]>([]);
   const [desire, setDesire] = useState<string[]>([]);
   const [intent, setIntent] = useState<string[]>([]);
+  const [predicting, setPredicting] = useState(false);
+  const [prediction, setPrediction] = useState<any>(null);
 
   const stages = Array.isArray(state?.stage_path) ? state.stage_path : Array.isArray(state?.stages) ? state.stages : [];
   const currentStage = state?.current_stage?.id ? String(state.current_stage.id) : "";
@@ -93,10 +103,27 @@ export function FaithJourneyPanel(props: { identity: Identity; onClose: () => vo
       setBelief(toStrArr(bdi?.belief));
       setDesire(toStrArr(bdi?.desire));
       setIntent(toStrArr(bdi?.intent));
+      setPrediction(null);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Failed to load memory");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function runPrediction() {
+    setPredicting(true);
+    setError(null);
+    try {
+      const r = await postJson<JourneyPredictFlowsResponse>("/api/a2a/journey/predict_flows", { identity, horizon_days: 30 });
+      if ((r as any)?.ok === false) throw new Error(String((r as any)?.error ?? "Prediction failed"));
+      const envelope = (r as any)?.output ?? null;
+      const pred = envelope?.data?.journey_prediction ?? null;
+      setPrediction(pred);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Prediction failed");
+    } finally {
+      setPredicting(false);
     }
   }
 
@@ -189,6 +216,58 @@ export function FaithJourneyPanel(props: { identity: Identity; onClose: () => vo
           <div style={{ color: "#64748b" }}>Loading…</div>
         ) : (
           <>
+            <section style={{ border: "1px solid #e2e8f0", borderRadius: 12, padding: 14, background: "white" }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: "#0f172a", marginBottom: 10 }}>Predictive flows</div>
+              <p style={{ fontSize: 12, color: "#64748b", margin: "0 0 10px 0" }}>
+                This uses your memory + the canonical journey graphs to predict likely next state changes and recommend next actions.
+              </p>
+              <button type="button" onClick={() => void runPrediction()} disabled={predicting} style={{ ...btn, background: "#0f172a" }}>
+                {predicting ? "Predicting…" : "Show predictive flows"}
+              </button>
+              {prediction?.predictions && Array.isArray(prediction.predictions) ? (
+                <div style={{ marginTop: 12, display: "grid", gap: 10 }}>
+                  {prediction.predictions.slice(0, 6).map((p: any, idx: number) => {
+                    const graphName = String(p?.graphName ?? p?.graphId ?? `Graph ${idx + 1}`);
+                    const currentTitle = String(p?.current?.title ?? p?.current?.nodeId ?? "");
+                    const changes = Array.isArray(p?.predictedChanges) ? p.predictedChanges : [];
+                    const actions = Array.isArray(p?.recommendedNextActions) ? p.recommendedNextActions : [];
+                    return (
+                      <div key={idx} style={{ border: "1px solid #e2e8f0", borderRadius: 12, padding: 12, background: "#f8fafc" }}>
+                        <div style={{ fontWeight: 900, color: "#0f172a" }}>{graphName}</div>
+                        {currentTitle ? <div style={{ marginTop: 4, fontSize: 12, color: "#475569" }}>Current: {currentTitle}</div> : null}
+                        {changes.length ? (
+                          <div style={{ marginTop: 10 }}>
+                            <div style={{ fontSize: 12, fontWeight: 800, color: "#0f172a" }}>Predicted changes</div>
+                            <div style={{ marginTop: 6, display: "grid", gap: 6 }}>
+                              {changes.slice(0, 4).map((c: any, j: number) => (
+                                <div key={j} style={{ fontSize: 12, color: "#334155" }}>
+                                  {String(c?.timeHorizonDays ?? 0)}d: {String(c?.stateLabel ?? "") || String(c?.manifestationLabel ?? "")}
+                                  {typeof c?.confidence === "number" ? ` (conf ${c.confidence.toFixed(2)})` : ""}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ) : null}
+                        {actions.length ? (
+                          <div style={{ marginTop: 10 }}>
+                            <div style={{ fontSize: 12, fontWeight: 800, color: "#0f172a" }}>Recommended next actions</div>
+                            <div style={{ marginTop: 6, display: "grid", gap: 6 }}>
+                              {actions.slice(0, 4).map((a: any, j: number) => (
+                                <div key={j} style={{ fontSize: 12, color: "#334155" }}>
+                                  {String(a?.title ?? a?.nodeId ?? "")}
+                                  {typeof a?.confidence === "number" ? ` (conf ${a.confidence.toFixed(2)})` : ""}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ) : null}
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : null}
+            </section>
+
             <section style={{ border: "1px solid #e2e8f0", borderRadius: 12, padding: 14, background: "white" }}>
               <div style={{ fontSize: 12, fontWeight: 700, color: "#0f172a", marginBottom: 10 }}>Stage path</div>
               <p style={{ fontSize: 12, color: "#64748b", margin: "0 0 10px 0" }}>

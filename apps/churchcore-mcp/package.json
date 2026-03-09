@@ -13,6 +13,7 @@
     "d1:remote:setup": "pnpm run d1:remote:schema && pnpm run d1:remote:seed",
     "d1:remote:migrate:events_weather": "wrangler d1 execute churchcore --remote --file ./migrations/2026-03-02_events_outdoor_weather.sql",
     "openbible:import": "node ./tools/openbible-import.mjs",
+    "graphdb:load-ontology": "node ./tools/load-ontology-to-graphdb.mjs",
     "deploy": "wrangler deploy",
     "lint": "tsc -p tsconfig.json --noEmit"
   },

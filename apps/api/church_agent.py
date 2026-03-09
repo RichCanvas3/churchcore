@@ -1012,6 +1012,122 @@ def _safe_json_loads(text: str) -> Any:
         return None
 
 
+def _json_only_envelope_error(message: str) -> OutputEnvelope:
+    return OutputEnvelope(message=message, data={"ok": False})
+
+
+async def _predict_journey_flows_with_sparql(
+    *,
+    model: ChatOpenAI,
+    tools: list[Any],
+    session: Session,
+    args: dict[str, Any],
+) -> OutputEnvelope:
+    """
+    LLM-driven:
+      1) propose SPARQL queries
+      2) execute them via churchcore_graphdb_sparql_query
+      3) synthesize predicted TimeVaryingConcept/Manifestation/State changes + next actions
+    """
+    mem, _mem_summary = _memory_context_from_args(args)
+    journey, _journey_summary = _journey_context_from_args(args)
+    weekly, _weekly_summary = _weekly_context_from_args(args)
+
+    # Step 1: ask for SPARQL queries
+    sys1 = (
+        "You are a faith-journey reasoning agent.\n"
+        "You will propose SPARQL SELECT queries to retrieve canonical journey graphs and next-step options from GraphDB.\n"
+        "Return STRICT JSON ONLY with shape:\n"
+        '{\"sparql_queries\":[{\"name\":\"...\",\"purpose\":\"...\",\"query\":\"...\"}]}\n'
+        "Rules:\n"
+        "- Use only SELECT queries.\n"
+        "- Prefer small result sets (use LIMIT).\n"
+        "- Use the ChurchCore journey/faith-journey vocabularies where possible.\n"
+    )
+    user1 = json.dumps(
+        {
+            "churchId": session.churchId,
+            "personId": session.personId,
+            "userId": session.userId,
+            "timezone": session.timezone,
+            "memory": mem or {},
+            "journey_context": journey or {},
+            "weekly_context": weekly or {},
+            "task": "Fetch the canonical journey graphs (MacroStages + Openness/Formation/Belonging/Multiplication), current-node to next-step edges, and any linked state categories, so you can predict next state/manifestation changes.",
+        },
+        ensure_ascii=False,
+    )[:8000]
+
+    r1 = await model.ainvoke([("system", sys1), ("user", user1)])
+    raw1 = str(getattr(r1, "content", "") or "").strip()
+    j1 = _safe_json_loads(raw1)
+    queries = j1.get("sparql_queries") if isinstance(j1, dict) else None
+    qlist = queries if isinstance(queries, list) else []
+    qclean: list[dict[str, str]] = []
+    for q in qlist[:12]:
+        if not isinstance(q, dict):
+            continue
+        name = str(q.get("name") or "").strip()
+        purpose = str(q.get("purpose") or "").strip()
+        query = str(q.get("query") or "").strip()
+        if not query.lower().startswith("select"):
+            continue
+        if not name:
+            name = f"q{len(qclean)+1}"
+        qclean.append({"name": name, "purpose": purpose, "query": query})
+    if not qclean:
+        return _json_only_envelope_error("Could not generate SPARQL queries.")
+
+    # Step 2: execute SPARQL via MCP
+    results: dict[str, Any] = {}
+    for q in qclean:
+        res = await _call_tool_json(
+            tools,
+            "churchcore_graphdb_sparql_query",
+            {"churchId": session.churchId, "query": q["query"], "accept": "application/sparql-results+json"},
+        )
+        results[q["name"]] = {"purpose": q.get("purpose"), "ok": bool(res and res.get("ok")), "result": res}
+
+    # Step 3: synthesize predictions
+    sys2 = (
+        "You are a faith-journey guide.\n"
+        "Use the user's memory + GraphDB SPARQL results to:\n"
+        "- predict plausible TimeVaryingConcept/Manifestation/State changes (synthetic forecast)\n"
+        "- recommend next actions (journey steps) per graph\n"
+        "Return STRICT JSON ONLY with shape:\n"
+        '{\"ok\":true,\"asOf\":\"<iso>\",\"predictions\":[{\"graphId\":\"\",\"graphName\":\"\",\"current\":{\"nodeId\":\"\",\"title\":\"\"},\"predictedChanges\":[{\"timeHorizonDays\":7,\"stateIri\":null,\"stateLabel\":\"\",\"manifestationLabel\":\"\",\"confidence\":0.0,\"evidence\":[\"...\"]}],\"recommendedNextActions\":[{\"nodeId\":\"\",\"title\":\"\",\"edgeKind\":\"\",\"confidence\":0.0,\"reason\":\"\"}]}],\"sparqlUsed\":[\"q1\",\"q2\"]}\n'
+        "Notes:\n"
+        "- Keep predictions pastorally appropriate and avoid certainty language.\n"
+        "- Ground recommendations in memory context (sermons, verses, completed steps) and in the journey graph structure.\n"
+    )
+    user2 = json.dumps(
+        {
+            "churchId": session.churchId,
+            "personId": session.personId,
+            "userId": session.userId,
+            "timezone": session.timezone,
+            "memory": mem or {},
+            "journey_context": journey or {},
+            "weekly_context": weekly or {},
+            "sparql_results": results,
+        },
+        ensure_ascii=False,
+    )[:12000]
+
+    r2 = await model.ainvoke([("system", sys2), ("user", user2)])
+    raw2 = str(getattr(r2, "content", "") or "").strip()
+    j2 = _safe_json_loads(raw2)
+    if not isinstance(j2, dict):
+        return _json_only_envelope_error("Could not parse predictive journey output.")
+    j2["ok"] = True
+    if "asOf" not in j2:
+        j2["asOf"] = _now_iso()
+    if "sparqlUsed" not in j2:
+        j2["sparqlUsed"] = [q["name"] for q in qclean]
+
+    return OutputEnvelope(message="", data={"journey_prediction": j2})
+
+
 async def _propose_memory_ops(
     *,
     model: ChatOpenAI,
@@ -1191,6 +1307,10 @@ async def handle_seeker_skill(
 
         schedule = {"asOfISO": _now_iso(), "weekStartISO": week_start, "weekEndISO": week_end, "events": out_items}
         return OutputEnvelope(message="", data={"schedule": schedule})
+
+    if skill in {"journey.predict_flows", "journey.predict"}:
+        model = get_chat_model()
+        return await _predict_journey_flows_with_sparql(model=model, tools=tools, session=session, args=args)
 
     if skill == "notify.send_email":
         return OutputEnvelope(
@@ -1737,6 +1857,10 @@ async def handle_guide_skill(
     if skill == "calendar.week":
         # Not sensitive; allow even if guide permission isn't configured.
         return await handle_seeker_skill(skill=skill, message=message, args=args, session=session, tools=tools)
+
+    if skill in {"journey.predict_flows", "journey.predict"}:
+        model = get_chat_model()
+        return await _predict_journey_flows_with_sparql(model=model, tools=tools, session=session, args=args)
 
     if skill == "notify.send_email":
         to = str(args.get("to") or "").strip()

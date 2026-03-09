@@ -2312,6 +2312,105 @@ function createServer(env: Env) {
     },
   );
 
+  server.tool(
+    "churchcore_kb_list_tables",
+    "List D1 tables for full KB export (for embedding).",
+    { churchId: z.string().min(1) },
+    async (args) => {
+      const parsed = z.object({ churchId: z.string().min(1) }).parse(args);
+      const tables = await d1ListTables(env);
+      const out: Array<{ table: string; hasChurchIdFilter: boolean; columns: string[] }> = [];
+      for (const t of tables) {
+        const cols = await d1TableColumns(env, t);
+        const hasChurch = cols.has("church_id") || cols.has("churchId");
+        out.push({ table: t, hasChurchIdFilter: hasChurch, columns: [...cols].sort() });
+      }
+      return jsonText({ churchId: parsed.churchId, tables: out });
+    },
+  );
+
+  server.tool(
+    "churchcore_kb_export_table_docs",
+    "Export one D1 table as KB docs (paginated).",
+    {
+      churchId: z.string().min(1),
+      table: z.string().min(1),
+      limit: z.number().int().min(1).max(1000).optional(),
+      offset: z.number().int().min(0).max(5000000).optional(),
+    },
+    async (args) => {
+      const parsed = z
+        .object({
+          churchId: z.string().min(1),
+          table: z.string().min(1),
+          limit: z.number().int().min(1).max(1000).optional(),
+          offset: z.number().int().min(0).max(5000000).optional(),
+        })
+        .parse(args);
+
+      const table = sanitizeSqlIdent(parsed.table);
+      const limit = parsed.limit ?? 200;
+      const offset = parsed.offset ?? 0;
+      const idBase = String(env.GRAPHDB_ID_BASE ?? "https://id.churchcore.ai").trim().replace(/\/+$/, "");
+
+      const info = await d1TableInfo(env, table);
+      const cols = info.map((c) => c.name);
+      if (!cols.length) return jsonText({ table, docs: [], offset, limit, hasMore: false });
+
+      const colsSet = new Set(cols);
+      const churchCol = pickCol(colsSet, ["church_id", "churchId"]);
+      const idCol = pickCol(colsSet, ["id"]);
+      const pkCols = info
+        .filter((c) => typeof c.pk === "number" && c.pk > 0)
+        .sort((a, b) => a.pk - b.pk)
+        .map((c) => c.name);
+
+      const orderCols = (pkCols.length ? pkCols : idCol ? [idCol] : []).map(sanitizeSqlIdent);
+      const orderClause = orderCols.length ? `ORDER BY ${orderCols.join(", ")}` : "";
+      const selectRowId = orderCols.length ? "" : ", rowid AS __rowid";
+      const orderRowId = orderCols.length ? "" : "ORDER BY __rowid";
+
+      const safeCols = cols.map(sanitizeSqlIdent);
+      const selectCols = safeCols.map((c) => `${c} AS ${c}`).join(", ");
+      const where = churchCol ? `WHERE ${sanitizeSqlIdent(churchCol)}=?1` : "";
+
+      const sql = churchCol
+        ? `SELECT ${selectCols}${selectRowId} FROM ${table} ${where} ${orderClause || orderRowId} LIMIT ?2 OFFSET ?3`
+        : `SELECT ${selectCols}${selectRowId} FROM ${table} ${where} ${orderClause || orderRowId} LIMIT ?1 OFFSET ?2`;
+      const binds = churchCol ? [parsed.churchId, limit, offset] : [limit, offset];
+      const rows = await d1All(env, sql, binds as any[]);
+
+      const docs: Array<{ sourceId: string; text: string }> = [];
+      for (const r of rows as any[]) {
+        let key = "";
+        if (pkCols.length && pkCols.every((c) => r?.[c] !== null && r?.[c] !== undefined && String(r?.[c]).trim() !== "")) {
+          key = pkCols.map((c) => String(r[c])).join("|");
+        } else if (idCol && r?.[idCol] !== null && r?.[idCol] !== undefined && String(r?.[idCol]).trim() !== "") {
+          key = String(r[idCol]);
+        } else if (r?.__rowid !== null && r?.__rowid !== undefined) {
+          key = `rowid:${String(r.__rowid)}`;
+        } else {
+          key = `h:${(await sha256Hex(JSON.stringify(r))).slice(0, 16)}`;
+        }
+
+        const sourceId = `d1/${table}/${key}`;
+        const rowIri = `${idBase}/d1raw/${encodeURIComponent(parsed.churchId)}/${encodeURIComponent(table)}/${encodeURIComponent(key)}`;
+        const header = `TABLE ${table}\nCHURCH ${parsed.churchId}\nROW ${rowIri}\n`;
+        const text = header + "\n" + JSON.stringify(r, null, 2);
+        docs.push({ sourceId, text });
+      }
+
+      return jsonText({
+        table,
+        offset,
+        limit,
+        hasMore: rows.length >= limit,
+        nextOffset: offset + rows.length,
+        docs,
+      });
+    },
+  );
+
   // Chat + identity binding (multi-topic messaging)
   async function requireOwnedThread(params: { churchId: string; userId: string; threadId: string }) {
     const row = (
@@ -4488,6 +4587,35 @@ async function d1TableColumns(env: Env, table: string) {
   }
 }
 
+async function d1TableInfo(env: Env, table: string) {
+  const t = sanitizeSqlIdent(table);
+  try {
+    const rows = await d1All(env, `PRAGMA table_info(${t})`);
+    const out: Array<{ name: string; pk: number }> = [];
+    for (const r of rows as any[]) {
+      const name = typeof r?.name === "string" ? String(r.name) : "";
+      const pk = typeof r?.pk === "number" ? Number(r.pk) : 0;
+      if (name) out.push({ name, pk });
+    }
+    return out;
+  } catch {
+    return [];
+  }
+}
+
+async function d1ListTables(env: Env) {
+  const rows = await d1All(
+    env,
+    "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name ASC",
+  );
+  const out: string[] = [];
+  for (const r of rows as any[]) {
+    const n = typeof r?.name === "string" ? String(r.name).trim() : "";
+    if (n) out.push(n);
+  }
+  return out;
+}
+
 function pickCol(cols: Set<string>, candidates: string[]) {
   for (const c of candidates) if (cols.has(c)) return c;
   return null;
@@ -4825,6 +4953,86 @@ async function syncGraphDbFromD1(env: Env, args: { churchId: string; mode: "full
           parts.push(`; prov:generatedAtTime ${ttlLitDateTime(r.updatedAt ?? r.createdAt ?? nowIso())} .`);
           lines.push(parts.join(" "));
         }
+        await uploadChunk(lines);
+        if (rows.length < batch) break;
+      }
+    }
+  }
+
+  // raw D1 export (all tables) into the SAME per-church graph.
+  // This ensures nothing is dropped while we incrementally improve ontology-aligned mappings.
+  {
+    const tables = await d1ListTables(env);
+    for (const table of tables) {
+      const info = await d1TableInfo(env, table);
+      const cols = info.map((c) => c.name);
+      if (!cols.length) continue;
+
+      const colsSet = new Set(cols);
+      const churchCol = pickCol(colsSet, ["church_id", "churchId"]);
+      const idCol = pickCol(colsSet, ["id"]);
+      const pkCols = info
+        .filter((c) => typeof c.pk === "number" && c.pk > 0)
+        .sort((a, b) => a.pk - b.pk)
+        .map((c) => c.name);
+
+      const orderCols = (pkCols.length ? pkCols : idCol ? [idCol] : []).map(sanitizeSqlIdent);
+      const orderClause = orderCols.length ? `ORDER BY ${orderCols.join(", ")}` : "";
+
+      // If no PK/id ordering, fall back to rowid ordering (best-effort).
+      const selectRowId = orderCols.length ? "" : ", rowid AS __rowid";
+      const orderRowId = orderCols.length ? "" : "ORDER BY __rowid";
+
+      const safeTable = sanitizeSqlIdent(table);
+      const safeCols = cols.map(sanitizeSqlIdent);
+      const selectCols = safeCols.map((c) => `${c} AS ${c}`).join(", ");
+      const where = churchCol ? `WHERE ${sanitizeSqlIdent(churchCol)}=?1` : "";
+
+      for (let offset = 0; ; offset += batch) {
+        const sql = churchCol
+          ? `SELECT ${selectCols}${selectRowId} FROM ${safeTable} ${where} ${orderClause || orderRowId} LIMIT ?2 OFFSET ?3`
+          : `SELECT ${selectCols}${selectRowId} FROM ${safeTable} ${where} ${orderClause || orderRowId} LIMIT ?1 OFFSET ?2`;
+        const binds = churchCol ? [churchId, batch, offset] : [batch, offset];
+        const rows = await d1All(env, sql, binds as any[]);
+        if (!rows.length) break;
+
+        const lines: string[] = [];
+        for (const r of rows as any[]) {
+          // Stable row key
+          let key = "";
+          if (pkCols.length && pkCols.every((c) => r?.[c] !== null && r?.[c] !== undefined && String(r?.[c]).trim() !== "")) {
+            key = pkCols.map((c) => String(r[c])).join("|");
+          } else if (idCol && r?.[idCol] !== null && r?.[idCol] !== undefined && String(r?.[idCol]).trim() !== "") {
+            key = String(r[idCol]);
+          } else if (r?.__rowid !== null && r?.__rowid !== undefined) {
+            key = `rowid:${String(r.__rowid)}`;
+          } else {
+            key = `h:${(await sha256Hex(JSON.stringify(r))).slice(0, 16)}`;
+          }
+
+          const subj = `${idBase}/d1raw/${encodeURIComponent(churchId)}/${encodeURIComponent(table)}/${encodeURIComponent(key)}`;
+          const classIri = `${idBase}/d1raw/schema/${encodeURIComponent(table)}`;
+
+          const parts: string[] = [`${ttlIri(subj)} a ${ttlIri(classIri)}`];
+          for (const c of cols) {
+            const v = (r as any)?.[c];
+            if (v === null || v === undefined) continue;
+            const pred = `${idBase}/d1raw/schema/${encodeURIComponent(table)}#${encodeURIComponent(c)}`;
+            if (typeof v === "number") {
+              const lit = Number.isInteger(v) ? `"${String(v)}"^^xsd:integer` : `"${String(v)}"^^xsd:decimal`;
+              parts.push(`; ${ttlIri(pred)} ${lit}`);
+              continue;
+            }
+            if (typeof v === "boolean") {
+              parts.push(`; ${ttlIri(pred)} "${v ? "true" : "false"}"^^xsd:boolean`);
+              continue;
+            }
+            parts.push(`; ${ttlIri(pred)} ${ttlLitString(String(v))}`);
+          }
+          parts.push(` .`);
+          lines.push(parts.join(" "));
+        }
+
         await uploadChunk(lines);
         if (rows.length < batch) break;
       }

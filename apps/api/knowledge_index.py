@@ -99,11 +99,19 @@ async def ensure_index_with_mcp(*, church_id: str, ttl_seconds: int = 300) -> li
         return cached
 
     persist_enabled = _truthy_env("KB_PERSIST_TO_CHURCHCORE", default=True)
+
+    # 1) Preferred: load persisted chunks (paged) for full coverage.
     if persist_enabled:
-        persisted = await _mcp_call_json("churchcore_kb_list_chunks", {"churchId": church_id, "limit": 5000, "offset": 0})
-        if isinstance(persisted, dict) and isinstance(persisted.get("chunks"), list) and (persisted.get("chunks") or []):
-            out: list[IndexedChunk] = []
-            for c in persisted.get("chunks") or []:
+        out: list[IndexedChunk] = []
+        offset = 0
+        page = 5000
+        while True:
+            persisted = await _mcp_call_json("churchcore_kb_list_chunks", {"churchId": church_id, "limit": page, "offset": offset})
+            rows = persisted.get("chunks") if isinstance(persisted, dict) else None
+            items = rows if isinstance(rows, list) else []
+            if not items:
+                break
+            for c in items:
                 if not isinstance(c, dict):
                     continue
                 sid = c.get("sourceId")
@@ -116,47 +124,98 @@ async def ensure_index_with_mcp(*, church_id: str, ttl_seconds: int = 300) -> li
                 except Exception:
                     continue
                 out.append(IndexedChunk(sourceId=sid, text=txt, embedding=embedding))
-            if out:
-                _CACHED_BY_CHURCH[church_id] = out
-                _CACHED_BUILT_AT[church_id] = now
-                return out
+            if len(items) < page:
+                break
+            offset += len(items)
+        if out:
+            _CACHED_BY_CHURCH[church_id] = out
+            _CACHED_BUILT_AT[church_id] = now
+            return out
 
-    # Export docs directly from ChurchCore D1 via MCP (source-of-truth).
-    exported = await _mcp_call_json("churchcore_kb_export_docs", {"churchId": church_id, "limitPerTable": 200})
-    docs: list[dict[str, Any]] = []
-    if isinstance(exported, dict) and isinstance(exported.get("docs"), list):
-        for d in exported.get("docs") or []:
-            if not isinstance(d, dict):
-                continue
-            sid = d.get("sourceId")
-            txt = d.get("text")
-            if isinstance(sid, str) and isinstance(txt, str) and sid.strip() and txt.strip():
-                docs.append({"sourceId": sid.strip(), "text": txt})
-
-    chunks: list[tuple[str, str]] = []
-    for d in docs:
-        for piece in chunk_text(str(d["text"]), chunk_size=900, overlap=150):
-            chunks.append((str(d["sourceId"]), piece))
+    # 2) Build: export ALL D1 tables (paged), embed in batches, and persist.
+    tables_resp = await _mcp_call_json("churchcore_kb_list_tables", {"churchId": church_id})
+    tables = tables_resp.get("tables") if isinstance(tables_resp, dict) else None
+    table_items = tables if isinstance(tables, list) else []
+    table_names: list[str] = []
+    for t in table_items:
+        if isinstance(t, dict) and isinstance(t.get("table"), str) and str(t.get("table") or "").strip():
+            table_names.append(str(t.get("table")).strip())
+    table_names = sorted(set(table_names))
 
     embeddings = OpenAIEmbeddings(
         api_key=os.environ.get("OPENAI_API_KEY"),
         model=os.environ.get("OPENAI_EMBEDDINGS_MODEL", "text-embedding-3-large"),
     )
-    vectors = embeddings.embed_documents([t for (_, t) in chunks]) if chunks else []
-    out: list[IndexedChunk] = []
-    for i, (sid, text) in enumerate(chunks):
-        out.append(IndexedChunk(sourceId=sid, text=text, embedding=list(vectors[i] or [])))
 
-    # Persist to ChurchCore (best effort), so hosted runs can reuse it.
-    if persist_enabled and out:
-        batch: list[dict[str, Any]] = []
-        for idx, c in enumerate(out):
-            batch.append({"chunkId": f"{church_id}:{c.sourceId}#{idx}", "sourceId": c.sourceId, "text": c.text, "embedding": c.embedding})
-            if len(batch) >= 200:
-                await _mcp_call_json("churchcore_kb_upsert_chunks", {"churchId": church_id, "chunks": batch})
-                batch = []
-        if batch:
-            await _mcp_call_json("churchcore_kb_upsert_chunks", {"churchId": church_id, "chunks": batch})
+    out: list[IndexedChunk] = []
+    chunk_buffer: list[tuple[str, str]] = []
+    chunk_seq = 0
+
+    async def flush_buffer() -> None:
+        nonlocal chunk_seq, chunk_buffer, out
+        if not chunk_buffer:
+            return
+        texts = [t for (_, t) in chunk_buffer]
+        vectors = embeddings.embed_documents(texts) if texts else []
+        built: list[IndexedChunk] = []
+        for i, (sid, text) in enumerate(chunk_buffer):
+            emb = list(vectors[i] or []) if i < len(vectors) else []
+            built.append(IndexedChunk(sourceId=sid, text=text, embedding=emb))
+
+        out.extend(built)
+
+        if persist_enabled and built:
+            up: list[dict[str, Any]] = []
+            for c in built:
+                up.append(
+                    {
+                        "chunkId": f"{church_id}:{c.sourceId}#{chunk_seq}",
+                        "sourceId": c.sourceId,
+                        "text": c.text,
+                        "embedding": c.embedding,
+                    }
+                )
+                chunk_seq += 1
+                if len(up) >= 200:
+                    await _mcp_call_json("churchcore_kb_upsert_chunks", {"churchId": church_id, "chunks": up})
+                    up = []
+            if up:
+                await _mcp_call_json("churchcore_kb_upsert_chunks", {"churchId": church_id, "chunks": up})
+
+        chunk_buffer = []
+
+    # Iterate tables and pages; chunk each row-doc into embedding chunks.
+    for table in table_names:
+        offset = 0
+        limit = 200
+        while True:
+            exported = await _mcp_call_json(
+                "churchcore_kb_export_table_docs",
+                {"churchId": church_id, "table": table, "limit": limit, "offset": offset},
+            )
+            docs = exported.get("docs") if isinstance(exported, dict) else None
+            docs_list = docs if isinstance(docs, list) else []
+            if not docs_list:
+                break
+            for d in docs_list:
+                if not isinstance(d, dict):
+                    continue
+                sid = d.get("sourceId")
+                txt = d.get("text")
+                if not isinstance(sid, str) or not isinstance(txt, str) or not sid.strip() or not txt.strip():
+                    continue
+                for piece in chunk_text(txt, chunk_size=900, overlap=150):
+                    chunk_buffer.append((sid.strip(), piece))
+                    if len(chunk_buffer) >= 200:
+                        await flush_buffer()
+            has_more = bool(exported.get("hasMore")) if isinstance(exported, dict) else False
+            next_off = exported.get("nextOffset") if isinstance(exported, dict) else None
+            if not has_more or not isinstance(next_off, int):
+                break
+            offset = next_off
+
+    if chunk_buffer:
+        await flush_buffer()
 
     _CACHED_BY_CHURCH[church_id] = out
     _CACHED_BUILT_AT[church_id] = now
