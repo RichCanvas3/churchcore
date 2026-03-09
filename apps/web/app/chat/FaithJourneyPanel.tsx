@@ -119,6 +119,7 @@ export function FaithJourneyPanel(props: { identity: Identity; onClose: () => vo
       if ((r as any)?.ok === false) throw new Error(String((r as any)?.error ?? "Prediction failed"));
       const envelope = (r as any)?.output ?? null;
       const pred = envelope?.data?.journey_prediction ?? null;
+      if (!pred || typeof pred !== "object") throw new Error("No predictive flow data returned.");
       setPrediction(pred);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Prediction failed");

@@ -1012,6 +1012,35 @@ def _safe_json_loads(text: str) -> Any:
         return None
 
 
+def _safe_json_extract(text: str) -> Any:
+    """
+    Best-effort JSON extraction when the model wraps JSON in extra text.
+    """
+    raw = str(text or "").strip()
+    if not raw:
+        return None
+    direct = _safe_json_loads(raw)
+    if direct is not None:
+        return direct
+    # Try to extract the first JSON object.
+    try:
+        i = raw.find("{")
+        j = raw.rfind("}")
+        if i >= 0 and j > i:
+            return _safe_json_loads(raw[i : j + 1])
+    except Exception:
+        pass
+    # Try to extract the first JSON array.
+    try:
+        i = raw.find("[")
+        j = raw.rfind("]")
+        if i >= 0 and j > i:
+            return _safe_json_loads(raw[i : j + 1])
+    except Exception:
+        pass
+    return None
+
+
 def _json_only_envelope_error(message: str) -> OutputEnvelope:
     return OutputEnvelope(message=message, data={"ok": False})
 
@@ -1043,6 +1072,8 @@ async def _predict_journey_flows_with_sparql(
         "- Use only SELECT queries.\n"
         "- Prefer small result sets (use LIMIT).\n"
         "- Use the ChurchCore journey/faith-journey vocabularies where possible.\n"
+        "Example (must be valid JSON):\n"
+        '{\"sparql_queries\":[{\"name\":\"graphs\",\"purpose\":\"list graphs\",\"query\":\"SELECT ?g ?name WHERE { GRAPH <https://churchcore.ai/graph/ontology> { ?g a <https://ontology.churchcore.ai/cc/journey#JourneyGraph> ; <https://ontology.churchcore.ai/cc#name> ?name . } } LIMIT 50\"}]}'
     )
     user1 = json.dumps(
         {
@@ -1060,7 +1091,7 @@ async def _predict_journey_flows_with_sparql(
 
     r1 = await model.ainvoke([("system", sys1), ("user", user1)])
     raw1 = str(getattr(r1, "content", "") or "").strip()
-    j1 = _safe_json_loads(raw1)
+    j1 = _safe_json_extract(raw1)
     queries = j1.get("sparql_queries") if isinstance(j1, dict) else None
     qlist = queries if isinstance(queries, list) else []
     qclean: list[dict[str, str]] = []
@@ -1075,8 +1106,88 @@ async def _predict_journey_flows_with_sparql(
         if not name:
             name = f"q{len(qclean)+1}"
         qclean.append({"name": name, "purpose": purpose, "query": query})
+
+    # Retry once with a stricter prompt if we didn't get queries.
     if not qclean:
-        return _json_only_envelope_error("Could not generate SPARQL queries.")
+        sys1b = (
+            "Return ONLY valid JSON. No prose.\n"
+            "Required key: sparql_queries (array).\n"
+            "Each item must contain: name, purpose, query.\n"
+            "All queries MUST start with SELECT.\n"
+            "If uncertain, still produce 3-6 small SELECT queries for graphs/nodes/edges using GRAPH <https://churchcore.ai/graph/ontology>.\n"
+        )
+        r1b = await model.ainvoke([("system", sys1b), ("user", user1)])
+        raw1b = str(getattr(r1b, "content", "") or "").strip()
+        j1b = _safe_json_extract(raw1b)
+        queries_b = j1b.get("sparql_queries") if isinstance(j1b, dict) else None
+        qlist_b = queries_b if isinstance(queries_b, list) else []
+        for q in qlist_b[:12]:
+            if not isinstance(q, dict):
+                continue
+            name = str(q.get("name") or "").strip()
+            purpose = str(q.get("purpose") or "").strip()
+            query = str(q.get("query") or "").strip()
+            if not query.lower().startswith("select"):
+                continue
+            if not name:
+                name = f"q{len(qclean)+1}"
+            qclean.append({"name": name, "purpose": purpose, "query": query})
+
+    # Fallback to defaults if the model still couldn't produce SPARQL.
+    if not qclean:
+        qclean = [
+            {
+                "name": "graphs",
+                "purpose": "List canonical journey graphs (ontology graph).",
+                "query": "\n".join(
+                    [
+                        "SELECT ?g ?name",
+                        "WHERE {",
+                        "  GRAPH <https://churchcore.ai/graph/ontology> {",
+                        "    ?g a <https://ontology.churchcore.ai/cc/journey#JourneyGraph> .",
+                        "    OPTIONAL { ?g <https://ontology.churchcore.ai/cc#name> ?name }",
+                        "  }",
+                        "}",
+                        "LIMIT 200",
+                    ]
+                ),
+            },
+            {
+                "name": "nodes",
+                "purpose": "List journey nodes and represented states (sample).",
+                "query": "\n".join(
+                    [
+                        "SELECT ?node ?name ?state",
+                        "WHERE {",
+                        "  GRAPH <https://churchcore.ai/graph/ontology> {",
+                        "    ?node a <https://ontology.churchcore.ai/cc/journey#JourneyNode> .",
+                        "    OPTIONAL { ?node <https://ontology.churchcore.ai/cc#name> ?name }",
+                        "    OPTIONAL { ?node <https://ontology.churchcore.ai/cc/journey#representsState> ?state }",
+                        "  }",
+                        "}",
+                        "LIMIT 500",
+                    ]
+                ),
+            },
+            {
+                "name": "edges",
+                "purpose": "List journey edges (sample).",
+                "query": "\n".join(
+                    [
+                        "SELECT ?edge ?from ?to ?kind",
+                        "WHERE {",
+                        "  GRAPH <https://churchcore.ai/graph/ontology> {",
+                        "    ?edge a <https://ontology.churchcore.ai/cc/journey#JourneyEdge> ;",
+                        "          <https://ontology.churchcore.ai/cc/journey#fromNode> ?from ;",
+                        "          <https://ontology.churchcore.ai/cc/journey#toNode> ?to .",
+                        "    OPTIONAL { ?edge <https://ontology.churchcore.ai/cc/journey#edgeKind> ?kind }",
+                        "  }",
+                        "}",
+                        "LIMIT 500",
+                    ]
+                ),
+            },
+        ]
 
     # Step 2: execute SPARQL via MCP
     results: dict[str, Any] = {}
@@ -1116,7 +1227,7 @@ async def _predict_journey_flows_with_sparql(
 
     r2 = await model.ainvoke([("system", sys2), ("user", user2)])
     raw2 = str(getattr(r2, "content", "") or "").strip()
-    j2 = _safe_json_loads(raw2)
+    j2 = _safe_json_extract(raw2)
     if not isinstance(j2, dict):
         return _json_only_envelope_error("Could not parse predictive journey output.")
     j2["ok"] = True

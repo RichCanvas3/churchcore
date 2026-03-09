@@ -993,6 +993,15 @@ async function handleJourneyPredictFlows(req: Request, env: Env) {
     },
   });
 
+  const journeyPrediction = (envelope as any)?.data?.journey_prediction;
+  if (!journeyPrediction || typeof journeyPrediction !== "object") {
+    const msg = typeof (envelope as any)?.message === "string" ? String((envelope as any).message) : "";
+    return json(
+      { ok: false, error: msg || "No journey_prediction returned by agent", person_id: personId, horizon_days: horizonDays, output: envelope },
+      { status: 502 },
+    );
+  }
+
   return json({ ok: true, person_id: personId, horizon_days: horizonDays, output: envelope });
 }
 
