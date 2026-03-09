@@ -1219,8 +1219,17 @@ async def _predict_journey_flows_with_sparql(
                 }
             else:
                 brief[name] = {"reason": "no_result", "query_snippet": str(qmap.get(name) or "").strip().replace("\n", " ")[:260]}
+        msg_lines = [f"SPARQL query failed for: {', '.join(failed[:6])}"]
+        for name in failed[:3]:
+            reason = ""
+            b = brief.get(name)
+            if isinstance(b, dict):
+                reason = str(b.get("reason") or "").strip()
+            if reason:
+                msg_lines.append(f"- {name}: {reason[:500]}")
+        msg_lines.append("See `data.failed_brief` for full details.")
         return OutputEnvelope(
-            message=f"SPARQL query failed for: {', '.join(failed[:6])}",
+            message="\n".join(msg_lines).strip(),
             data={
                 "ok": False,
                 "reason": "sparql_execution_failed",
