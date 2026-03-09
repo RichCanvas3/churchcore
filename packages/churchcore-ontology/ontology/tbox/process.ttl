@@ -18,7 +18,7 @@
 
 ccproc:ProcessRole a owl:Class ;
   rdfs:label "ProcessRole" ;
-  rdfs:comment "Specification of a process: a plan that bundles Steps and relevant State categories (preconditions/effects)." ;
+  rdfs:comment "Specification of a process: a Plan that bundles Steps and relevant State categories (preconditions/effects). Use ccplan:Plan for generic plans; use ccproc:ProcessRole when you want a process-oriented plan with explicit step/state semantics." ;
   rdfs:subClassOf ccplan:Plan .
 
 ccproc:Process a owl:Class ;
@@ -51,14 +51,54 @@ ccproc:hasTargetState a owl:ObjectProperty ;
   rdfs:domain ccproc:ProcessRole ;
   rdfs:range cc:State .
 
+ccproc:hasPreconditionState a owl:ObjectProperty ;
+  rdfs:label "hasPreconditionState" ;
+  rdfs:comment "Specification-side: a State category that should hold (typically on a Manifestation) before executing an Activity that corresponds to this Step." ;
+  rdfs:domain cc:Step ;
+  rdfs:range cc:State .
+
+ccproc:hasEffectState a owl:ObjectProperty ;
+  rdfs:label "hasEffectState" ;
+  rdfs:comment "Specification-side: a State category that should hold (typically on a Manifestation) as an intended outcome of executing an Activity that corresponds to this Step." ;
+  rdfs:domain cc:Step ;
+  rdfs:range cc:State .
+
 ccproc:hasActivity a owl:ObjectProperty ;
   rdfs:label "hasActivity" ;
   rdfs:comment "Convenience: links a Process bundle to an included Activity occurrence." ;
   rdfs:domain ccproc:Process ;
   rdfs:range prov:Activity .
 
+ccproc:inProcess a owl:ObjectProperty ;
+  rdfs:label "inProcess" ;
+  rdfs:comment "Inverse convenience: links an Activity occurrence to the Process bundle that contains it." ;
+  rdfs:domain prov:Activity ;
+  rdfs:range ccproc:Process ;
+  owl:inverseOf ccproc:hasActivity .
+
 ccproc:hasManifestation a owl:ObjectProperty ;
   rdfs:label "hasManifestation" ;
   rdfs:comment "Convenience: links a Process bundle to an included Manifestation snapshot." ;
   rdfs:domain ccproc:Process ;
   rdfs:range cc:Manifestation .
+
+ccproc:manifestationInProcess a owl:ObjectProperty ;
+  rdfs:label "manifestationInProcess" ;
+  rdfs:comment "Inverse convenience: links a Manifestation snapshot to the Process bundle that contains it." ;
+  rdfs:domain cc:Manifestation ;
+  rdfs:range ccproc:Process ;
+  owl:inverseOf ccproc:hasManifestation .
+
+ccproc:usedManifestation a owl:ObjectProperty ;
+  rdfs:label "usedManifestation" ;
+  rdfs:comment "Execution-side: links an Activity to an input Manifestation snapshot it used. This is a typed convenience for provenance, aligned to prov:used." ;
+  rdfs:domain cc:Activity ;
+  rdfs:range cc:Manifestation ;
+  rdfs:subPropertyOf prov:used .
+
+ccproc:generatedManifestation a owl:ObjectProperty ;
+  rdfs:label "generatedManifestation" ;
+  rdfs:comment "Execution-side: links an Activity to an output Manifestation snapshot it generated. This is a typed convenience for provenance, aligned to prov:generated." ;
+  rdfs:domain cc:Activity ;
+  rdfs:range cc:Manifestation ;
+  rdfs:subPropertyOf prov:generated .

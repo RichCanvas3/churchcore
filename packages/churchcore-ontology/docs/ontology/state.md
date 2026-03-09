@@ -59,6 +59,20 @@ The situations module defines:
 
 In practice, the “outcome/enabling Entity” is often a `cc:Manifestation`.
 
+## How this connects to planning + process execution
+
+Planning side:
+
+- `cc:Step` can declare intended state constraints via:
+  - `ccproc:hasPreconditionState`
+  - `ccproc:hasEffectState`
+
+Execution side:
+
+- an executed `cc:Activity` can attach explicit provenance to state change by linking the manifestation snapshots it consumed/produced:
+  - `ccproc:usedManifestation` (typed subproperty of `prov:used`)
+  - `ccproc:generatedManifestation` (typed subproperty of `prov:generated`)
+
 ## SPARQL: list manifestations and their states
 
 ```sparql

@@ -7,7 +7,7 @@ Sources:
 
 This module models the website’s “ProcessRole vs Process” distinction:
 
-- **ProcessRole**: a *specification* (plan-level) bundle of `cc:Step` + required/target `cc:State` categories
+- **ProcessRole**: a *specification* (plan-level) bundle of `cc:Step` + required/target `cc:State` categories (a specialized `ccplan:Plan`)
 - **Process**: an *execution* (run-level) bundle of activities and entities (including `cc:Manifestation`)
 
 ## Class hierarchy
@@ -44,8 +44,33 @@ ccproc_ProcessRole --> cc_Step : hasStep
 ccproc_ProcessRole --> cc_State : hasRequiredState
 ccproc_ProcessRole --> cc_State : hasTargetState
 
+cc_Step --> cc_State : hasPreconditionState
+cc_Step --> cc_State : hasEffectState
+
 ccproc_Process --> prov_Activity : hasActivity
 ccproc_Process --> cc_Manifestation : hasManifestation
+```
+
+## Step preconditions and effects
+
+`ccproc:hasPreconditionState` and `ccproc:hasEffectState` attach state semantics directly to a specification-side `cc:Step` (mirroring the “precondition/effect of a step-type” concept on the website).
+
+Execution-side, an `cc:Activity` that `cc:correspondsToStep` can make this provenance explicit by linking the input/output manifestations it used/generated:
+
+- `ccproc:usedManifestation` (subproperty of `prov:used`)
+- `ccproc:generatedManifestation` (subproperty of `prov:generated`)
+
+## SPARQL: activities that generated manifestations
+
+```sparql
+PREFIX ccproc: <https://ontology.churchcore.ai/cc/process#>
+
+SELECT ?activity ?m
+WHERE {
+  ?activity ccproc:generatedManifestation ?m .
+}
+ORDER BY ?activity ?m
+LIMIT 200
 ```
 
 ## SPARQL: list processes and their roles
