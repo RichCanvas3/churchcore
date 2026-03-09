@@ -40,7 +40,7 @@ The Cloudflare sync writes instance triples into a named graph:
 
 - `https://churchcore.ai/graph/d1/<churchId>`
 
-In the current implementation, instance IRIs use:
+Instance IRIs are minted under:
 
 - `https://id.churchcore.ai/...`
 

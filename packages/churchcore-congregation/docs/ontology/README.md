@@ -20,7 +20,7 @@ This package defines **local church operations** concepts that derive from the C
 - `audience.md`: audience/segment schema + local segment taxonomies
 - `sparql-queries.md`: practical GraphDB queries (patterns)
 
-## GraphDB conventions (current)
+## GraphDB conventions
 
 - **Named graph** per church: `https://churchcore.ai/graph/d1/<churchId>`
 - **Instance IDs**: `https://id.churchcore.ai/...`

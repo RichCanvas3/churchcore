@@ -1,8 +1,6 @@
 # ChurchCore-Congregation Ontology
 
-This is a landing page for legacy links.
-
-Use the up-to-date docs index instead:
+Use the up-to-date docs index:
 
 - `docs/ontology/README.md`
 
