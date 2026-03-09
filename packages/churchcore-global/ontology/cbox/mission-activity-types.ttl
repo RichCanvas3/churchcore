@@ -1,0 +1,49 @@
+@prefix ccgclass: <https://ontology.churchcore.ai/cc/global/class#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+
+<https://ontology.churchcore.ai/cc/global/cbox/mission-activity-types>
+  a owl:Ontology ;
+  rdfs:label "ChurchCore-Global C-Box (mission activity types)" ;
+  rdfs:comment "Starter mission activity type scheme used to classify mission activities across congregations, mission orgs, and people groups." ;
+  owl:imports <http://www.w3.org/2004/02/skos/core> .
+
+ccgclass:MissionActivityTypeScheme a skos:ConceptScheme ;
+  skos:prefLabel "Mission activity types" .
+
+ccgclass:mission_activity_evangelism a skos:Concept ;
+  skos:inScheme ccgclass:MissionActivityTypeScheme ;
+  skos:notation "evangelism" ;
+  skos:prefLabel "Evangelism" .
+
+ccgclass:mission_activity_discipleship a skos:Concept ;
+  skos:inScheme ccgclass:MissionActivityTypeScheme ;
+  skos:notation "discipleship" ;
+  skos:prefLabel "Discipleship" .
+
+ccgclass:mission_activity_teaching a skos:Concept ;
+  skos:inScheme ccgclass:MissionActivityTypeScheme ;
+  skos:notation "teaching" ;
+  skos:prefLabel "Teaching" .
+
+ccgclass:mission_activity_baptism a skos:Concept ;
+  skos:inScheme ccgclass:MissionActivityTypeScheme ;
+  skos:notation "baptism" ;
+  skos:prefLabel "Baptism" .
+
+ccgclass:mission_activity_church_planting a skos:Concept ;
+  skos:inScheme ccgclass:MissionActivityTypeScheme ;
+  skos:notation "church_planting" ;
+  skos:prefLabel "Church planting" .
+
+ccgclass:mission_activity_scripture_translation a skos:Concept ;
+  skos:inScheme ccgclass:MissionActivityTypeScheme ;
+  skos:notation "scripture_translation" ;
+  skos:prefLabel "Scripture translation" .
+
+ccgclass:mission_activity_compassion_ministry a skos:Concept ;
+  skos:inScheme ccgclass:MissionActivityTypeScheme ;
+  skos:notation "compassion" ;
+  skos:prefLabel "Compassion ministry" .
+

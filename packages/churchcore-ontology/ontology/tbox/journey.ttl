@@ -68,3 +68,9 @@ ccjourney:hasReferenceSet a owl:ObjectProperty ;
   rdfs:domain ccjourney:JourneyNode ;
   rdfs:range cc:Resource .
 
+ccjourney:representsState a owl:ObjectProperty ;
+  rdfs:label "representsState" ;
+  rdfs:comment "Links a JourneyNode to a State category it represents. This supports aligning journey graphs (nodes/edges) with state-based behavioristics (manifestations classified by states)." ;
+  rdfs:domain ccjourney:JourneyNode ;
+  rdfs:range cc:State .
+

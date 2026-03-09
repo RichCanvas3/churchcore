@@ -1,0 +1,64 @@
+@prefix cc: <https://ontology.churchcore.ai/cc#> .
+@prefix ccpgclass: <https://ontology.churchcore.ai/cc/people-groups/class#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+
+<https://ontology.churchcore.ai/cc/people-groups/cbox/people-group-faith-phases>
+  a owl:Ontology ;
+  rdfs:label "ChurchCore People Groups C-Box (faith phases)" ;
+  rdfs:comment "People group gospel progress phases (Phase 0–7) as state categories for classifying manifestations over time." ;
+  owl:imports <https://ontology.churchcore.ai/cc/state/tbox> ;
+  owl:imports <http://www.w3.org/2004/02/skos/core> .
+
+ccpgclass:PeopleGroupFaithPhaseScheme a skos:ConceptScheme ;
+  skos:prefLabel "People group faith phases" .
+
+ccpgclass:pg_phase_0_unengaged a skos:Concept, cc:NonTerminalState ;
+  skos:inScheme ccpgclass:PeopleGroupFaithPhaseScheme ;
+  skos:notation "phase0_unengaged" ;
+  skos:prefLabel "Phase 0 — Unengaged" ;
+  skos:definition "No active engagement or responsible organization attempting to reach the group." .
+
+ccpgclass:pg_phase_1_adoption a skos:Concept, cc:NonTerminalState ;
+  skos:inScheme ccpgclass:PeopleGroupFaithPhaseScheme ;
+  skos:notation "phase1_adoption" ;
+  skos:prefLabel "Phase 1 — Adoption" ;
+  skos:definition "A church or mission organization adopts responsibility and forms initial strategy." .
+
+ccpgclass:pg_phase_2_gospel_presence a skos:Concept, cc:NonTerminalState ;
+  skos:inScheme ccpgclass:PeopleGroupFaithPhaseScheme ;
+  skos:notation "phase2_gospel_presence" ;
+  skos:prefLabel "Phase 2 — Gospel presence" ;
+  skos:definition "Workers are actively sharing the gospel; early entry and contextualization underway." .
+
+ccpgclass:pg_phase_3_disciples_emerging a skos:Concept, cc:NonTerminalState ;
+  skos:inScheme ccpgclass:PeopleGroupFaithPhaseScheme ;
+  skos:notation "phase3_disciples_emerging" ;
+  skos:prefLabel "Phase 3 — Disciples emerging" ;
+  skos:definition "Responding believers and early disciples emerge; small gatherings begin." .
+
+ccpgclass:pg_phase_4_local_church a skos:Concept, cc:NonTerminalState ;
+  skos:inScheme ccpgclass:PeopleGroupFaithPhaseScheme ;
+  skos:notation "phase4_local_church" ;
+  skos:prefLabel "Phase 4 — Local church" ;
+  skos:definition "An indigenous church exists within the culture with local leadership and regular teaching." .
+
+ccpgclass:pg_phase_5_reproducing_churches a skos:Concept, cc:NonTerminalState ;
+  skos:inScheme ccpgclass:PeopleGroupFaithPhaseScheme ;
+  skos:notation "phase5_reproducing_churches" ;
+  skos:prefLabel "Phase 5 — Reproducing churches" ;
+  skos:definition "Churches reproduce within the people group (second-generation churches; indigenous missionaries emerging)." .
+
+ccpgclass:pg_phase_6_multiplying_movement a skos:Concept, cc:NonTerminalState ;
+  skos:inScheme ccpgclass:PeopleGroupFaithPhaseScheme ;
+  skos:notation "phase6_multiplying_movement" ;
+  skos:prefLabel "Phase 6 — Multiplying movement" ;
+  skos:definition "Multi-generation multiplication across networks with leadership multiplication and durable practices." .
+
+ccpgclass:pg_phase_7_cross_cultural_sending a skos:Concept, cc:NonTerminalState ;
+  skos:inScheme ccpgclass:PeopleGroupFaithPhaseScheme ;
+  skos:notation "phase7_cross_cultural_sending" ;
+  skos:prefLabel "Phase 7 — Cross-cultural sending" ;
+  skos:definition "The people group becomes a sending movement to other peoples (cross-cultural mission sending)." .
+

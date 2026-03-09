@@ -18,6 +18,7 @@ This package defines the **Big‑C** Christian ecosystem layer that derives from
 
 - `overview.md`: design patterns + layering + query patterns
 - `ecosystem.md`: Big-C ecosystem schema (denomination, mission agency, initiative, people group)
+- `mission.md`: Great Commission mission schema + MissionSituation bridge
 - `audience.md`: audience/segment schema + global segment taxonomies
 - `bible.md`: Bible reference set schema
 - `classifications.md`: global C-Box categories (traditions, theology, initiative types)

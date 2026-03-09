@@ -1,0 +1,59 @@
+@prefix cc: <https://ontology.churchcore.ai/cc#> .
+@prefix ccpg: <https://ontology.churchcore.ai/cc/people-groups#> .
+@prefix prov: <http://www.w3.org/ns/prov#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<https://ontology.churchcore.ai/cc/people-groups/tbox/people-groups>
+  a owl:Ontology ;
+  rdfs:label "ChurchCore People Groups T-Box" ;
+  rdfs:comment "People group modeling primitives aligned with ChurchCore state-based behavioristics (people groups as time-varying concepts)." ;
+  owl:imports <https://ontology.churchcore.ai/cc/all> ;
+  owl:imports <https://ontology.churchcore.ai/cc/state/tbox> ;
+  owl:imports <http://www.w3.org/ns/prov-o-20130430> .
+
+ccpg:PeopleGroup a owl:Class ;
+  rdfs:label "PeopleGroup" ;
+  rdfs:comment "A people group identity (ethnolinguistic, diaspora, national, regional, etc.) modeled as a TimeVaryingConcept so its manifestations can track gospel progress phases over time." ;
+  rdfs:subClassOf cc:TimeVaryingConcept .
+
+ccpg:EthnolinguisticGroup a owl:Class ;
+  rdfs:label "EthnolinguisticGroup" ;
+  rdfs:subClassOf ccpg:PeopleGroup .
+
+ccpg:DiasporaGroup a owl:Class ;
+  rdfs:label "DiasporaGroup" ;
+  rdfs:subClassOf ccpg:PeopleGroup .
+
+ccpg:Nation a owl:Class ;
+  rdfs:label "Nation" ;
+  rdfs:comment "A geopolitical nation as a people-group scope (used for mission analysis; distinct from an Organization)." ;
+  rdfs:subClassOf ccpg:PeopleGroup .
+
+ccpg:Region a owl:Class ;
+  rdfs:label "Region" ;
+  rdfs:subClassOf ccpg:PeopleGroup .
+
+ccpg:City a owl:Class ;
+  rdfs:label "City" ;
+  rdfs:subClassOf ccpg:PeopleGroup .
+
+ccpg:locatedIn a owl:ObjectProperty ;
+  rdfs:label "locatedIn" ;
+  rdfs:comment "Location containment for people-group scopes (e.g., group located in region; diaspora located in nation/city)." ;
+  rdfs:domain ccpg:PeopleGroup ;
+  rdfs:range ccpg:PeopleGroup .
+
+ccpg:populationEstimate a owl:DatatypeProperty ;
+  rdfs:label "populationEstimate" ;
+  rdfs:comment "Approximate population estimate for a people group scope." ;
+  rdfs:domain ccpg:PeopleGroup ;
+  rdfs:range xsd:integer .
+
+ccpg:reachedStatus a owl:DatatypeProperty ;
+  rdfs:label "reachedStatus" ;
+  rdfs:comment "Optional coarse reached/unreached status tag (string). Prefer modeling gospel progress using manifestations classified by phase states." ;
+  rdfs:domain ccpg:PeopleGroup ;
+  rdfs:range xsd:string .
+

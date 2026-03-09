@@ -1,0 +1,256 @@
+@prefix cc: <https://ontology.churchcore.ai/cc#> .
+@prefix ccjourney: <https://ontology.churchcore.ai/cc/journey#> .
+@prefix ccfj: <https://ontology.churchcore.ai/cc/faith-journey#> .
+@prefix ccfjclass: <https://ontology.churchcore.ai/cc/faith-journey/class#> .
+@prefix ccclass: <https://ontology.churchcore.ai/cc/class#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<https://ontology.churchcore.ai/cc/faith-journey/cbox/faith-journey-graph>
+  a owl:Ontology ;
+  rdfs:label "ChurchCore Faith Journey C-Box (faith journey graph)" ;
+  rdfs:comment "Canonical faith journey graph (not per church). Provides macro stages 1–9 and a finer-grained subgraph for stages 1–3." ;
+  owl:imports <https://ontology.churchcore.ai/cc/all> ;
+  owl:imports <https://ontology.churchcore.ai/cc/journey/tbox> ;
+  owl:imports <https://ontology.churchcore.ai/cc/cbox/journey> ;
+  owl:imports <https://ontology.churchcore.ai/cc/faith-journey/cbox/faith-journey-states> .
+
+###
+# Macro stage nodes (1–9)
+###
+
+ccfj:journey_faith_graph_v1 a ccjourney:JourneyGraph ;
+  cc:name "Faith journey (v1)" .
+
+ccfj:journey_stage_seeker a ccjourney:JourneyNode ;
+  cc:name "Seeker" ;
+  ccjourney:representsState ccfjclass:faith_stage_seeker .
+
+ccfj:journey_stage_gospel_clarity a ccjourney:JourneyNode ;
+  cc:name "Gospel clarity" ;
+  ccjourney:representsState ccfjclass:faith_stage_gospel_clarity .
+
+ccfj:journey_stage_conversion a ccjourney:JourneyNode ;
+  cc:name "Conversion" ;
+  ccjourney:representsState ccfjclass:faith_stage_conversion .
+
+ccfj:journey_stage_new_believer a ccjourney:JourneyNode ;
+  cc:name "New believer" ;
+  ccjourney:representsState ccfjclass:faith_stage_new_believer .
+
+ccfj:journey_stage_connected a ccjourney:JourneyNode ;
+  cc:name "Connected" ;
+  ccjourney:representsState ccfjclass:faith_stage_connected .
+
+ccfj:journey_stage_growing_disciple a ccjourney:JourneyNode ;
+  cc:name "Growing disciple" ;
+  ccjourney:representsState ccfjclass:faith_stage_growing_disciple .
+
+ccfj:journey_stage_serving a ccjourney:JourneyNode ;
+  cc:name "Serving" ;
+  ccjourney:representsState ccfjclass:faith_stage_serving .
+
+ccfj:journey_stage_multiplying a ccjourney:JourneyNode ;
+  cc:name "Multiplying" ;
+  ccjourney:representsState ccfjclass:faith_stage_multiplying .
+
+ccfj:journey_stage_leader a ccjourney:JourneyNode ;
+  cc:name "Leader" ;
+  ccjourney:representsState ccfjclass:faith_stage_leader .
+
+###
+# Macro next-stage edges (simple map)
+###
+
+ccfj:journey_edge_seeker_to_gospel_clarity a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:journey_stage_seeker ;
+  ccjourney:toNode ccfj:journey_stage_gospel_clarity ;
+  ccjourney:edgeKind "NEXT_STAGE" .
+
+ccfj:journey_edge_gospel_clarity_to_conversion a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:journey_stage_gospel_clarity ;
+  ccjourney:toNode ccfj:journey_stage_conversion ;
+  ccjourney:edgeKind "NEXT_STAGE" .
+
+ccfj:journey_edge_conversion_to_new_believer a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:journey_stage_conversion ;
+  ccjourney:toNode ccfj:journey_stage_new_believer ;
+  ccjourney:edgeKind "NEXT_STAGE" .
+
+ccfj:journey_edge_new_believer_to_connected a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:journey_stage_new_believer ;
+  ccjourney:toNode ccfj:journey_stage_connected ;
+  ccjourney:edgeKind "NEXT_STAGE" .
+
+ccfj:journey_edge_connected_to_growing_disciple a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:journey_stage_connected ;
+  ccjourney:toNode ccfj:journey_stage_growing_disciple ;
+  ccjourney:edgeKind "NEXT_STAGE" .
+
+ccfj:journey_edge_growing_disciple_to_serving a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:journey_stage_growing_disciple ;
+  ccjourney:toNode ccfj:journey_stage_serving ;
+  ccjourney:edgeKind "NEXT_STAGE" .
+
+ccfj:journey_edge_serving_to_multiplying a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:journey_stage_serving ;
+  ccjourney:toNode ccfj:journey_stage_multiplying ;
+  ccjourney:edgeKind "NEXT_STAGE" .
+
+ccfj:journey_edge_multiplying_to_leader a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:journey_stage_multiplying ;
+  ccjourney:toNode ccfj:journey_stage_leader ;
+  ccjourney:edgeKind "NEXT_STAGE" .
+
+###
+# Stage 1–3 fine-grained subgraph (v1)
+###
+
+ccfj:journey_seeker_questions a ccjourney:JourneyNode ; cc:name "Questions and curiosity" .
+ccfj:journey_seeker_trust a ccjourney:JourneyNode ; cc:name "Relational trust" .
+ccfj:journey_seeker_exposure_gospel a ccjourney:JourneyNode ; cc:name "Exposure to the gospel" .
+ccfj:journey_seeker_barrier_misconceptions a ccjourney:JourneyNode ; cc:name "Misconceptions / objections" .
+ccfj:journey_seeker_barrier_hurt a ccjourney:JourneyNode ; cc:name "Church hurt / distrust" .
+ccfj:journey_seeker_action_attend a ccjourney:JourneyNode ; cc:name "Attend a gathering" .
+ccfj:journey_seeker_action_conversation a ccjourney:JourneyNode ; cc:name "Conversation with a believer" .
+ccfj:journey_seeker_action_prayer a ccjourney:JourneyNode ; cc:name "Pray honestly" .
+ccfj:journey_seeker_action_read_scripture a ccjourney:JourneyNode ; cc:name "Read scripture" .
+
+ccfj:journey_edge_stage_seeker_to_questions a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:journey_stage_seeker ;
+  ccjourney:toNode ccfj:journey_seeker_questions ;
+  ccjourney:edgeKind "UNLOCKS" .
+
+ccfj:journey_edge_questions_to_conversation a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:journey_seeker_questions ;
+  ccjourney:toNode ccfj:journey_seeker_action_conversation ;
+  ccjourney:edgeKind "RECOMMENDS" .
+
+ccfj:journey_edge_conversation_to_exposure a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:journey_seeker_action_conversation ;
+  ccjourney:toNode ccfj:journey_seeker_exposure_gospel ;
+  ccjourney:edgeKind "UNLOCKS" .
+
+ccfj:journey_edge_questions_to_attend a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:journey_seeker_questions ;
+  ccjourney:toNode ccfj:journey_seeker_action_attend ;
+  ccjourney:edgeKind "RECOMMENDS" .
+
+ccfj:journey_edge_attend_to_trust a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:journey_seeker_action_attend ;
+  ccjourney:toNode ccfj:journey_seeker_trust ;
+  ccjourney:edgeKind "UNLOCKS" .
+
+ccfj:journey_edge_trust_to_exposure a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:journey_seeker_trust ;
+  ccjourney:toNode ccfj:journey_seeker_exposure_gospel ;
+  ccjourney:edgeKind "UNLOCKS" .
+
+ccfj:journey_edge_exposure_to_read_scripture a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:journey_seeker_exposure_gospel ;
+  ccjourney:toNode ccfj:journey_seeker_action_read_scripture ;
+  ccjourney:edgeKind "RECOMMENDS" .
+
+ccfj:journey_edge_exposure_to_prayer a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:journey_seeker_exposure_gospel ;
+  ccjourney:toNode ccfj:journey_seeker_action_prayer ;
+  ccjourney:edgeKind "RECOMMENDS" .
+
+ccfj:journey_edge_misconceptions_blocks_exposure a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:journey_seeker_exposure_gospel ;
+  ccjourney:toNode ccfj:journey_seeker_barrier_misconceptions ;
+  ccjourney:edgeKind "BLOCKED_BY" .
+
+ccfj:journey_edge_hurt_blocks_trust a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:journey_seeker_trust ;
+  ccjourney:toNode ccfj:journey_seeker_barrier_hurt ;
+  ccjourney:edgeKind "BLOCKED_BY" .
+
+ccfj:journey_edge_misconceptions_resolved_by_conversation a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:journey_seeker_barrier_misconceptions ;
+  ccjourney:toNode ccfj:journey_seeker_action_conversation ;
+  ccjourney:edgeKind "RESOLVED_BY" .
+
+ccfj:journey_edge_hurt_resolved_by_trust a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:journey_seeker_barrier_hurt ;
+  ccjourney:toNode ccfj:journey_seeker_trust ;
+  ccjourney:edgeKind "RESOLVED_BY" .
+
+ccfj:journey_gospel_clarity_understand_person_jesus a ccjourney:JourneyNode ; cc:name "Who Jesus is" .
+ccfj:journey_gospel_clarity_understand_sin_grace a ccjourney:JourneyNode ; cc:name "Sin and grace" .
+ccfj:journey_gospel_clarity_understand_cross_resurrection a ccjourney:JourneyNode ; cc:name "Cross and resurrection" .
+ccfj:journey_gospel_clarity_understand_response a ccjourney:JourneyNode ; cc:name "Repentance and faith response" .
+ccfj:journey_gospel_clarity_assess_understanding a ccjourney:JourneyNode ; cc:name "Assess understanding" .
+ccfj:journey_gospel_clarity_barrier_confusion a ccjourney:JourneyNode ; cc:name "Confusion about the gospel" .
+
+ccfj:journey_edge_stage_gospel_clarity_to_person_jesus a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:journey_stage_gospel_clarity ;
+  ccjourney:toNode ccfj:journey_gospel_clarity_understand_person_jesus ;
+  ccjourney:edgeKind "UNLOCKS" .
+
+ccfj:journey_edge_person_jesus_to_cross_resurrection a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:journey_gospel_clarity_understand_person_jesus ;
+  ccjourney:toNode ccfj:journey_gospel_clarity_understand_cross_resurrection ;
+  ccjourney:edgeKind "REQUIRES" .
+
+ccfj:journey_edge_cross_to_sin_grace a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:journey_gospel_clarity_understand_cross_resurrection ;
+  ccjourney:toNode ccfj:journey_gospel_clarity_understand_sin_grace ;
+  ccjourney:edgeKind "REQUIRES" .
+
+ccfj:journey_edge_sin_grace_to_response a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:journey_gospel_clarity_understand_sin_grace ;
+  ccjourney:toNode ccfj:journey_gospel_clarity_understand_response ;
+  ccjourney:edgeKind "REQUIRES" .
+
+ccfj:journey_edge_response_to_assess a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:journey_gospel_clarity_understand_response ;
+  ccjourney:toNode ccfj:journey_gospel_clarity_assess_understanding ;
+  ccjourney:edgeKind "RECOMMENDS" .
+
+ccfj:journey_edge_assess_to_conversion a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:journey_gospel_clarity_assess_understanding ;
+  ccjourney:toNode ccfj:journey_stage_conversion ;
+  ccjourney:edgeKind "NEXT_STAGE" .
+
+ccfj:journey_edge_clarity_blocked_by_confusion a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:journey_stage_gospel_clarity ;
+  ccjourney:toNode ccfj:journey_gospel_clarity_barrier_confusion ;
+  ccjourney:edgeKind "BLOCKED_BY" .
+
+ccfj:journey_edge_confusion_resolved_by_read_scripture a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:journey_gospel_clarity_barrier_confusion ;
+  ccjourney:toNode ccfj:journey_seeker_action_read_scripture ;
+  ccjourney:edgeKind "RESOLVED_BY" .
+
+ccfj:journey_conversion_conviction a ccjourney:JourneyNode ; cc:name "Conviction and willingness to turn" .
+ccfj:journey_conversion_repentance a ccjourney:JourneyNode ; cc:name "Repentance" .
+ccfj:journey_conversion_faith_in_christ a ccjourney:JourneyNode ; cc:name "Faith in Christ" .
+ccfj:journey_conversion_confession a ccjourney:JourneyNode ; cc:name "Confession / declaration" .
+
+ccfj:journey_edge_stage_conversion_to_conviction a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:journey_stage_conversion ;
+  ccjourney:toNode ccfj:journey_conversion_conviction ;
+  ccjourney:edgeKind "UNLOCKS" .
+
+ccfj:journey_edge_conviction_to_repentance a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:journey_conversion_conviction ;
+  ccjourney:toNode ccfj:journey_conversion_repentance ;
+  ccjourney:edgeKind "REQUIRES" .
+
+ccfj:journey_edge_repentance_to_faith a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:journey_conversion_repentance ;
+  ccjourney:toNode ccfj:journey_conversion_faith_in_christ ;
+  ccjourney:edgeKind "REQUIRES" .
+
+ccfj:journey_edge_faith_to_confession a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:journey_conversion_faith_in_christ ;
+  ccjourney:toNode ccfj:journey_conversion_confession ;
+  ccjourney:edgeKind "RECOMMENDS" .
+
+ccfj:journey_edge_confession_to_new_believer a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:journey_conversion_confession ;
+  ccjourney:toNode ccfj:journey_stage_new_believer ;
+  ccjourney:edgeKind "NEXT_STAGE" .
+

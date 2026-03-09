@@ -1,0 +1,82 @@
+@prefix cc: <https://ontology.churchcore.ai/cc#> .
+@prefix ccglobal: <https://ontology.churchcore.ai/cc/global#> .
+@prefix ccsit: <https://ontology.churchcore.ai/cc/situation#> .
+@prefix ccplan: <https://ontology.churchcore.ai/cc/plan#> .
+@prefix ccpg: <https://ontology.churchcore.ai/cc/people-groups#> .
+@prefix prov: <http://www.w3.org/ns/prov#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+
+<https://ontology.churchcore.ai/cc/global/tbox/mission>
+  a owl:Ontology ;
+  rdfs:label "ChurchCore-Global T-Box (mission)" ;
+  rdfs:comment "Big-C mission schema aligned to PROV, planning, situations, and people group phases. Centers on MissionSituation as the bridge across congregations, mission organizations, people groups, activities, and outcomes." ;
+  owl:imports <https://ontology.churchcore.ai/cc/all> ;
+  owl:imports <https://ontology.churchcore.ai/cc/plan/tbox> ;
+  owl:imports <https://ontology.churchcore.ai/cc/situation/tbox> ;
+  owl:imports <https://ontology.churchcore.ai/cc/people-groups/tbox/people-groups> ;
+  owl:imports <http://www.w3.org/ns/prov-o-20130430> ;
+  owl:imports <http://www.w3.org/2004/02/skos/core> .
+
+ccglobal:Mission a owl:Class ;
+  rdfs:label "Mission" ;
+  rdfs:comment "A mission plan/specification (why/what/how) that can be executed through activities and participation. Modeled as a Plan." ;
+  rdfs:subClassOf ccplan:Plan .
+
+ccglobal:GreatCommissionMission a owl:Class ;
+  rdfs:label "GreatCommissionMission" ;
+  rdfs:comment "A mission plan aligned to the Great Commission (make disciples among people groups, through baptism and teaching)." ;
+  rdfs:subClassOf ccglobal:Mission .
+
+ccglobal:MissionSituation a owl:Class ;
+  rdfs:label "MissionSituation" ;
+  rdfs:comment "Reified mission context connecting participants (congregations, mission orgs), targets (people groups), mission plan, activities, and outcomes." ;
+  rdfs:subClassOf ccsit:ChurchSituation .
+
+ccglobal:MissionSituationSpecification a owl:Class ;
+  rdfs:label "MissionSituationSpecification" ;
+  rdfs:comment "Specification for a MissionSituation (roles/constraints), distinct from an occurrence." ;
+  rdfs:subClassOf ccsit:ChurchSituationSpecification .
+
+ccglobal:hasMission a owl:ObjectProperty ;
+  rdfs:label "hasMission" ;
+  rdfs:comment "Links a MissionSituation to its mission plan/specification." ;
+  rdfs:domain ccglobal:MissionSituation ;
+  rdfs:range ccglobal:Mission ;
+  rdfs:subPropertyOf ccsit:hasEntity .
+
+ccglobal:missionParticipant a owl:ObjectProperty ;
+  rdfs:label "missionParticipant" ;
+  rdfs:comment "A participating Agent (congregation, mission organization, team, etc.) in a MissionSituation." ;
+  rdfs:domain ccglobal:MissionSituation ;
+  rdfs:range prov:Agent ;
+  rdfs:subPropertyOf ccsit:hasAgent .
+
+ccglobal:missionTargetPeopleGroup a owl:ObjectProperty ;
+  rdfs:label "missionTargetPeopleGroup" ;
+  rdfs:comment "Target people group for a MissionSituation." ;
+  rdfs:domain ccglobal:MissionSituation ;
+  rdfs:range ccpg:PeopleGroup ;
+  rdfs:subPropertyOf ccsit:hasEntity .
+
+ccglobal:missionActivity a owl:ObjectProperty ;
+  rdfs:label "missionActivity" ;
+  rdfs:comment "Activities executed as part of a MissionSituation (evangelism, discipleship, church planting, etc.)." ;
+  rdfs:domain ccglobal:MissionSituation ;
+  rdfs:range prov:Activity ;
+  rdfs:subPropertyOf ccsit:hasActivity .
+
+ccglobal:missionOutcomeEntity a owl:ObjectProperty ;
+  rdfs:label "missionOutcomeEntity" ;
+  rdfs:comment "Outcome artifact/entity of a MissionSituation (often a Manifestation snapshot on a person, congregation, or people group)." ;
+  rdfs:domain ccglobal:MissionSituation ;
+  rdfs:range prov:Entity ;
+  rdfs:subPropertyOf ccsit:hasEntity .
+
+ccglobal:hasMissionActivityType a owl:ObjectProperty ;
+  rdfs:label "hasMissionActivityType" ;
+  rdfs:comment "Tags an Activity with a mission activity type (SKOS concept), using the global MissionActivityTypeScheme." ;
+  rdfs:domain prov:Activity ;
+  rdfs:range skos:Concept .
+

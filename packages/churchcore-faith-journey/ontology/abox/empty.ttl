@@ -1,0 +1,8 @@
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+<https://ontology.churchcore.ai/cc/faith-journey/abox>
+  a owl:Ontology ;
+  rdfs:label "ChurchCore Faith Journey A-Box (placeholder)" ;
+  rdfs:comment "Instance data is stored in GraphDB named graphs, not in the repo." .
+

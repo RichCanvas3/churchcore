@@ -1,0 +1,86 @@
+@prefix cc: <https://ontology.churchcore.ai/cc#> .
+@prefix ccjourney: <https://ontology.churchcore.ai/cc/journey#> .
+@prefix ccpg: <https://ontology.churchcore.ai/cc/people-groups#> .
+@prefix ccpgclass: <https://ontology.churchcore.ai/cc/people-groups/class#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+<https://ontology.churchcore.ai/cc/people-groups/cbox/people-group-faith-journey-graph>
+  a owl:Ontology ;
+  rdfs:label "ChurchCore People Groups C-Box (faith journey graph)" ;
+  rdfs:comment "Canonical people group gospel progress graph, aligned to Phase 0–7 state categories." ;
+  owl:imports <https://ontology.churchcore.ai/cc/all> ;
+  owl:imports <https://ontology.churchcore.ai/cc/journey/tbox> ;
+  owl:imports <https://ontology.churchcore.ai/cc/cbox/journey> ;
+  owl:imports <https://ontology.churchcore.ai/cc/people-groups/cbox/people-group-faith-phases> .
+
+ccpg:journey_people_group_phases_v1 a ccjourney:JourneyGraph ;
+  cc:name "People group faith phases (v1)" .
+
+ccpg:pg_phase_0_node a ccjourney:JourneyNode ;
+  cc:name "Phase 0 — Unengaged" ;
+  ccjourney:representsState ccpgclass:pg_phase_0_unengaged .
+
+ccpg:pg_phase_1_node a ccjourney:JourneyNode ;
+  cc:name "Phase 1 — Adoption" ;
+  ccjourney:representsState ccpgclass:pg_phase_1_adoption .
+
+ccpg:pg_phase_2_node a ccjourney:JourneyNode ;
+  cc:name "Phase 2 — Gospel presence" ;
+  ccjourney:representsState ccpgclass:pg_phase_2_gospel_presence .
+
+ccpg:pg_phase_3_node a ccjourney:JourneyNode ;
+  cc:name "Phase 3 — Disciples emerging" ;
+  ccjourney:representsState ccpgclass:pg_phase_3_disciples_emerging .
+
+ccpg:pg_phase_4_node a ccjourney:JourneyNode ;
+  cc:name "Phase 4 — Local church" ;
+  ccjourney:representsState ccpgclass:pg_phase_4_local_church .
+
+ccpg:pg_phase_5_node a ccjourney:JourneyNode ;
+  cc:name "Phase 5 — Reproducing churches" ;
+  ccjourney:representsState ccpgclass:pg_phase_5_reproducing_churches .
+
+ccpg:pg_phase_6_node a ccjourney:JourneyNode ;
+  cc:name "Phase 6 — Multiplying movement" ;
+  ccjourney:representsState ccpgclass:pg_phase_6_multiplying_movement .
+
+ccpg:pg_phase_7_node a ccjourney:JourneyNode ;
+  cc:name "Phase 7 — Cross-cultural sending" ;
+  ccjourney:representsState ccpgclass:pg_phase_7_cross_cultural_sending .
+
+ccpg:edge_0_to_1 a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccpg:pg_phase_0_node ;
+  ccjourney:toNode ccpg:pg_phase_1_node ;
+  ccjourney:edgeKind "NEXT_STAGE" .
+
+ccpg:edge_1_to_2 a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccpg:pg_phase_1_node ;
+  ccjourney:toNode ccpg:pg_phase_2_node ;
+  ccjourney:edgeKind "NEXT_STAGE" .
+
+ccpg:edge_2_to_3 a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccpg:pg_phase_2_node ;
+  ccjourney:toNode ccpg:pg_phase_3_node ;
+  ccjourney:edgeKind "NEXT_STAGE" .
+
+ccpg:edge_3_to_4 a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccpg:pg_phase_3_node ;
+  ccjourney:toNode ccpg:pg_phase_4_node ;
+  ccjourney:edgeKind "NEXT_STAGE" .
+
+ccpg:edge_4_to_5 a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccpg:pg_phase_4_node ;
+  ccjourney:toNode ccpg:pg_phase_5_node ;
+  ccjourney:edgeKind "NEXT_STAGE" .
+
+ccpg:edge_5_to_6 a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccpg:pg_phase_5_node ;
+  ccjourney:toNode ccpg:pg_phase_6_node ;
+  ccjourney:edgeKind "NEXT_STAGE" .
+
+ccpg:edge_6_to_7 a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccpg:pg_phase_6_node ;
+  ccjourney:toNode ccpg:pg_phase_7_node ;
+  ccjourney:edgeKind "NEXT_STAGE" .
+

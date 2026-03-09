@@ -1,0 +1,14 @@
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+<https://ontology.churchcore.ai/cc/people-groups/all>
+  a owl:Ontology ;
+  rdfs:label "ChurchCore People Groups Ontology (all)" ;
+  rdfs:comment "Master import file for ChurchCore People Groups modules." ;
+  owl:imports
+    <https://ontology.churchcore.ai/cc/people-groups/tbox/people-groups>,
+    <https://ontology.churchcore.ai/cc/people-groups/cbox>,
+    <https://ontology.churchcore.ai/cc/journey/tbox>,
+    <https://ontology.churchcore.ai/cc/state/tbox>,
+    <https://ontology.churchcore.ai/cc/cbox/journey> .
+

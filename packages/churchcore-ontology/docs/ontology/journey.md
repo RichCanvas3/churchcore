@@ -37,6 +37,16 @@ ccjourney_PersonJourneyState --> cc_Person : forPerson
 ccjourney_PersonJourneyState --> ccjourney_JourneyNode : currentNode
 ```
 
+## Mapping journey nodes to state categories
+
+When you want a journey graph to drive state-based reasoning (preconditions/effects, progress, inferred next steps), link `ccjourney:JourneyNode` to `cc:State` categories using:
+
+- `representsState` (JourneyNode → State)
+
+This lets you align:
+
+- **graph**: “where can someone go next?” (nodes/edges)\n+- **state**: “what is true about the person right now?” (manifestations classified by states)
+
 ## SPARQL: list journey nodes + their outgoing edges
 
 ```sparql

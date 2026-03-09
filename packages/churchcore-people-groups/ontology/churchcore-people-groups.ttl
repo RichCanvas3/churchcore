@@ -1,0 +1,10 @@
+@prefix ccpg: <https://ontology.churchcore.ai/cc/people-groups#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+<https://ontology.churchcore.ai/cc/people-groups>
+  a owl:Ontology ;
+  rdfs:label "ChurchCore People Groups Ontology" ;
+  rdfs:comment "People groups and their gospel progress phases (not per church). Derives from ChurchCore upper ontology." ;
+  owl:imports <https://ontology.churchcore.ai/cc/people-groups/all> .
+

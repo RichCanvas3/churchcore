@@ -8,6 +8,7 @@
   owl:imports
     <https://ontology.churchcore.ai/cc/global/tbox/bible>,
     <https://ontology.churchcore.ai/cc/global/tbox/ecosystem>,
+    <https://ontology.churchcore.ai/cc/global/tbox/mission>,
     <https://ontology.churchcore.ai/cc/global/tbox/audience>,
     <https://ontology.churchcore.ai/cc/global/tbox/measurement>,
     <https://ontology.churchcore.ai/cc/global/cbox/denominations>,
@@ -18,6 +19,7 @@
     <https://ontology.churchcore.ai/cc/global/cbox/organization-service-categories>,
     <https://ontology.churchcore.ai/cc/global/cbox/partnership-types>,
     <https://ontology.churchcore.ai/cc/global/cbox/ecosystem-relationship-types>,
+    <https://ontology.churchcore.ai/cc/global/cbox/mission-activity-types>,
     <https://ontology.churchcore.ai/cc/global/cbox/audience-segments>,
     <https://ontology.churchcore.ai/cc/global/cbox/flourishing-dimensions>,
     <https://ontology.churchcore.ai/cc/global/cbox/congregation-thriving-dimensions> .

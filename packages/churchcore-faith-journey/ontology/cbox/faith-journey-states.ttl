@@ -1,0 +1,71 @@
+@prefix cc: <https://ontology.churchcore.ai/cc#> .
+@prefix ccfjclass: <https://ontology.churchcore.ai/cc/faith-journey/class#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+
+<https://ontology.churchcore.ai/cc/faith-journey/cbox/faith-journey-states>
+  a owl:Ontology ;
+  rdfs:label "ChurchCore Faith Journey C-Box (stage states)" ;
+  rdfs:comment "Canonical individual faith journey stage state categories, intended to align with journey graph nodes via ccjourney:representsState." ;
+  owl:imports <https://ontology.churchcore.ai/cc/state/tbox> ;
+  owl:imports <https://ontology.churchcore.ai/cc/journey/tbox> ;
+  owl:imports <http://www.w3.org/2004/02/skos/core> .
+
+ccfjclass:FaithJourneyStageScheme a skos:ConceptScheme ;
+  skos:prefLabel "Faith journey stages" .
+
+ccfjclass:faith_stage_seeker a skos:Concept, cc:NonTerminalState ;
+  skos:inScheme ccfjclass:FaithJourneyStageScheme ;
+  skos:notation "seeker" ;
+  skos:prefLabel "Seeker" ;
+  skos:definition "Exploring faith; asking questions; openness to the gospel." .
+
+ccfjclass:faith_stage_gospel_clarity a skos:Concept, cc:NonTerminalState ;
+  skos:inScheme ccfjclass:FaithJourneyStageScheme ;
+  skos:notation "gospel_clarity" ;
+  skos:prefLabel "Gospel clarity" ;
+  skos:definition "Understands the gospel and its implications." .
+
+ccfjclass:faith_stage_conversion a skos:Concept, cc:NonTerminalState ;
+  skos:inScheme ccfjclass:FaithJourneyStageScheme ;
+  skos:notation "conversion" ;
+  skos:prefLabel "Conversion" ;
+  skos:definition "Responded to Christ with repentance and faith." .
+
+ccfjclass:faith_stage_new_believer a skos:Concept, cc:NonTerminalState ;
+  skos:inScheme ccfjclass:FaithJourneyStageScheme ;
+  skos:notation "new_believer" ;
+  skos:prefLabel "New believer" ;
+  skos:definition "Early formation, assurance, basic practices." .
+
+ccfjclass:faith_stage_connected a skos:Concept, cc:NonTerminalState ;
+  skos:inScheme ccfjclass:FaithJourneyStageScheme ;
+  skos:notation "connected" ;
+  skos:prefLabel "Connected" ;
+  skos:definition "Belongs in community and participates regularly." .
+
+ccfjclass:faith_stage_growing_disciple a skos:Concept, cc:NonTerminalState ;
+  skos:inScheme ccfjclass:FaithJourneyStageScheme ;
+  skos:notation "growing_disciple" ;
+  skos:prefLabel "Growing disciple" ;
+  skos:definition "Developing habits, doctrine, and obedience." .
+
+ccfjclass:faith_stage_serving a skos:Concept, cc:NonTerminalState ;
+  skos:inScheme ccfjclass:FaithJourneyStageScheme ;
+  skos:notation "serving" ;
+  skos:prefLabel "Serving" ;
+  skos:definition "Using gifts to build up the church." .
+
+ccfjclass:faith_stage_multiplying a skos:Concept, cc:NonTerminalState ;
+  skos:inScheme ccfjclass:FaithJourneyStageScheme ;
+  skos:notation "multiplying" ;
+  skos:prefLabel "Multiplying" ;
+  skos:definition "Sharing faith and discipling others." .
+
+ccfjclass:faith_stage_leader a skos:Concept, cc:NonTerminalState ;
+  skos:inScheme ccfjclass:FaithJourneyStageScheme ;
+  skos:notation "leader" ;
+  skos:prefLabel "Leader" ;
+  skos:definition "Shepherding others with recognized responsibility." .
+

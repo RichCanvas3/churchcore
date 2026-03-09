@@ -1,0 +1,10 @@
+@prefix ccfj: <https://ontology.churchcore.ai/cc/faith-journey#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+<https://ontology.churchcore.ai/cc/faith-journey>
+  a owl:Ontology ;
+  rdfs:label "ChurchCore Faith Journey Ontology" ;
+  rdfs:comment "Individual faith journey canonical graphs and stage state categories (not per church). Derives from ChurchCore upper ontology." ;
+  owl:imports <https://ontology.churchcore.ai/cc/faith-journey/all> .
+

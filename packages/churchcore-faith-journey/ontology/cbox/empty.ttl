@@ -1,0 +1,11 @@
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+<https://ontology.churchcore.ai/cc/faith-journey/cbox>
+  a owl:Ontology ;
+  rdfs:label "ChurchCore Faith Journey C-Box" ;
+  rdfs:comment "C-Box index for faith journey controlled vocabularies and canonical graphs." ;
+  owl:imports
+    <https://ontology.churchcore.ai/cc/faith-journey/cbox/faith-journey-states>,
+    <https://ontology.churchcore.ai/cc/faith-journey/cbox/faith-journey-graph> .
+

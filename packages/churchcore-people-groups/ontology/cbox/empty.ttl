@@ -1,0 +1,11 @@
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+<https://ontology.churchcore.ai/cc/people-groups/cbox>
+  a owl:Ontology ;
+  rdfs:label "ChurchCore People Groups C-Box" ;
+  rdfs:comment "C-Box index for people group controlled vocabularies and canonical graphs." ;
+  owl:imports
+    <https://ontology.churchcore.ai/cc/people-groups/cbox/people-group-faith-phases>,
+    <https://ontology.churchcore.ai/cc/people-groups/cbox/people-group-faith-journey-graph> .
+
