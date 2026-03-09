@@ -1,0 +1,31 @@
+@prefix cc: <https://ontology.churchcore.ai/cc#> .
+@prefix ccfjclass: <https://ontology.churchcore.ai/cc/faith-journey/class#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+
+<https://ontology.churchcore.ai/cc/faith-journey/cbox/formation-states>
+  a owl:Ontology ;
+  rdfs:label "ChurchCore Faith Journey C-Box (formation states)" ;
+  rdfs:comment "Spiritual formation / maturity state categories (B-graph) used to classify manifestations and journey nodes." ;
+  owl:imports <https://ontology.churchcore.ai/cc/state/tbox> ;
+  owl:imports <http://www.w3.org/2004/02/skos/core> .
+
+ccfjclass:FormationScheme a skos:ConceptScheme ;
+  skos:prefLabel "Formation states" .
+
+ccfjclass:formation_growing_in_christ a skos:Concept, cc:NonTerminalState ;
+  skos:inScheme ccfjclass:FormationScheme ;
+  skos:notation "growing_in_christ" ;
+  skos:prefLabel "Growing in Christ" .
+
+ccfjclass:formation_close_to_christ a skos:Concept, cc:NonTerminalState ;
+  skos:inScheme ccfjclass:FormationScheme ;
+  skos:notation "close_to_christ" ;
+  skos:prefLabel "Close to Christ" .
+
+ccfjclass:formation_christ_centered a skos:Concept, cc:NonTerminalState ;
+  skos:inScheme ccfjclass:FormationScheme ;
+  skos:notation "christ_centered" ;
+  skos:prefLabel "Christ-centered" .
+

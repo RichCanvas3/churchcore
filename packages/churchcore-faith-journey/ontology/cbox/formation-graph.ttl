@@ -1,0 +1,40 @@
+@prefix cc: <https://ontology.churchcore.ai/cc#> .
+@prefix ccjourney: <https://ontology.churchcore.ai/cc/journey#> .
+@prefix ccfj: <https://ontology.churchcore.ai/cc/faith-journey#> .
+@prefix ccfjclass: <https://ontology.churchcore.ai/cc/faith-journey/class#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+<https://ontology.churchcore.ai/cc/faith-journey/cbox/formation-graph>
+  a owl:Ontology ;
+  rdfs:label "ChurchCore Faith Journey C-Box (formation graph)" ;
+  rdfs:comment "Spiritual formation/maturity graph (B) aligned to formation state categories." ;
+  owl:imports <https://ontology.churchcore.ai/cc/all> ;
+  owl:imports <https://ontology.churchcore.ai/cc/journey/tbox> ;
+  owl:imports <https://ontology.churchcore.ai/cc/faith-journey/cbox/formation-states> .
+
+ccfj:journey_formation_v1 a ccjourney:JourneyGraph ;
+  cc:name "Formation and maturity (v1)" .
+
+ccfj:formation_growing_in_christ_node a ccjourney:JourneyNode ;
+  cc:name "Growing in Christ" ;
+  ccjourney:representsState ccfjclass:formation_growing_in_christ .
+
+ccfj:formation_close_to_christ_node a ccjourney:JourneyNode ;
+  cc:name "Close to Christ" ;
+  ccjourney:representsState ccfjclass:formation_close_to_christ .
+
+ccfj:formation_christ_centered_node a ccjourney:JourneyNode ;
+  cc:name "Christ-centered" ;
+  ccjourney:representsState ccfjclass:formation_christ_centered .
+
+ccfj:edge_formation_1_to_2 a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:formation_growing_in_christ_node ;
+  ccjourney:toNode ccfj:formation_close_to_christ_node ;
+  ccjourney:edgeKind "NEXT_STAGE" .
+
+ccfj:edge_formation_2_to_3 a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:formation_close_to_christ_node ;
+  ccjourney:toNode ccfj:formation_christ_centered_node ;
+  ccjourney:edgeKind "NEXT_STAGE" .
+

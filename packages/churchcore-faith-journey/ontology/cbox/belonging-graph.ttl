@@ -1,0 +1,67 @@
+@prefix cc: <https://ontology.churchcore.ai/cc#> .
+@prefix ccjourney: <https://ontology.churchcore.ai/cc/journey#> .
+@prefix ccfj: <https://ontology.churchcore.ai/cc/faith-journey#> .
+@prefix ccfjclass: <https://ontology.churchcore.ai/cc/faith-journey/class#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+<https://ontology.churchcore.ai/cc/faith-journey/cbox/belonging-graph>
+  a owl:Ontology ;
+  rdfs:label "ChurchCore Faith Journey C-Box (belonging graph)" ;
+  rdfs:comment "Church belonging/integration graph (C) aligned to belonging state categories." ;
+  owl:imports <https://ontology.churchcore.ai/cc/all> ;
+  owl:imports <https://ontology.churchcore.ai/cc/journey/tbox> ;
+  owl:imports <https://ontology.churchcore.ai/cc/faith-journey/cbox/belonging-states> .
+
+ccfj:journey_belonging_v1 a ccjourney:JourneyGraph ;
+  cc:name "Belonging and participation (v1)" .
+
+ccfj:belonging_visitor_guest_node a ccjourney:JourneyNode ;
+  cc:name "Visitor / guest" ;
+  ccjourney:representsState ccfjclass:belonging_visitor_guest .
+
+ccfj:belonging_regular_attender_node a ccjourney:JourneyNode ;
+  cc:name "Regular attender" ;
+  ccjourney:representsState ccfjclass:belonging_regular_attender .
+
+ccfj:belonging_connected_participant_node a ccjourney:JourneyNode ;
+  cc:name "Connected participant" ;
+  ccjourney:representsState ccfjclass:belonging_connected_participant .
+
+ccfj:belonging_committed_member_node a ccjourney:JourneyNode ;
+  cc:name "Committed member / covenant participant" ;
+  ccjourney:representsState ccfjclass:belonging_committed_member .
+
+ccfj:belonging_active_servant_node a ccjourney:JourneyNode ;
+  cc:name "Active servant" ;
+  ccjourney:representsState ccfjclass:belonging_active_servant .
+
+ccfj:belonging_team_leader_node a ccjourney:JourneyNode ;
+  cc:name "Ministry contributor / team leader" ;
+  ccjourney:representsState ccfjclass:belonging_ministry_contributor_team_leader .
+
+ccfj:edge_belonging_0_to_1 a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:belonging_visitor_guest_node ;
+  ccjourney:toNode ccfj:belonging_regular_attender_node ;
+  ccjourney:edgeKind "NEXT_STAGE" .
+
+ccfj:edge_belonging_1_to_2 a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:belonging_regular_attender_node ;
+  ccjourney:toNode ccfj:belonging_connected_participant_node ;
+  ccjourney:edgeKind "NEXT_STAGE" .
+
+ccfj:edge_belonging_2_to_3 a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:belonging_connected_participant_node ;
+  ccjourney:toNode ccfj:belonging_committed_member_node ;
+  ccjourney:edgeKind "NEXT_STAGE" .
+
+ccfj:edge_belonging_3_to_4 a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:belonging_committed_member_node ;
+  ccjourney:toNode ccfj:belonging_active_servant_node ;
+  ccjourney:edgeKind "NEXT_STAGE" .
+
+ccfj:edge_belonging_4_to_5 a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:belonging_active_servant_node ;
+  ccjourney:toNode ccfj:belonging_team_leader_node ;
+  ccjourney:edgeKind "NEXT_STAGE" .
+

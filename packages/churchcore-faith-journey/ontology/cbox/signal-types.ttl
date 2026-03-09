@@ -1,0 +1,55 @@
+@prefix ccfjclass: <https://ontology.churchcore.ai/cc/faith-journey/class#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+
+<https://ontology.churchcore.ai/cc/faith-journey/cbox/signal-types>
+  a owl:Ontology ;
+  rdfs:label "ChurchCore Faith Journey C-Box (signal types)" ;
+  rdfs:comment "Signal types used to measure/observe journey dimensions (belief, practices, belonging, mission, multiplication, and risk). Values are attached in A-Box using observations/events." ;
+  owl:imports <http://www.w3.org/2004/02/skos/core> .
+
+ccfjclass:SignalTypeScheme a skos:ConceptScheme ;
+  skos:prefLabel "Journey signal types" .
+
+# Belief / identity
+ccfjclass:signal_belief_in_god a skos:Concept ; skos:inScheme ccfjclass:SignalTypeScheme ; skos:notation "belief_in_god" ; skos:prefLabel "Belief in God status" .
+ccfjclass:signal_belief_in_jesus a skos:Concept ; skos:inScheme ccfjclass:SignalTypeScheme ; skos:notation "belief_in_jesus" ; skos:prefLabel "Belief in Jesus status" .
+ccfjclass:signal_assurance_of_salvation a skos:Concept ; skos:inScheme ccfjclass:SignalTypeScheme ; skos:notation "assurance_of_salvation" ; skos:prefLabel "Assurance of salvation level" .
+ccfjclass:signal_biblical_authority_commitment a skos:Concept ; skos:inScheme ccfjclass:SignalTypeScheme ; skos:notation "biblical_authority_commitment" ; skos:prefLabel "Biblical authority commitment" .
+ccfjclass:signal_christian_identity_strength a skos:Concept ; skos:inScheme ccfjclass:SignalTypeScheme ; skos:notation "christian_identity_strength" ; skos:prefLabel "Christian identity strength" .
+
+# Practices
+ccfjclass:signal_bible_engagement a skos:Concept ; skos:inScheme ccfjclass:SignalTypeScheme ; skos:notation "bible_engagement" ; skos:prefLabel "Bible engagement level" .
+ccfjclass:signal_prayer_frequency a skos:Concept ; skos:inScheme ccfjclass:SignalTypeScheme ; skos:notation "prayer_frequency" ; skos:prefLabel "Prayer frequency" .
+ccfjclass:signal_confession_practice a skos:Concept ; skos:inScheme ccfjclass:SignalTypeScheme ; skos:notation "confession_practice" ; skos:prefLabel "Confession practice" .
+ccfjclass:signal_solitude_practice a skos:Concept ; skos:inScheme ccfjclass:SignalTypeScheme ; skos:notation "solitude_practice" ; skos:prefLabel "Solitude practice" .
+ccfjclass:signal_generosity_pattern a skos:Concept ; skos:inScheme ccfjclass:SignalTypeScheme ; skos:notation "generosity_pattern" ; skos:prefLabel "Generosity pattern" .
+
+# Belonging / community
+ccfjclass:signal_worship_attendance_frequency a skos:Concept ; skos:inScheme ccfjclass:SignalTypeScheme ; skos:notation "worship_attendance_frequency" ; skos:prefLabel "Worship attendance frequency" .
+ccfjclass:signal_small_group_frequency a skos:Concept ; skos:inScheme ccfjclass:SignalTypeScheme ; skos:notation "small_group_frequency" ; skos:prefLabel "Small group participation frequency" .
+ccfjclass:signal_spiritual_friendship_density a skos:Concept ; skos:inScheme ccfjclass:SignalTypeScheme ; skos:notation "spiritual_friendship_density" ; skos:prefLabel "Spiritual friendship density" .
+ccfjclass:signal_mentor_presence a skos:Concept ; skos:inScheme ccfjclass:SignalTypeScheme ; skos:notation "mentor_presence" ; skos:prefLabel "Mentor presence status" .
+ccfjclass:signal_membership_or_covenant_status a skos:Concept ; skos:inScheme ccfjclass:SignalTypeScheme ; skos:notation "membership_or_covenant_status" ; skos:prefLabel "Membership/covenant status" .
+
+# Mission / witness
+ccfjclass:signal_service_frequency a skos:Concept ; skos:inScheme ccfjclass:SignalTypeScheme ; skos:notation "service_frequency" ; skos:prefLabel "Service frequency" .
+ccfjclass:signal_evangelism_conversation_frequency a skos:Concept ; skos:inScheme ccfjclass:SignalTypeScheme ; skos:notation "evangelism_conversation_frequency" ; skos:prefLabel "Evangelism conversation frequency" .
+ccfjclass:signal_local_mission_participation a skos:Concept ; skos:inScheme ccfjclass:SignalTypeScheme ; skos:notation "local_mission_participation" ; skos:prefLabel "Local mission participation" .
+ccfjclass:signal_global_mission_participation a skos:Concept ; skos:inScheme ccfjclass:SignalTypeScheme ; skos:notation "global_mission_participation" ; skos:prefLabel "Global mission participation" .
+
+# Multiplication
+ccfjclass:signal_being_discipled_status a skos:Concept ; skos:inScheme ccfjclass:SignalTypeScheme ; skos:notation "being_discipled_status" ; skos:prefLabel "Being discipled status" .
+ccfjclass:signal_discipling_others_status a skos:Concept ; skos:inScheme ccfjclass:SignalTypeScheme ; skos:notation "discipling_others_status" ; skos:prefLabel "Discipling others status" .
+ccfjclass:signal_leader_training_status a skos:Concept ; skos:inScheme ccfjclass:SignalTypeScheme ; skos:notation "leader_training_status" ; skos:prefLabel "Leader training status" .
+ccfjclass:signal_group_leadership_status a skos:Concept ; skos:inScheme ccfjclass:SignalTypeScheme ; skos:notation "group_leadership_status" ; skos:prefLabel "Group leadership status" .
+ccfjclass:signal_sending_readiness_status a skos:Concept ; skos:inScheme ccfjclass:SignalTypeScheme ; skos:notation "sending_readiness_status" ; skos:prefLabel "Sending readiness status" .
+
+# Risk / stall indicators
+ccfjclass:signal_nominalism_risk a skos:Concept ; skos:inScheme ccfjclass:SignalTypeScheme ; skos:notation "nominalism_risk" ; skos:prefLabel "Nominalism risk" .
+ccfjclass:signal_belonging_without_practice_risk a skos:Concept ; skos:inScheme ccfjclass:SignalTypeScheme ; skos:notation "belonging_without_practice_risk" ; skos:prefLabel "Belonging without practice risk" .
+ccfjclass:signal_practice_without_mission_risk a skos:Concept ; skos:inScheme ccfjclass:SignalTypeScheme ; skos:notation "practice_without_mission_risk" ; skos:prefLabel "Practice without mission risk" .
+ccfjclass:signal_isolation_risk a skos:Concept ; skos:inScheme ccfjclass:SignalTypeScheme ; skos:notation "isolation_risk" ; skos:prefLabel "Isolation risk" .
+ccfjclass:signal_dropout_risk a skos:Concept ; skos:inScheme ccfjclass:SignalTypeScheme ; skos:notation "dropout_risk" ; skos:prefLabel "Dropout risk" .
+

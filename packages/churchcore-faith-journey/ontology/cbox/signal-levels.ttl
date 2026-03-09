@@ -1,0 +1,34 @@
+@prefix ccfjclass: <https://ontology.churchcore.ai/cc/faith-journey/class#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+
+<https://ontology.churchcore.ai/cc/faith-journey/cbox/signal-levels>
+  a owl:Ontology ;
+  rdfs:label "ChurchCore Faith Journey C-Box (signal levels)" ;
+  rdfs:comment "Reusable levels for journey signals (none/low/medium/high) across multiple signal types." ;
+  owl:imports <http://www.w3.org/2004/02/skos/core> .
+
+ccfjclass:SignalLevelScheme a skos:ConceptScheme ;
+  skos:prefLabel "Signal levels" .
+
+ccfjclass:signal_none a skos:Concept ;
+  skos:inScheme ccfjclass:SignalLevelScheme ;
+  skos:notation "none" ;
+  skos:prefLabel "None" .
+
+ccfjclass:signal_low a skos:Concept ;
+  skos:inScheme ccfjclass:SignalLevelScheme ;
+  skos:notation "low" ;
+  skos:prefLabel "Low" .
+
+ccfjclass:signal_medium a skos:Concept ;
+  skos:inScheme ccfjclass:SignalLevelScheme ;
+  skos:notation "medium" ;
+  skos:prefLabel "Medium" .
+
+ccfjclass:signal_high a skos:Concept ;
+  skos:inScheme ccfjclass:SignalLevelScheme ;
+  skos:notation "high" ;
+  skos:prefLabel "High" .
+

@@ -1,0 +1,41 @@
+@prefix cc: <https://ontology.churchcore.ai/cc#> .
+@prefix ccfjclass: <https://ontology.churchcore.ai/cc/faith-journey/class#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+
+<https://ontology.churchcore.ai/cc/faith-journey/cbox/openness-states>
+  a owl:Ontology ;
+  rdfs:label "ChurchCore Faith Journey C-Box (openness states)" ;
+  rdfs:comment "Spiritual openness / conversion state categories (A-graph) used to classify manifestations and journey nodes." ;
+  owl:imports <https://ontology.churchcore.ai/cc/state/tbox> ;
+  owl:imports <http://www.w3.org/2004/02/skos/core> .
+
+ccfjclass:SpiritualOpennessScheme a skos:ConceptScheme ;
+  skos:prefLabel "Spiritual openness states" .
+
+ccfjclass:openness_unaware_indifferent a skos:Concept, cc:NonTerminalState ;
+  skos:inScheme ccfjclass:SpiritualOpennessScheme ;
+  skos:notation "unaware_indifferent" ;
+  skos:prefLabel "Unaware / indifferent" .
+
+ccfjclass:openness_spiritually_curious a skos:Concept, cc:NonTerminalState ;
+  skos:inScheme ccfjclass:SpiritualOpennessScheme ;
+  skos:notation "spiritually_curious" ;
+  skos:prefLabel "Spiritually curious" .
+
+ccfjclass:openness_exploring_christ a skos:Concept, cc:NonTerminalState ;
+  skos:inScheme ccfjclass:SpiritualOpennessScheme ;
+  skos:notation "exploring_christ" ;
+  skos:prefLabel "Exploring Christ" .
+
+ccfjclass:openness_new_believer_commitment a skos:Concept, cc:NonTerminalState ;
+  skos:inScheme ccfjclass:SpiritualOpennessScheme ;
+  skos:notation "new_believer_commitment" ;
+  skos:prefLabel "New believer / initial commitment" .
+
+ccfjclass:openness_public_identification a skos:Concept, cc:NonTerminalState ;
+  skos:inScheme ccfjclass:SpiritualOpennessScheme ;
+  skos:notation "public_identification" ;
+  skos:prefLabel "Public identification" .
+

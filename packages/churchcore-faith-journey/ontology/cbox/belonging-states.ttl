@@ -1,0 +1,46 @@
+@prefix cc: <https://ontology.churchcore.ai/cc#> .
+@prefix ccfjclass: <https://ontology.churchcore.ai/cc/faith-journey/class#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+
+<https://ontology.churchcore.ai/cc/faith-journey/cbox/belonging-states>
+  a owl:Ontology ;
+  rdfs:label "ChurchCore Faith Journey C-Box (belonging states)" ;
+  rdfs:comment "Church belonging / integration state categories (C-graph) used to classify manifestations and journey nodes." ;
+  owl:imports <https://ontology.churchcore.ai/cc/state/tbox> ;
+  owl:imports <http://www.w3.org/2004/02/skos/core> .
+
+ccfjclass:BelongingScheme a skos:ConceptScheme ;
+  skos:prefLabel "Belonging states" .
+
+ccfjclass:belonging_visitor_guest a skos:Concept, cc:NonTerminalState ;
+  skos:inScheme ccfjclass:BelongingScheme ;
+  skos:notation "visitor_guest" ;
+  skos:prefLabel "Visitor / guest" .
+
+ccfjclass:belonging_regular_attender a skos:Concept, cc:NonTerminalState ;
+  skos:inScheme ccfjclass:BelongingScheme ;
+  skos:notation "regular_attender" ;
+  skos:prefLabel "Regular attender" .
+
+ccfjclass:belonging_connected_participant a skos:Concept, cc:NonTerminalState ;
+  skos:inScheme ccfjclass:BelongingScheme ;
+  skos:notation "connected_participant" ;
+  skos:prefLabel "Connected participant" .
+
+ccfjclass:belonging_committed_member a skos:Concept, cc:NonTerminalState ;
+  skos:inScheme ccfjclass:BelongingScheme ;
+  skos:notation "committed_member" ;
+  skos:prefLabel "Committed member / covenant participant" .
+
+ccfjclass:belonging_active_servant a skos:Concept, cc:NonTerminalState ;
+  skos:inScheme ccfjclass:BelongingScheme ;
+  skos:notation "active_servant" ;
+  skos:prefLabel "Active servant" .
+
+ccfjclass:belonging_ministry_contributor_team_leader a skos:Concept, cc:NonTerminalState ;
+  skos:inScheme ccfjclass:BelongingScheme ;
+  skos:notation "team_leader" ;
+  skos:prefLabel "Ministry contributor / team leader" .
+

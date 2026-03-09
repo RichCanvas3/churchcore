@@ -1,0 +1,58 @@
+@prefix cc: <https://ontology.churchcore.ai/cc#> .
+@prefix ccjourney: <https://ontology.churchcore.ai/cc/journey#> .
+@prefix ccfj: <https://ontology.churchcore.ai/cc/faith-journey#> .
+@prefix ccfjclass: <https://ontology.churchcore.ai/cc/faith-journey/class#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+<https://ontology.churchcore.ai/cc/faith-journey/cbox/multiplication-graph>
+  a owl:Ontology ;
+  rdfs:label "ChurchCore Faith Journey C-Box (multiplication graph)" ;
+  rdfs:comment "Disciple-maker/multiplication graph (D) aligned to multiplication state categories." ;
+  owl:imports <https://ontology.churchcore.ai/cc/all> ;
+  owl:imports <https://ontology.churchcore.ai/cc/journey/tbox> ;
+  owl:imports <https://ontology.churchcore.ai/cc/faith-journey/cbox/multiplication-states> .
+
+ccfj:journey_multiplication_v1 a ccjourney:JourneyGraph ;
+  cc:name "Multiplication (v1)" .
+
+ccfj:multiplication_recipient_node a ccjourney:JourneyNode ;
+  cc:name "Recipient" ;
+  ccjourney:representsState ccfjclass:multiplication_recipient .
+
+ccfj:multiplication_reproducer_in_training_node a ccjourney:JourneyNode ;
+  cc:name "Reproducer-in-training" ;
+  ccjourney:representsState ccfjclass:multiplication_reproducer_in_training .
+
+ccfj:multiplication_disciple_maker_node a ccjourney:JourneyNode ;
+  cc:name "Disciple-maker" ;
+  ccjourney:representsState ccfjclass:multiplication_disciple_maker .
+
+ccfj:multiplication_leader_of_disciple_makers_node a ccjourney:JourneyNode ;
+  cc:name "Leader of disciple-makers" ;
+  ccjourney:representsState ccfjclass:multiplication_leader_of_disciple_makers .
+
+ccfj:multiplication_sender_multiplier_node a ccjourney:JourneyNode ;
+  cc:name "Sender / multiplier" ;
+  ccjourney:representsState ccfjclass:multiplication_sender_multiplier .
+
+ccfj:edge_mult_0_to_1 a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:multiplication_recipient_node ;
+  ccjourney:toNode ccfj:multiplication_reproducer_in_training_node ;
+  ccjourney:edgeKind "NEXT_STAGE" .
+
+ccfj:edge_mult_1_to_2 a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:multiplication_reproducer_in_training_node ;
+  ccjourney:toNode ccfj:multiplication_disciple_maker_node ;
+  ccjourney:edgeKind "NEXT_STAGE" .
+
+ccfj:edge_mult_2_to_3 a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:multiplication_disciple_maker_node ;
+  ccjourney:toNode ccfj:multiplication_leader_of_disciple_makers_node ;
+  ccjourney:edgeKind "NEXT_STAGE" .
+
+ccfj:edge_mult_3_to_4 a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:multiplication_leader_of_disciple_makers_node ;
+  ccjourney:toNode ccfj:multiplication_sender_multiplier_node ;
+  ccjourney:edgeKind "NEXT_STAGE" .
+

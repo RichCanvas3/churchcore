@@ -1,0 +1,41 @@
+@prefix cc: <https://ontology.churchcore.ai/cc#> .
+@prefix ccfjclass: <https://ontology.churchcore.ai/cc/faith-journey/class#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+
+<https://ontology.churchcore.ai/cc/faith-journey/cbox/multiplication-states>
+  a owl:Ontology ;
+  rdfs:label "ChurchCore Faith Journey C-Box (multiplication states)" ;
+  rdfs:comment "Disciple-maker / multiplication state categories (D-graph) used to classify manifestations and journey nodes." ;
+  owl:imports <https://ontology.churchcore.ai/cc/state/tbox> ;
+  owl:imports <http://www.w3.org/2004/02/skos/core> .
+
+ccfjclass:MultiplicationScheme a skos:ConceptScheme ;
+  skos:prefLabel "Multiplication states" .
+
+ccfjclass:multiplication_recipient a skos:Concept, cc:NonTerminalState ;
+  skos:inScheme ccfjclass:MultiplicationScheme ;
+  skos:notation "recipient" ;
+  skos:prefLabel "Recipient" .
+
+ccfjclass:multiplication_reproducer_in_training a skos:Concept, cc:NonTerminalState ;
+  skos:inScheme ccfjclass:MultiplicationScheme ;
+  skos:notation "reproducer_in_training" ;
+  skos:prefLabel "Reproducer-in-training" .
+
+ccfjclass:multiplication_disciple_maker a skos:Concept, cc:NonTerminalState ;
+  skos:inScheme ccfjclass:MultiplicationScheme ;
+  skos:notation "disciple_maker" ;
+  skos:prefLabel "Disciple-maker" .
+
+ccfjclass:multiplication_leader_of_disciple_makers a skos:Concept, cc:NonTerminalState ;
+  skos:inScheme ccfjclass:MultiplicationScheme ;
+  skos:notation "leader_of_disciple_makers" ;
+  skos:prefLabel "Leader of disciple-makers" .
+
+ccfjclass:multiplication_sender_multiplier a skos:Concept, cc:NonTerminalState ;
+  skos:inScheme ccfjclass:MultiplicationScheme ;
+  skos:notation "sender_multiplier" ;
+  skos:prefLabel "Sender / multiplier" .
+

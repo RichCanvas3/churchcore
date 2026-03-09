@@ -7,5 +7,15 @@
   rdfs:comment "C-Box index for faith journey controlled vocabularies and canonical graphs." ;
   owl:imports
     <https://ontology.churchcore.ai/cc/faith-journey/cbox/faith-journey-states>,
-    <https://ontology.churchcore.ai/cc/faith-journey/cbox/faith-journey-graph> .
+    <https://ontology.churchcore.ai/cc/faith-journey/cbox/faith-journey-graph>,
+    <https://ontology.churchcore.ai/cc/faith-journey/cbox/openness-states>,
+    <https://ontology.churchcore.ai/cc/faith-journey/cbox/formation-states>,
+    <https://ontology.churchcore.ai/cc/faith-journey/cbox/belonging-states>,
+    <https://ontology.churchcore.ai/cc/faith-journey/cbox/multiplication-states>,
+    <https://ontology.churchcore.ai/cc/faith-journey/cbox/openness-graph>,
+    <https://ontology.churchcore.ai/cc/faith-journey/cbox/formation-graph>,
+    <https://ontology.churchcore.ai/cc/faith-journey/cbox/belonging-graph>,
+    <https://ontology.churchcore.ai/cc/faith-journey/cbox/multiplication-graph>,
+    <https://ontology.churchcore.ai/cc/faith-journey/cbox/signal-levels>,
+    <https://ontology.churchcore.ai/cc/faith-journey/cbox/signal-types> .
 

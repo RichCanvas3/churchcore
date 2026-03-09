@@ -1,0 +1,58 @@
+@prefix cc: <https://ontology.churchcore.ai/cc#> .
+@prefix ccjourney: <https://ontology.churchcore.ai/cc/journey#> .
+@prefix ccfj: <https://ontology.churchcore.ai/cc/faith-journey#> .
+@prefix ccfjclass: <https://ontology.churchcore.ai/cc/faith-journey/class#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+<https://ontology.churchcore.ai/cc/faith-journey/cbox/openness-graph>
+  a owl:Ontology ;
+  rdfs:label "ChurchCore Faith Journey C-Box (openness graph)" ;
+  rdfs:comment "Spiritual openness and conversion graph (A) aligned to openness state categories." ;
+  owl:imports <https://ontology.churchcore.ai/cc/all> ;
+  owl:imports <https://ontology.churchcore.ai/cc/journey/tbox> ;
+  owl:imports <https://ontology.churchcore.ai/cc/faith-journey/cbox/openness-states> .
+
+ccfj:journey_openness_v1 a ccjourney:JourneyGraph ;
+  cc:name "Spiritual openness (v1)" .
+
+ccfj:openness_unaware_indifferent_node a ccjourney:JourneyNode ;
+  cc:name "Unaware / indifferent" ;
+  ccjourney:representsState ccfjclass:openness_unaware_indifferent .
+
+ccfj:openness_spiritually_curious_node a ccjourney:JourneyNode ;
+  cc:name "Spiritually curious" ;
+  ccjourney:representsState ccfjclass:openness_spiritually_curious .
+
+ccfj:openness_exploring_christ_node a ccjourney:JourneyNode ;
+  cc:name "Exploring Christ" ;
+  ccjourney:representsState ccfjclass:openness_exploring_christ .
+
+ccfj:openness_new_believer_commitment_node a ccjourney:JourneyNode ;
+  cc:name "New believer / initial commitment" ;
+  ccjourney:representsState ccfjclass:openness_new_believer_commitment .
+
+ccfj:openness_public_identification_node a ccjourney:JourneyNode ;
+  cc:name "Public identification" ;
+  ccjourney:representsState ccfjclass:openness_public_identification .
+
+ccfj:edge_openness_0_to_1 a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:openness_unaware_indifferent_node ;
+  ccjourney:toNode ccfj:openness_spiritually_curious_node ;
+  ccjourney:edgeKind "NEXT_STAGE" .
+
+ccfj:edge_openness_1_to_2 a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:openness_spiritually_curious_node ;
+  ccjourney:toNode ccfj:openness_exploring_christ_node ;
+  ccjourney:edgeKind "NEXT_STAGE" .
+
+ccfj:edge_openness_2_to_3 a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:openness_exploring_christ_node ;
+  ccjourney:toNode ccfj:openness_new_believer_commitment_node ;
+  ccjourney:edgeKind "NEXT_STAGE" .
+
+ccfj:edge_openness_3_to_4 a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:openness_new_believer_commitment_node ;
+  ccjourney:toNode ccfj:openness_public_identification_node ;
+  ccjourney:edgeKind "NEXT_STAGE" .
+
