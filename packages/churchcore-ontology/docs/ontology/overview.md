@@ -14,7 +14,7 @@ It defines the stable “grammar” for:
 
 See [AgenticTrust’s ontology docs](https://github.com/agentictrustlabs/agent-explorer/tree/main/docs/ontology) for the documentation style this follows.
 
-## Semantic Arts boxes
+## T-Box / C-Box / A-Box layout
 
 - **T-Box** (`ontology/tbox/`): classes + properties (schema)
 - **C-Box** (`ontology/cbox/`): category instances (SKOS schemes + concepts, typed category individuals)

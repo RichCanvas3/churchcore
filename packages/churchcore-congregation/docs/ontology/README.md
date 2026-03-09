@@ -7,7 +7,7 @@ This package defines **local church operations** concepts that derive from the C
 - Small groups, ministries, facilities/rooms, services, volunteer teams
 - Local operational categories (service types, attendance statuses, etc.)
 
-## Semantic Arts boxes
+## T-Box / C-Box / A-Box layout
 
 - **T-Box** (`ontology/tbox/`): schema (classes + properties)
 - **C-Box** (`ontology/cbox/`): category instances / controlled vocabularies

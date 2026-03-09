@@ -8,7 +8,7 @@ This package defines the **Big‑C** Christian ecosystem layer that derives from
 - Mission agencies, networks, movements, global initiatives (schema + categories)
 - Shared Christian reference structures (e.g., Bible reference sets)
 
-## Semantic Arts boxes
+## T-Box / C-Box / A-Box layout
 
 - **T-Box** (`ontology/tbox/`): schema (classes + properties)
 - **C-Box** (`ontology/cbox/`): category instances / controlled vocabularies

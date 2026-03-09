@@ -26,7 +26,7 @@ ChurchCore adds a church-domain upper ontology on top of:
 - `classifications.md`: controlled vocabularies (SKOS)
 - `sparql-queries.md`: practical GraphDB queries against ChurchCore graphs
 
-## Semantic Arts boxes (how files are organized)
+## T-Box / C-Box / A-Box layout (how files are organized)
 
 - **T-Box** (`ontology/tbox/`): schema (classes + properties)
 - **C-Box** (`ontology/cbox/`): category instances / controlled vocabularies

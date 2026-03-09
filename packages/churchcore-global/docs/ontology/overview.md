@@ -9,7 +9,7 @@ It is intentionally focused on:
 - shared reference structures (e.g., Bible reference sets)
 - ecosystem measurement and benchmarking schema + category systems
 
-## Semantic Arts boxes
+## T-Box / C-Box / A-Box layout
 
 - **T-Box** (`ontology/tbox/`): classes + properties (schema)
 - **C-Box** (`ontology/cbox/`): category instances (SKOS schemes + concepts; starter typed individuals)

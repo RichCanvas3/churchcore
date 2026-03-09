@@ -4,7 +4,7 @@ This package models **congregation-level ministry and operations** (Local‑C sc
 
 It extends the ChurchCore upper ontology with concepts that are *still reusable across many congregations*, but are not part of the faith-neutral upper layer.
 
-## Semantic Arts boxes
+## T-Box / C-Box / A-Box layout
 
 - **T-Box** (`ontology/tbox/`): classes + properties (schema)
 - **C-Box** (`ontology/cbox/`): category instances (service types, attendance statuses, ministry categories, etc.)

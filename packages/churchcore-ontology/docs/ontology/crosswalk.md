@@ -6,7 +6,7 @@ This page maps the **conceptual model** from the ChurchCore ontology website int
 - **p-plan / EP-PLAN**: specifications (plans, steps) + plan/execution correspondence
 - **AgenticTrust**: DnS-style situations/roles/participation + trust patterns
 
-It also indicates where concepts belong in the Semantic Arts boxes:
+It also indicates where concepts belong (T-Box / C-Box / A-Box):
 
 - **T-Box**: schema (classes + properties)
 - **C-Box**: controlled vocabularies (SKOS schemes + concepts)
