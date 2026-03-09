@@ -50,7 +50,7 @@ SELECT
   (SAMPLE(?personName) AS ?personName)
   (COUNT(DISTINCT ?group) AS ?groupCount)
 WHERE {
-  GRAPH <https://churchcore.ai/graph/d1/calvarybible> {
+  GRAPH <https://churchcore.ai/graph/d1/example> {
     ?person a cc:Person .
     OPTIONAL { ?person cc:name ?personName }
     OPTIONAL {
@@ -73,7 +73,7 @@ PREFIX cccomm: <https://ontology.churchcore.ai/cc/community#>
 
 SELECT ?person ?personName ?group ?groupName ?status
 WHERE {
-  GRAPH <https://churchcore.ai/graph/d1/calvarybible> {
+  GRAPH <https://churchcore.ai/graph/d1/example> {
     ?m a cccomm:GroupMembershipSituation ;
        cccomm:membershipPerson ?person ;
        cccomm:membershipGroup ?group .

@@ -108,7 +108,7 @@ PREFIX cc: <https://ontology.churchcore.ai/cc#>
 
 SELECT ?person (SAMPLE(?name) AS ?name)
 WHERE {
-  GRAPH <https://churchcore.ai/graph/d1/calvarybible> {
+  GRAPH <https://churchcore.ai/graph/d1/example> {
     ?person a cc:Person .
     OPTIONAL { ?person cc:name ?name }
   }
@@ -127,7 +127,7 @@ PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
 
 SELECT ?s ?type ?from ?to
 WHERE {
-  GRAPH <https://churchcore.ai/graph/d1/calvarybible> {
+  GRAPH <https://churchcore.ai/graph/d1/example> {
     ?s a ?type .
     ?type rdfs:subClassOf* at:Situation .
     OPTIONAL { ?s ccsit:validFrom ?from }

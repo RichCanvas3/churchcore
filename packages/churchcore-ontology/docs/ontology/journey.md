@@ -45,7 +45,7 @@ PREFIX ccjourney: <https://ontology.churchcore.ai/cc/journey#>
 
 SELECT ?from ?fromName ?edge ?to ?toName
 WHERE {
-  GRAPH <https://churchcore.ai/graph/d1/calvarybible> {
+  GRAPH <https://churchcore.ai/graph/d1/example> {
     ?edge ccjourney:fromNode ?from ;
           ccjourney:toNode ?to .
     OPTIONAL { ?from cc:name ?fromName }

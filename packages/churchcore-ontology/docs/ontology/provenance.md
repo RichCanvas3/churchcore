@@ -39,7 +39,7 @@ PREFIX ccprov: <https://ontology.churchcore.ai/cc/prov#>
 
 SELECT ?r ?name ?url
 WHERE {
-  GRAPH <https://churchcore.ai/graph/d1/calvarybible> {
+  GRAPH <https://churchcore.ai/graph/d1/example> {
     ?r a cc:Resource .
     OPTIONAL { ?r cc:name ?name }
     ?r ccprov:sourceUrl ?url .

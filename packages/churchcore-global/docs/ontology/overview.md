@@ -40,7 +40,7 @@ PREFIX ccglobal: <https://ontology.churchcore.ai/cc/global#>
 
 SELECT ?church ?churchName ?initiative
 WHERE {
-  GRAPH <https://churchcore.ai/graph/d1/calvarybible> {
+  GRAPH <https://churchcore.ai/graph/d1/example> {
     ?church a cc:Church .
     OPTIONAL { ?church cc:name ?churchName }
     OPTIONAL { ?church ccglobal:participatesIn ?initiative }

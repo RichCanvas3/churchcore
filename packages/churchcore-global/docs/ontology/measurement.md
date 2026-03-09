@@ -41,7 +41,7 @@ PREFIX ccglobal: <https://ontology.churchcore.ai/cc/global#>
 
 SELECT ?dimension (COUNT(DISTINCT ?metric) AS ?metricCount) (SAMPLE(?score) AS ?sampleScore)
 WHERE {
-  GRAPH <https://churchcore.ai/graph/d1/calvarybible> {
+  GRAPH <https://churchcore.ai/graph/d1/example> {
     ?metric a ccglobal:Metric ;
             ccglobal:measuresDimension ?dimension .
     OPTIONAL { ?metric ccglobal:scoreValue ?score }

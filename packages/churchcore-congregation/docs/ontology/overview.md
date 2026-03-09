@@ -42,7 +42,7 @@ PREFIX cccong: <https://ontology.churchcore.ai/cc/congregation#>
 
 SELECT ?group (SAMPLE(?name) AS ?name)
 WHERE {
-  GRAPH <https://churchcore.ai/graph/d1/calvarybible> {
+  GRAPH <https://churchcore.ai/graph/d1/example> {
     ?group a cccomm:Group, cccong:SmallGroup .
     OPTIONAL { ?group cc:name ?name }
   }

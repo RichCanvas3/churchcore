@@ -2,7 +2,7 @@
 
 These queries assume instance data is loaded into a named graph like:
 
-- `https://churchcore.ai/graph/d1/calvarybible`
+- `https://churchcore.ai/graph/d1/example`
 
 ## Prefixes
 
@@ -21,7 +21,7 @@ PREFIX cc: <https://ontology.churchcore.ai/cc#>
 
 SELECT ?person (SAMPLE(?name) AS ?name)
 WHERE {
-  GRAPH <https://churchcore.ai/graph/d1/calvarybible> {
+  GRAPH <https://churchcore.ai/graph/d1/example> {
     ?person a cc:Person .
     OPTIONAL { ?person cc:name ?name }
   }
@@ -39,7 +39,7 @@ PREFIX cccomm: <https://ontology.churchcore.ai/cc/community#>
 
 SELECT ?person ?personName ?group ?groupName (SAMPLE(?status) AS ?status)
 WHERE {
-  GRAPH <https://churchcore.ai/graph/d1/calvarybible> {
+  GRAPH <https://churchcore.ai/graph/d1/example> {
     ?m a cccomm:GroupMembershipSituation ;
        cccomm:membershipPerson ?person ;
        cccomm:membershipGroup ?group .
@@ -61,7 +61,7 @@ PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
 
 SELECT ?s (SAMPLE(?type) AS ?type)
 WHERE {
-  GRAPH <https://churchcore.ai/graph/d1/calvarybible> {
+  GRAPH <https://churchcore.ai/graph/d1/example> {
     ?s a ?type .
     ?type rdfs:subClassOf* at:Situation .
   }
