@@ -720,8 +720,28 @@ async def _call_tool_json(tools: list[Any], tool_suffix: str, payload: dict[str,
     tool = _find_tool_by_suffix(tools, tool_suffix)
     if not tool:
         return None
-    raw = await tool.ainvoke(payload if isinstance(payload, dict) else {})
-    return _tool_raw_to_json(raw)
+    try:
+        raw = await tool.ainvoke(payload if isinstance(payload, dict) else {})
+    except Exception as e:
+        return {
+            "ok": False,
+            "reason": "tool_invoke_failed",
+            "tool": str(getattr(tool, "name", tool_suffix) or tool_suffix),
+            "error": str(e),
+        }
+
+    parsed = _tool_raw_to_json(raw)
+    if parsed is not None:
+        return parsed
+
+    # If the tool returned a non-JSON error payload, preserve it so callers can surface real failures.
+    txt = _tool_raw_to_text(raw)
+    return {
+        "ok": False,
+        "reason": "tool_returned_non_json",
+        "tool": str(getattr(tool, "name", tool_suffix) or tool_suffix),
+        "error": (txt or "Tool returned non-JSON output.")[:2000],
+    }
 
 
 async def _call_tool_text(tools: list[Any], tool_suffix: str, payload: dict[str, Any]) -> Optional[str]:
@@ -1187,6 +1207,7 @@ async def _predict_journey_flows_with_sparql(
     failed = [name for name, r in results.items() if not (isinstance(r, dict) and r.get("ok") is True)]
     if failed:
         # Hard fail if SPARQL isn't working so it's visible in tracing/UI.
+        qmap = {q["name"]: q.get("query") for q in qclean if isinstance(q, dict) and isinstance(q.get("name"), str)}
         brief: dict[str, Any] = {}
         for name in failed[:6]:
             r = results.get(name) if isinstance(results.get(name), dict) else {}
@@ -1194,9 +1215,10 @@ async def _predict_journey_flows_with_sparql(
             if isinstance(rr, dict):
                 brief[name] = {
                     "reason": rr.get("reason") or rr.get("error") or rr.get("message"),
+                    "query_snippet": str(qmap.get(name) or "").strip().replace("\n", " ")[:260],
                 }
             else:
-                brief[name] = {"reason": "no_result"}
+                brief[name] = {"reason": "no_result", "query_snippet": str(qmap.get(name) or "").strip().replace("\n", " ")[:260]}
         return OutputEnvelope(
             message=f"SPARQL query failed for: {', '.join(failed[:6])}",
             data={
@@ -1204,6 +1226,7 @@ async def _predict_journey_flows_with_sparql(
                 "reason": "sparql_execution_failed",
                 "failed": failed,
                 "failed_brief": brief,
+                "note": "Check failed_brief[*].reason for GraphDB/config/auth/SPARQL errors.",
             },
         )
 
