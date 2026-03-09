@@ -20,6 +20,7 @@ const required = [
   "ontology/cbox/people-group-status.ttl",
   "ontology/cbox/organization-service-categories.ttl",
   "ontology/cbox/partnership-types.ttl",
+  "ontology/cbox/ecosystem-relationship-types.ttl",
   "ontology/cbox/audience-segments.ttl",
   "ontology/cbox/flourishing-dimensions.ttl",
   "ontology/cbox/congregation-thriving-dimensions.ttl",

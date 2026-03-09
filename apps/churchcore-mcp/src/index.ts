@@ -4500,6 +4500,8 @@ function ttlPrefixes() {
     `@prefix cccong: <https://ontology.churchcore.ai/cc/congregation#> .`,
     `@prefix ccglobal: <https://ontology.churchcore.ai/cc/global#> .`,
     `@prefix ccbible: <https://ontology.churchcore.ai/cc/global/bible#> .`,
+    `@prefix ccintent: <https://ontology.churchcore.ai/cc/intent#> .`,
+    `@prefix ccproc: <https://ontology.churchcore.ai/cc/process#> .`,
     `@prefix ccprov: <https://ontology.churchcore.ai/cc/prov#> .`,
     `@prefix ccsit: <https://ontology.churchcore.ai/cc/situation#> .`,
     `@prefix prov: <http://www.w3.org/ns/prov#> .`,

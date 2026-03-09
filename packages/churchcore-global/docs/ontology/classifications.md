@@ -9,6 +9,7 @@ Sources:
 - `ontology/cbox/people-group-status.ttl`
 - `ontology/cbox/organization-service-categories.ttl`
 - `ontology/cbox/partnership-types.ttl`
+- `ontology/cbox/ecosystem-relationship-types.ttl`
 
 This package intentionally keeps **Big‑C** category vocabularies here, rather than in the ChurchCore upper layer.
 

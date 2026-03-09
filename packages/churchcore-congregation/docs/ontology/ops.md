@@ -35,6 +35,7 @@ Congregation categories are modeled as **instances** (SKOS Concepts) in the C-Bo
 Current schemes:
 
 - `cc/congregation/cbox/ministry-categories`
+- `cc/congregation/cbox/program-categories`
 - `cc/congregation/cbox/service-types`
 - `cc/congregation/cbox/attendance-statuses`
 

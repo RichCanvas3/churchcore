@@ -1,0 +1,36 @@
+@prefix cccongclass: <https://ontology.churchcore.ai/cc/congregation/class#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+
+<https://ontology.churchcore.ai/cc/congregation/cbox/program-categories>
+  a owl:Ontology ;
+  rdfs:label "ChurchCore-Congregation C-Box (program categories)" ;
+  rdfs:comment "Program/ministry offering categories for local congregation operations (classes/courses, care programs, outreach programs, etc.). Keep as SKOS concepts so new programs don't require schema changes." ;
+  owl:imports <http://www.w3.org/2004/02/skos/core> .
+
+cccongclass:ProgramCategoryScheme a skos:ConceptScheme ;
+  skos:prefLabel "Program categories" .
+
+# Discipleship / formation
+cccongclass:program_bible_study a skos:Concept ; skos:inScheme cccongclass:ProgramCategoryScheme ; skos:notation "bible_study" ; skos:prefLabel "Bible study" .
+cccongclass:program_prayer a skos:Concept ; skos:inScheme cccongclass:ProgramCategoryScheme ; skos:notation "prayer" ; skos:prefLabel "Prayer" .
+cccongclass:program_discipleship_course a skos:Concept ; skos:inScheme cccongclass:ProgramCategoryScheme ; skos:notation "discipleship_course" ; skos:prefLabel "Discipleship course" .
+cccongclass:program_membership_class a skos:Concept ; skos:inScheme cccongclass:ProgramCategoryScheme ; skos:notation "membership_class" ; skos:prefLabel "Membership class" .
+
+# Care / support
+cccongclass:program_grief_support a skos:Concept ; skos:inScheme cccongclass:ProgramCategoryScheme ; skos:notation "grief_support" ; skos:prefLabel "Grief support" .
+cccongclass:program_addiction_recovery a skos:Concept ; skos:inScheme cccongclass:ProgramCategoryScheme ; skos:notation "addiction_recovery" ; skos:prefLabel "Addiction recovery" .
+cccongclass:program_mental_health_support a skos:Concept ; skos:inScheme cccongclass:ProgramCategoryScheme ; skos:notation "mental_health_support" ; skos:prefLabel "Mental health support" .
+cccongclass:program_counseling a skos:Concept ; skos:inScheme cccongclass:ProgramCategoryScheme ; skos:notation "counseling" ; skos:prefLabel "Counseling" .
+
+# Family / relationships
+cccongclass:program_marriage_course a skos:Concept ; skos:inScheme cccongclass:ProgramCategoryScheme ; skos:notation "marriage_course" ; skos:prefLabel "Marriage course" .
+cccongclass:program_parenting a skos:Concept ; skos:inScheme cccongclass:ProgramCategoryScheme ; skos:notation "parenting" ; skos:prefLabel "Parenting" .
+
+# Outreach / community service
+cccongclass:program_food_pantry a skos:Concept ; skos:inScheme cccongclass:ProgramCategoryScheme ; skos:notation "food_pantry" ; skos:prefLabel "Food pantry" .
+cccongclass:program_homeless_support a skos:Concept ; skos:inScheme cccongclass:ProgramCategoryScheme ; skos:notation "homeless_support" ; skos:prefLabel "Homeless support" .
+cccongclass:program_job_assistance a skos:Concept ; skos:inScheme cccongclass:ProgramCategoryScheme ; skos:notation "job_assistance" ; skos:prefLabel "Job assistance" .
+cccongclass:program_community_mentoring a skos:Concept ; skos:inScheme cccongclass:ProgramCategoryScheme ; skos:notation "community_mentoring" ; skos:prefLabel "Community mentoring" .
+

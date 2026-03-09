@@ -10,6 +10,7 @@
     <https://ontology.churchcore.ai/cc/congregation/tbox/audience>,
     <https://ontology.churchcore.ai/cc/congregation/cbox/ministry-categories>,
     <https://ontology.churchcore.ai/cc/congregation/cbox/audience-segments>,
+    <https://ontology.churchcore.ai/cc/congregation/cbox/program-categories>,
     <https://ontology.churchcore.ai/cc/congregation/cbox/service-types>,
     <https://ontology.churchcore.ai/cc/congregation/cbox/attendance-statuses> .
 

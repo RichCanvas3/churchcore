@@ -24,6 +24,8 @@ This module is a library of **shared classification schemes** (SKOS ConceptSchem
 - `ontology/cbox/state-categories.ttl` (typed state categories)
 - `ontology/cbox/situations.ttl` (situation types + participation roles)
 
+All concepts keep their existing IRIs (e.g. `ccclass:journey_node_Stage`), so consumers can depend on stable identifiers while the repo stays modular and maintainable.
+
 ## Pattern
 
 - A scheme is a `skos:ConceptScheme`

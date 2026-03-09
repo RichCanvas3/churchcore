@@ -17,6 +17,7 @@
     <https://ontology.churchcore.ai/cc/global/cbox/people-group-status>,
     <https://ontology.churchcore.ai/cc/global/cbox/organization-service-categories>,
     <https://ontology.churchcore.ai/cc/global/cbox/partnership-types>,
+    <https://ontology.churchcore.ai/cc/global/cbox/ecosystem-relationship-types>,
     <https://ontology.churchcore.ai/cc/global/cbox/audience-segments>,
     <https://ontology.churchcore.ai/cc/global/cbox/flourishing-dimensions>,
     <https://ontology.churchcore.ai/cc/global/cbox/congregation-thriving-dimensions> .

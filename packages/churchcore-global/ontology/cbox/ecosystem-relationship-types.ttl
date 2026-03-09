@@ -1,0 +1,31 @@
+@prefix ccgclass: <https://ontology.churchcore.ai/cc/global/class#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+
+<https://ontology.churchcore.ai/cc/global/cbox/ecosystem-relationship-types>
+  a owl:Ontology ;
+  rdfs:label "ChurchCore-Global C-Box (ecosystem relationship types)" ;
+  rdfs:comment "Controlled vocabulary for common relationship/edge types used in ecosystem mapping (org↔org, person↔org, org↔program). Keep as SKOS concepts so it can evolve without schema changes." ;
+  owl:imports <http://www.w3.org/2004/02/skos/core> .
+
+ccgclass:EcosystemRelationshipTypeScheme a skos:ConceptScheme ;
+  skos:prefLabel "Ecosystem relationship types" .
+
+# Organization ↔ organization
+ccgclass:rel_partners_with a skos:Concept ; skos:inScheme ccgclass:EcosystemRelationshipTypeScheme ; skos:notation "partners_with" ; skos:prefLabel "Partners with" .
+ccgclass:rel_affiliated_with a skos:Concept ; skos:inScheme ccgclass:EcosystemRelationshipTypeScheme ; skos:notation "affiliated_with" ; skos:prefLabel "Affiliated with" .
+ccgclass:rel_member_of a skos:Concept ; skos:inScheme ccgclass:EcosystemRelationshipTypeScheme ; skos:notation "member_of" ; skos:prefLabel "Member of" .
+ccgclass:rel_supports a skos:Concept ; skos:inScheme ccgclass:EcosystemRelationshipTypeScheme ; skos:notation "supports" ; skos:prefLabel "Supports" .
+ccgclass:rel_funds a skos:Concept ; skos:inScheme ccgclass:EcosystemRelationshipTypeScheme ; skos:notation "funds" ; skos:prefLabel "Funds" .
+
+# Person ↔ organization (leadership/membership motifs)
+ccgclass:rel_attends a skos:Concept ; skos:inScheme ccgclass:EcosystemRelationshipTypeScheme ; skos:notation "attends" ; skos:prefLabel "Attends" .
+ccgclass:rel_leads a skos:Concept ; skos:inScheme ccgclass:EcosystemRelationshipTypeScheme ; skos:notation "leads" ; skos:prefLabel "Leads" .
+ccgclass:rel_oversees a skos:Concept ; skos:inScheme ccgclass:EcosystemRelationshipTypeScheme ; skos:notation "oversees" ; skos:prefLabel "Oversees" .
+
+# Organization ↔ program/service
+ccgclass:rel_hosts a skos:Concept ; skos:inScheme ccgclass:EcosystemRelationshipTypeScheme ; skos:notation "hosts" ; skos:prefLabel "Hosts" .
+ccgclass:rel_provides a skos:Concept ; skos:inScheme ccgclass:EcosystemRelationshipTypeScheme ; skos:notation "provides" ; skos:prefLabel "Provides" .
+ccgclass:rel_serves a skos:Concept ; skos:inScheme ccgclass:EcosystemRelationshipTypeScheme ; skos:notation "serves" ; skos:prefLabel "Serves" .
+
