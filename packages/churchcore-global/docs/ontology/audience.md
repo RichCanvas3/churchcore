@@ -17,21 +17,21 @@ classDiagram
 direction LR
 
 class prov_Entity["prov:Entity"]
-class ccglobal_AudienceSegment["ccglobal:AudienceSegment"]
+class skos_Concept["skos:Concept"]
 
-prov_Entity --> "0..*" ccglobal_AudienceSegment : hasAudienceSegment
+prov_Entity --> "0..*" skos_Concept : hasAudienceSegment
 ```
 
 ## SPARQL: list all global audience segments
 
 ```sparql
 PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
-PREFIX ccgclass: <https://ontology.churchcore.ai/cc/global/class#>
+PREFIX ccclass: <https://ontology.churchcore.ai/cc/class#>
 
 SELECT ?segment ?label ?notation
 WHERE {
   ?segment a skos:Concept ;
-           skos:inScheme ccgclass:AudienceSegmentScheme .
+           skos:inScheme ccclass:AudienceScheme .
   OPTIONAL { ?segment skos:prefLabel ?label }
   OPTIONAL { ?segment skos:notation ?notation }
 }
@@ -43,11 +43,11 @@ LIMIT 500
 
 ```sparql
 PREFIX ccglobal: <https://ontology.churchcore.ai/cc/global#>
-PREFIX ccgclass: <https://ontology.churchcore.ai/cc/global/class#>
+PREFIX ccclass: <https://ontology.churchcore.ai/cc/class#>
 
 SELECT ?entity
 WHERE {
-  ?entity ccglobal:hasAudienceSegment ccgclass:audience_students .
+  ?entity ccglobal:hasAudienceSegment ccclass:audience_students .
 }
 ORDER BY ?entity
 LIMIT 200

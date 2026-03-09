@@ -76,19 +76,6 @@ WHERE {
 ORDER BY ?role ?required ?target
 LIMIT 200
 ```
-
-# Process (cc/process) — ProcessRole vs Process
-
-Sources:
-
-- wrapper: `ontology/churchcore-upper-process.ttl`
-- T-Box: `ontology/tbox/process.ttl`
-
-This module extends the repo’s “specification vs execution” pattern to the **process** level:
-
-- **ProcessRole**: specification (plan) that bundles steps (`cc:Step`) and relevant state categories
-- **Process**: execution (bundle/run) that groups activities and produced/used entities (including manifestations)
-
 ## SPARQL: process runs with included activities
 
 ```sparql
@@ -102,4 +89,3 @@ WHERE {
 ORDER BY ?process ?activity
 LIMIT 200
 ```
-

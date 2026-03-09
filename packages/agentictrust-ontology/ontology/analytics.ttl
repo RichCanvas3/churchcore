@@ -33,7 +33,7 @@
 
 :agentId a owl:DatatypeProperty ;
   rdfs:label "agentId" ;
-  rdfs:comment "Legacy numeric ERC-8004 agentId (string form, as stored in indexer DB)." ;
+  rdfs:comment "ERC-8004 agentId (string form, as stored in the indexer DB)." ;
   rdfs:domain :AgentTrustIndex ;
   rdfs:range xsd:string .
 
@@ -226,7 +226,7 @@
 
 :trustLedgerAgentId a owl:DatatypeProperty ;
   rdfs:label "trustLedgerAgentId" ;
-  rdfs:comment "Legacy numeric ERC-8004 agentId (string form, as stored in indexer DB)." ;
+  rdfs:comment "ERC-8004 agentId (string form, as stored in the indexer DB)." ;
   rdfs:domain :AgentTrustLedgerScore ;
   rdfs:range xsd:string .
 

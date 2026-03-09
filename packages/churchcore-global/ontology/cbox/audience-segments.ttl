@@ -1,5 +1,5 @@
-@prefix ccglobal: <https://ontology.churchcore.ai/cc/global#> .
 @prefix ccgclass: <https://ontology.churchcore.ai/cc/global/class#> .
+@prefix ccclass: <https://ontology.churchcore.ai/cc/class#> .
 @prefix owl: <http://www.w3.org/2002/07/owl#> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
 @prefix skos: <http://www.w3.org/2004/02/skos/core#> .
@@ -7,27 +7,45 @@
 <https://ontology.churchcore.ai/cc/global/cbox/audience-segments>
   a owl:Ontology ;
   rdfs:label "ChurchCore-Global C-Box (audience segments)" ;
-  rdfs:comment "Ecosystem-scale audience/segment categories for discovery, benchmarking, and targeting. Keep this as controlled vocabulary (SKOS), not classes." ;
-  owl:imports <http://www.w3.org/2004/02/skos/core> .
+  rdfs:comment "Ecosystem-scale audience/segment categories for discovery, benchmarking, and targeting. This module EXTENDS the canonical audience scheme in the upper ontology (ccclass:AudienceScheme) without defining a competing scheme." ;
+  owl:imports <http://www.w3.org/2004/02/skos/core> ;
+  owl:imports <https://ontology.churchcore.ai/cc/cbox/taxonomies> .
 
-ccgclass:AudienceSegmentScheme a skos:ConceptScheme ;
-  skos:prefLabel "Audience segments (global)" .
+# Global extensions (keep as controlled vocabulary; join canonical scheme)
 
-# Life-stage oriented segments (starter set)
-ccgclass:audience_kids a skos:Concept ; skos:inScheme ccgclass:AudienceSegmentScheme ; skos:notation "kids" ; skos:prefLabel "Kids" .
-ccgclass:audience_students a skos:Concept ; skos:inScheme ccgclass:AudienceSegmentScheme ; skos:notation "students" ; skos:prefLabel "Students" .
-ccgclass:audience_young_adults a skos:Concept ; skos:inScheme ccgclass:AudienceSegmentScheme ; skos:notation "young_adults" ; skos:prefLabel "Young adults" .
-ccgclass:audience_adults a skos:Concept ; skos:inScheme ccgclass:AudienceSegmentScheme ; skos:notation "adults" ; skos:prefLabel "Adults" .
-ccgclass:audience_seniors a skos:Concept ; skos:inScheme ccgclass:AudienceSegmentScheme ; skos:notation "seniors" ; skos:prefLabel "Seniors" .
+ccgclass:audience_parents a skos:Concept ;
+  skos:inScheme ccclass:AudienceScheme ;
+  skos:notation "parents" ;
+  skos:prefLabel "Parents / caregivers" ;
+  skos:broader ccclass:audience_parents_families .
 
-# Family/household oriented segments (starter set)
-ccgclass:audience_parents a skos:Concept ; skos:inScheme ccgclass:AudienceSegmentScheme ; skos:notation "parents" ; skos:prefLabel "Parents / caregivers" .
-ccgclass:audience_marriage a skos:Concept ; skos:inScheme ccgclass:AudienceSegmentScheme ; skos:notation "marriage" ; skos:prefLabel "Marriages / couples" .
-ccgclass:audience_singles a skos:Concept ; skos:inScheme ccgclass:AudienceSegmentScheme ; skos:notation "singles" ; skos:prefLabel "Singles" .
+ccgclass:audience_marriage a skos:Concept ;
+  skos:inScheme ccclass:AudienceScheme ;
+  skos:notation "marriage" ;
+  skos:prefLabel "Marriages / couples" .
 
-# Community-need oriented segments (starter set; use with care)
-ccgclass:audience_grief_support a skos:Concept ; skos:inScheme ccgclass:AudienceSegmentScheme ; skos:notation "grief_support" ; skos:prefLabel "Grief support" .
-ccgclass:audience_addiction_recovery a skos:Concept ; skos:inScheme ccgclass:AudienceSegmentScheme ; skos:notation "addiction_recovery" ; skos:prefLabel "Addiction recovery" .
-ccgclass:audience_mental_health_support a skos:Concept ; skos:inScheme ccgclass:AudienceSegmentScheme ; skos:notation "mental_health_support" ; skos:prefLabel "Mental health support" .
-ccgclass:audience_housing_insecurity a skos:Concept ; skos:inScheme ccgclass:AudienceSegmentScheme ; skos:notation "housing_insecurity" ; skos:prefLabel "Housing insecurity" .
+ccgclass:audience_singles a skos:Concept ;
+  skos:inScheme ccclass:AudienceScheme ;
+  skos:notation "singles" ;
+  skos:prefLabel "Singles" .
+
+ccgclass:audience_grief_support a skos:Concept ;
+  skos:inScheme ccclass:AudienceScheme ;
+  skos:notation "grief_support" ;
+  skos:prefLabel "Grief support" .
+
+ccgclass:audience_addiction_recovery a skos:Concept ;
+  skos:inScheme ccclass:AudienceScheme ;
+  skos:notation "addiction_recovery" ;
+  skos:prefLabel "Addiction recovery" .
+
+ccgclass:audience_mental_health_support a skos:Concept ;
+  skos:inScheme ccclass:AudienceScheme ;
+  skos:notation "mental_health_support" ;
+  skos:prefLabel "Mental health support" .
+
+ccgclass:audience_housing_insecurity a skos:Concept ;
+  skos:inScheme ccclass:AudienceScheme ;
+  skos:notation "housing_insecurity" ;
+  skos:prefLabel "Housing insecurity" .
 

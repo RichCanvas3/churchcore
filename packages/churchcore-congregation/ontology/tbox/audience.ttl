@@ -1,6 +1,4 @@
-@prefix cc: <https://ontology.churchcore.ai/cc#> .
 @prefix cccong: <https://ontology.churchcore.ai/cc/congregation#> .
-@prefix cccongclass: <https://ontology.churchcore.ai/cc/congregation/class#> .
 @prefix prov: <http://www.w3.org/ns/prov#> .
 @prefix owl: <http://www.w3.org/2002/07/owl#> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
@@ -18,17 +16,17 @@
 cccong:AudienceSegment a owl:Class ;
   rdfs:label "AudienceSegment" ;
   rdfs:comment "A reusable audience/segment category used for local congregation targeting (SKOS concept).";
-  rdfs:subClassOf prov:Entity, skos:Concept .
+  rdfs:subClassOf skos:Concept .
 
 cccong:hasAudienceSegment a owl:ObjectProperty ;
   rdfs:label "hasAudienceSegment" ;
   rdfs:comment "Links an entity (ministry, small group, service, event, resource) to an audience segment category (SKOS concept)." ;
   rdfs:domain prov:Entity ;
-  rdfs:range cccong:AudienceSegment .
+  rdfs:range skos:Concept .
 
 cccong:audienceSegmentScheme a owl:ObjectProperty ;
   rdfs:label "audienceSegmentScheme" ;
-  rdfs:comment "Links an AudienceSegment concept to its scheme; values SHOULD include cccongclass:AudienceSegmentScheme." ;
-  rdfs:domain cccong:AudienceSegment ;
+  rdfs:comment "Links an audience segment concept to its scheme (typically ccclass:AudienceScheme in the upper ontology)." ;
+  rdfs:domain skos:Concept ;
   rdfs:range skos:ConceptScheme .
 

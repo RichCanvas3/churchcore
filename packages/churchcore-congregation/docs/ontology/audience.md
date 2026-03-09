@@ -18,21 +18,21 @@ classDiagram
 direction LR
 
 class prov_Entity["prov:Entity"]
-class cccong_AudienceSegment["cccong:AudienceSegment"]
+class skos_Concept["skos:Concept"]
 
-prov_Entity --> "0..*" cccong_AudienceSegment : hasAudienceSegment
+prov_Entity --> "0..*" skos_Concept : hasAudienceSegment
 ```
 
 ## SPARQL: list all congregation audience segments
 
 ```sparql
 PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
-PREFIX cccongclass: <https://ontology.churchcore.ai/cc/congregation/class#>
+PREFIX ccclass: <https://ontology.churchcore.ai/cc/class#>
 
 SELECT ?segment ?label ?notation
 WHERE {
   ?segment a skos:Concept ;
-           skos:inScheme cccongclass:AudienceSegmentScheme .
+           skos:inScheme ccclass:AudienceScheme .
   OPTIONAL { ?segment skos:prefLabel ?label }
   OPTIONAL { ?segment skos:notation ?notation }
 }
