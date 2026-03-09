@@ -38,3 +38,160 @@ ccfj:edge_formation_2_to_3 a ccjourney:JourneyEdge ;
   ccjourney:toNode ccfj:formation_christ_centered_node ;
   ccjourney:edgeKind "NEXT_STAGE" .
 
+###
+# Formation detail: practices, relationships, and common blockers
+# These nodes are not "stages"; they represent formation mechanisms and measurable dimensions.
+###
+
+# Practices / disciplines
+ccfj:formation_scripture_engagement a ccjourney:JourneyNode ;
+  cc:name "Scripture engagement" .
+
+ccfj:formation_prayer_dependence a ccjourney:JourneyNode ;
+  cc:name "Prayer and dependence" .
+
+ccfj:formation_obedience_self_denial a ccjourney:JourneyNode ;
+  cc:name "Obedience and self-denial" .
+
+ccfj:formation_serving_others a ccjourney:JourneyNode ;
+  cc:name "Serving God and others" .
+
+ccfj:formation_sharing_christ a ccjourney:JourneyNode ;
+  cc:name "Sharing Christ" .
+
+ccfj:formation_exercising_faith a ccjourney:JourneyNode ;
+  cc:name "Exercising faith (risk/steps)" .
+
+# Relationships / community
+ccfj:formation_building_relationships a ccjourney:JourneyNode ;
+  cc:name "Building relationships (community)" .
+
+ccfj:formation_transparency_accountability a ccjourney:JourneyNode ;
+  cc:name "Transparency and accountability" .
+
+# Catalysts
+ccfj:formation_truth_in_love a ccjourney:JourneyNode ;
+  cc:name "Truth in love (teaching + encouragement)" .
+
+ccfj:formation_trial_perseverance a ccjourney:JourneyNode ;
+  cc:name "Trial and perseverance" .
+
+# Blockers / stalls
+ccfj:formation_barrier_isolation a ccjourney:JourneyNode ;
+  cc:name "Isolation" .
+
+ccfj:formation_barrier_unconfessed_sin a ccjourney:JourneyNode ;
+  cc:name "Unconfessed sin pattern" .
+
+ccfj:formation_barrier_compartmentalization a ccjourney:JourneyNode ;
+  cc:name "Compartmentalization (faith not integrated)" .
+
+ccfj:formation_barrier_doctrinal_confusion a ccjourney:JourneyNode ;
+  cc:name "Doctrinal confusion" .
+
+ccfj:formation_barrier_burnout a ccjourney:JourneyNode ;
+  cc:name "Burnout / fatigue" .
+
+# Common resolutions
+ccfj:formation_action_confession a ccjourney:JourneyNode ;
+  cc:name "Confession and repentance" .
+
+ccfj:formation_action_mentoring a ccjourney:JourneyNode ;
+  cc:name "Mentoring / spiritual friendship" .
+
+ccfj:formation_action_rule_of_life a ccjourney:JourneyNode ;
+  cc:name "Rule of life / rhythms" .
+
+# Stage → mechanisms (recommendations)
+ccfj:edge_growing_recommends_scripture a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:formation_growing_in_christ_node ;
+  ccjourney:toNode ccfj:formation_scripture_engagement ;
+  ccjourney:edgeKind "RECOMMENDS" .
+
+ccfj:edge_growing_recommends_prayer a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:formation_growing_in_christ_node ;
+  ccjourney:toNode ccfj:formation_prayer_dependence ;
+  ccjourney:edgeKind "RECOMMENDS" .
+
+ccfj:edge_growing_recommends_relationships a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:formation_growing_in_christ_node ;
+  ccjourney:toNode ccfj:formation_building_relationships ;
+  ccjourney:edgeKind "RECOMMENDS" .
+
+ccfj:edge_close_recommends_obedience a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:formation_close_to_christ_node ;
+  ccjourney:toNode ccfj:formation_obedience_self_denial ;
+  ccjourney:edgeKind "RECOMMENDS" .
+
+ccfj:edge_close_recommends_serving a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:formation_close_to_christ_node ;
+  ccjourney:toNode ccfj:formation_serving_others ;
+  ccjourney:edgeKind "RECOMMENDS" .
+
+ccfj:edge_close_recommends_transparency a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:formation_close_to_christ_node ;
+  ccjourney:toNode ccfj:formation_transparency_accountability ;
+  ccjourney:edgeKind "RECOMMENDS" .
+
+ccfj:edge_christ_centered_recommends_sharing a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:formation_christ_centered_node ;
+  ccjourney:toNode ccfj:formation_sharing_christ ;
+  ccjourney:edgeKind "RECOMMENDS" .
+
+ccfj:edge_christ_centered_recommends_faith_steps a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:formation_christ_centered_node ;
+  ccjourney:toNode ccfj:formation_exercising_faith ;
+  ccjourney:edgeKind "RECOMMENDS" .
+
+ccfj:edge_truth_in_love_unlocks_growth a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:formation_truth_in_love ;
+  ccjourney:toNode ccfj:formation_close_to_christ_node ;
+  ccjourney:edgeKind "UNLOCKS" .
+
+ccfj:edge_trials_unlocks_depth a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:formation_trial_perseverance ;
+  ccjourney:toNode ccfj:formation_christ_centered_node ;
+  ccjourney:edgeKind "UNLOCKS" .
+
+# Blockers: common causes of stagnation (attach to any stage)
+ccfj:edge_growing_blocked_by_isolation a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:formation_growing_in_christ_node ;
+  ccjourney:toNode ccfj:formation_barrier_isolation ;
+  ccjourney:edgeKind "BLOCKED_BY" .
+
+ccfj:edge_close_blocked_by_unconfessed_sin a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:formation_close_to_christ_node ;
+  ccjourney:toNode ccfj:formation_barrier_unconfessed_sin ;
+  ccjourney:edgeKind "BLOCKED_BY" .
+
+ccfj:edge_close_blocked_by_compartmentalization a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:formation_close_to_christ_node ;
+  ccjourney:toNode ccfj:formation_barrier_compartmentalization ;
+  ccjourney:edgeKind "BLOCKED_BY" .
+
+ccfj:edge_growing_blocked_by_doctrinal_confusion a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:formation_growing_in_christ_node ;
+  ccjourney:toNode ccfj:formation_barrier_doctrinal_confusion ;
+  ccjourney:edgeKind "BLOCKED_BY" .
+
+ccfj:edge_christ_centered_blocked_by_burnout a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:formation_christ_centered_node ;
+  ccjourney:toNode ccfj:formation_barrier_burnout ;
+  ccjourney:edgeKind "BLOCKED_BY" .
+
+# Resolutions
+ccfj:edge_isolation_resolved_by_mentoring a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:formation_barrier_isolation ;
+  ccjourney:toNode ccfj:formation_action_mentoring ;
+  ccjourney:edgeKind "RESOLVED_BY" .
+
+ccfj:edge_unconfessed_sin_resolved_by_confession a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:formation_barrier_unconfessed_sin ;
+  ccjourney:toNode ccfj:formation_action_confession ;
+  ccjourney:edgeKind "RESOLVED_BY" .
+
+ccfj:edge_compartmentalization_resolved_by_rule_of_life a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:formation_barrier_compartmentalization ;
+  ccjourney:toNode ccfj:formation_action_rule_of_life ;
+  ccjourney:edgeKind "RESOLVED_BY" .
+

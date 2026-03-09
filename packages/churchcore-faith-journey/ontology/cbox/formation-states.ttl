@@ -17,15 +17,18 @@ ccfjclass:FormationScheme a skos:ConceptScheme ;
 ccfjclass:formation_growing_in_christ a skos:Concept, cc:NonTerminalState ;
   skos:inScheme ccfjclass:FormationScheme ;
   skos:notation "growing_in_christ" ;
-  skos:prefLabel "Growing in Christ" .
+  skos:prefLabel "Growing in Christ" ;
+  skos:definition "Early formation: learning Christ, beginning disciplines, and growing from spiritual infancy toward obedience and stability." .
 
 ccfjclass:formation_close_to_christ a skos:Concept, cc:NonTerminalState ;
   skos:inScheme ccfjclass:FormationScheme ;
   skos:notation "close_to_christ" ;
-  skos:prefLabel "Close to Christ" .
+  skos:prefLabel "Close to Christ" ;
+  skos:definition "Deepening intimacy and dependence: abiding in Christ, increasing fruit, and integrating faith into daily decisions and relationships." .
 
 ccfjclass:formation_christ_centered a skos:Concept, cc:NonTerminalState ;
   skos:inScheme ccfjclass:FormationScheme ;
   skos:notation "christ_centered" ;
-  skos:prefLabel "Christ-centered" .
+  skos:prefLabel "Christ-centered" ;
+  skos:definition "Mature formation: identity, priorities, and practices are anchored in Christ; ongoing surrender, wisdom, and stability shape a fruitful life." .
 

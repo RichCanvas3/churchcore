@@ -17,25 +17,35 @@ ccfjclass:MultiplicationScheme a skos:ConceptScheme ;
 ccfjclass:multiplication_recipient a skos:Concept, cc:NonTerminalState ;
   skos:inScheme ccfjclass:MultiplicationScheme ;
   skos:notation "recipient" ;
-  skos:prefLabel "Recipient" .
+  skos:prefLabel "Recipient" ;
+  skos:definition "Primarily receiving intentional discipleship, teaching, and care; not yet intentionally discipling others." ;
+  skos:scopeNote "Recommended signals: is_being_discipled, is_discipling_others, disciplemaking_confidence." .
 
 ccfjclass:multiplication_reproducer_in_training a skos:Concept, cc:NonTerminalState ;
   skos:inScheme ccfjclass:MultiplicationScheme ;
   skos:notation "reproducer_in_training" ;
-  skos:prefLabel "Reproducer-in-training" .
+  skos:prefLabel "Reproducer-in-training" ;
+  skos:definition "Learning disciple-making by doing (often with coaching): sharing faith, mentoring, serving missionally, and practicing multiplication skills." ;
+  skos:scopeNote "Recommended signals: is_being_discipled, is_discipling_others, disciplemaking_confidence." .
 
 ccfjclass:multiplication_disciple_maker a skos:Concept, cc:NonTerminalState ;
   skos:inScheme ccfjclass:MultiplicationScheme ;
   skos:notation "disciple_maker" ;
-  skos:prefLabel "Disciple-maker" .
+  skos:prefLabel "Disciple-maker" ;
+  skos:definition "Intentionally discipling at least one person; teaching obedience and equipping others to follow Jesus and reproduce." ;
+  skos:scopeNote "Recommended signals: is_discipling_others, disciplemaking_confidence, leader_reproduction_count." .
 
 ccfjclass:multiplication_leader_of_disciple_makers a skos:Concept, cc:NonTerminalState ;
   skos:inScheme ccfjclass:MultiplicationScheme ;
   skos:notation "leader_of_disciple_makers" ;
-  skos:prefLabel "Leader of disciple-makers" .
+  skos:prefLabel "Leader of disciple-makers" ;
+  skos:definition "Equipping and leading multiple disciple-makers (team/group/micro-community), building a culture of multiplication." ;
+  skos:scopeNote "Recommended signals: leader_reproduction_count, group_launch_count, mission_sending_participation." .
 
 ccfjclass:multiplication_sender_multiplier a skos:Concept, cc:NonTerminalState ;
   skos:inScheme ccfjclass:MultiplicationScheme ;
   skos:notation "sender_multiplier" ;
-  skos:prefLabel "Sender / multiplier" .
+  skos:prefLabel "Sender / multiplier" ;
+  skos:definition "Focused on systemic multiplication: launching new groups/leaders/initiatives and sending others (including church planting/missions)." ;
+  skos:scopeNote "Recommended signals: group_launch_count, mission_sending_participation, leader_reproduction_count." .
 

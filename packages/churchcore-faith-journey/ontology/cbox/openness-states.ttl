@@ -17,25 +17,35 @@ ccfjclass:SpiritualOpennessScheme a skos:ConceptScheme ;
 ccfjclass:openness_unaware_indifferent a skos:Concept, cc:NonTerminalState ;
   skos:inScheme ccfjclass:SpiritualOpennessScheme ;
   skos:notation "unaware_indifferent" ;
-  skos:prefLabel "Unaware / indifferent" .
+  skos:prefLabel "Unaware / indifferent" ;
+  skos:definition "Minimal spiritual interest; not actively seeking or engaging with the gospel." ;
+  skos:scopeNote "Recommended signals: spiritual_interest_level." .
 
 ccfjclass:openness_spiritually_curious a skos:Concept, cc:NonTerminalState ;
   skos:inScheme ccfjclass:SpiritualOpennessScheme ;
   skos:notation "spiritually_curious" ;
-  skos:prefLabel "Spiritually curious" .
+  skos:prefLabel "Spiritually curious" ;
+  skos:definition "Open to spiritual questions and meaning; early signs of seeking (often prompted by creation, conscience, life events, or relationships)." ;
+  skos:scopeNote "Recommended signals: spiritual_interest_level, gospel_understanding_level." .
 
 ccfjclass:openness_exploring_christ a skos:Concept, cc:NonTerminalState ;
   skos:inScheme ccfjclass:SpiritualOpennessScheme ;
   skos:notation "exploring_christ" ;
-  skos:prefLabel "Exploring Christ" .
+  skos:prefLabel "Exploring Christ" ;
+  skos:definition "Focused inquiry about Jesus and the gospel; engaging Christian claims, communities, and resources." ;
+  skos:scopeNote "Recommended signals: gospel_understanding_level, belief_in_jesus, jesus_commitment_status." .
 
 ccfjclass:openness_new_believer_commitment a skos:Concept, cc:NonTerminalState ;
   skos:inScheme ccfjclass:SpiritualOpennessScheme ;
   skos:notation "new_believer_commitment" ;
-  skos:prefLabel "New believer / initial commitment" .
+  skos:prefLabel "New believer / initial commitment" ;
+  skos:definition "Initial repentance and faith commitment; early discipleship foundations typically needed." ;
+  skos:scopeNote "Recommended signals: jesus_commitment_status, christian_identity_strength, conversion_testimony_status." .
 
 ccfjclass:openness_public_identification a skos:Concept, cc:NonTerminalState ;
   skos:inScheme ccfjclass:SpiritualOpennessScheme ;
   skos:notation "public_identification" ;
-  skos:prefLabel "Public identification" .
+  skos:prefLabel "Public identification" ;
+  skos:definition "Public identification with Christ (e.g., baptism/testimony) and initial church attachment." ;
+  skos:scopeNote "Recommended signals: baptism_status, public_faith_identification_status, public_identification_status, testimony_shared_status." .
 

@@ -56,3 +56,227 @@ ccfj:edge_mult_3_to_4 a ccjourney:JourneyEdge ;
   ccjourney:toNode ccfj:multiplication_sender_multiplier_node ;
   ccjourney:edgeKind "NEXT_STAGE" .
 
+###
+# Multiplication detail: receiving → practicing → discipling → leading disciple-makers → sending/launching
+###
+
+# Receiving discipleship (foundation)
+ccfj:multiplication_being_with_jesus a ccjourney:JourneyNode ;
+  cc:name "Being discipled (learning by presence and practice)" .
+
+ccfj:multiplication_teaching_fellowship a ccjourney:JourneyNode ;
+  cc:name "Teaching and fellowship rhythm" .
+
+# Training / equipping moves
+ccfj:multiplication_apprenticeship a ccjourney:JourneyNode ;
+  cc:name "Apprenticeship under a mentor" .
+
+ccfj:multiplication_share_testimony a ccjourney:JourneyNode ;
+  cc:name "Share testimony" .
+
+ccfj:multiplication_pray_with_others a ccjourney:JourneyNode ;
+  cc:name "Pray with others" .
+
+ccfj:multiplication_co_lead_study a ccjourney:JourneyNode ;
+  cc:name "Co-lead a study/group" .
+
+ccfj:multiplication_spiritual_conversations a ccjourney:JourneyNode ;
+  cc:name "Spiritual conversations" .
+
+# Disciple-making actions
+ccfj:multiplication_intentional_discipleship_relationship a ccjourney:JourneyNode ;
+  cc:name "Intentional discipleship relationship" .
+
+ccfj:multiplication_teach_obedience a ccjourney:JourneyNode ;
+  cc:name "Teach obedience (application)" .
+
+ccfj:multiplication_equip_to_reproduce a ccjourney:JourneyNode ;
+  cc:name "Equip to reproduce (2 Timothy 2:2 pattern)" .
+
+# Leading disciple-makers
+ccfj:multiplication_coach_disciple_makers a ccjourney:JourneyNode ;
+  cc:name "Coach disciple-makers" .
+
+ccfj:multiplication_build_culture_of_multiplication a ccjourney:JourneyNode ;
+  cc:name "Build a culture of multiplication" .
+
+ccfj:multiplication_identify_and_develop_leaders a ccjourney:JourneyNode ;
+  cc:name "Identify and develop leaders" .
+
+# Sending / launching
+ccfj:multiplication_launch_new_group a ccjourney:JourneyNode ;
+  cc:name "Launch a new group/ministry" .
+
+ccfj:multiplication_send_others a ccjourney:JourneyNode ;
+  cc:name "Send others (commissioning)" .
+
+ccfj:multiplication_church_planting_participation a ccjourney:JourneyNode ;
+  cc:name "Church planting participation" .
+
+ccfj:multiplication_cross_cultural_mission_participation a ccjourney:JourneyNode ;
+  cc:name "Cross-cultural mission participation" .
+
+# Blockers / stalls
+ccfj:multiplication_barrier_fear a ccjourney:JourneyNode ;
+  cc:name "Fear / reluctance" .
+
+ccfj:multiplication_barrier_no_equipping a ccjourney:JourneyNode ;
+  cc:name "Lack of equipping" .
+
+ccfj:multiplication_barrier_no_margin a ccjourney:JourneyNode ;
+  cc:name "No margin / overload" .
+
+ccfj:multiplication_barrier_consumer_mindset a ccjourney:JourneyNode ;
+  cc:name "Consumer mindset" .
+
+# Resolutions
+ccfj:multiplication_action_coaching a ccjourney:JourneyNode ;
+  cc:name "Coaching and feedback" .
+
+ccfj:multiplication_action_simple_tools a ccjourney:JourneyNode ;
+  cc:name "Simple disciple-making tools" .
+
+ccfj:multiplication_action_prayer_dependence a ccjourney:JourneyNode ;
+  cc:name "Prayerful dependence and courage" .
+
+ccfj:multiplication_action_simplify_commitments a ccjourney:JourneyNode ;
+  cc:name "Simplify commitments (recover margin)" .
+
+# Stage supports / recommendations
+ccfj:edge_recipient_supported_by_being_discipled a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:multiplication_recipient_node ;
+  ccjourney:toNode ccfj:multiplication_being_with_jesus ;
+  ccjourney:edgeKind "SUPPORTED_BY" .
+
+ccfj:edge_recipient_supported_by_teaching_fellowship a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:multiplication_recipient_node ;
+  ccjourney:toNode ccfj:multiplication_teaching_fellowship ;
+  ccjourney:edgeKind "SUPPORTED_BY" .
+
+ccfj:edge_training_recommends_apprenticeship a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:multiplication_reproducer_in_training_node ;
+  ccjourney:toNode ccfj:multiplication_apprenticeship ;
+  ccjourney:edgeKind "RECOMMENDS" .
+
+ccfj:edge_training_recommends_testimony a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:multiplication_reproducer_in_training_node ;
+  ccjourney:toNode ccfj:multiplication_share_testimony ;
+  ccjourney:edgeKind "RECOMMENDS" .
+
+ccfj:edge_training_recommends_prayer_with_others a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:multiplication_reproducer_in_training_node ;
+  ccjourney:toNode ccfj:multiplication_pray_with_others ;
+  ccjourney:edgeKind "RECOMMENDS" .
+
+ccfj:edge_training_recommends_colead a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:multiplication_reproducer_in_training_node ;
+  ccjourney:toNode ccfj:multiplication_co_lead_study ;
+  ccjourney:edgeKind "RECOMMENDS" .
+
+ccfj:edge_training_unlocks_disciple_maker a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:multiplication_apprenticeship ;
+  ccjourney:toNode ccfj:multiplication_disciple_maker_node ;
+  ccjourney:edgeKind "UNLOCKS" .
+
+ccfj:edge_disciple_maker_requires_relationship a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:multiplication_disciple_maker_node ;
+  ccjourney:toNode ccfj:multiplication_intentional_discipleship_relationship ;
+  ccjourney:edgeKind "REQUIRES" .
+
+ccfj:edge_relationship_recommends_teach_obedience a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:multiplication_intentional_discipleship_relationship ;
+  ccjourney:toNode ccfj:multiplication_teach_obedience ;
+  ccjourney:edgeKind "RECOMMENDS" .
+
+ccfj:edge_relationship_recommends_equip_to_reproduce a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:multiplication_intentional_discipleship_relationship ;
+  ccjourney:toNode ccfj:multiplication_equip_to_reproduce ;
+  ccjourney:edgeKind "RECOMMENDS" .
+
+ccfj:edge_equip_unlocks_leader_of_disciple_makers a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:multiplication_equip_to_reproduce ;
+  ccjourney:toNode ccfj:multiplication_leader_of_disciple_makers_node ;
+  ccjourney:edgeKind "UNLOCKS" .
+
+ccfj:edge_leader_recommends_coaching a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:multiplication_leader_of_disciple_makers_node ;
+  ccjourney:toNode ccfj:multiplication_coach_disciple_makers ;
+  ccjourney:edgeKind "RECOMMENDS" .
+
+ccfj:edge_leader_recommends_culture a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:multiplication_leader_of_disciple_makers_node ;
+  ccjourney:toNode ccfj:multiplication_build_culture_of_multiplication ;
+  ccjourney:edgeKind "RECOMMENDS" .
+
+ccfj:edge_leader_recommends_develop_leaders a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:multiplication_leader_of_disciple_makers_node ;
+  ccjourney:toNode ccfj:multiplication_identify_and_develop_leaders ;
+  ccjourney:edgeKind "RECOMMENDS" .
+
+ccfj:edge_leader_unlocks_sender a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:multiplication_build_culture_of_multiplication ;
+  ccjourney:toNode ccfj:multiplication_sender_multiplier_node ;
+  ccjourney:edgeKind "UNLOCKS" .
+
+ccfj:edge_sender_recommends_launch_group a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:multiplication_sender_multiplier_node ;
+  ccjourney:toNode ccfj:multiplication_launch_new_group ;
+  ccjourney:edgeKind "RECOMMENDS" .
+
+ccfj:edge_sender_recommends_send_others a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:multiplication_sender_multiplier_node ;
+  ccjourney:toNode ccfj:multiplication_send_others ;
+  ccjourney:edgeKind "RECOMMENDS" .
+
+ccfj:edge_sender_recommends_church_planting a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:multiplication_sender_multiplier_node ;
+  ccjourney:toNode ccfj:multiplication_church_planting_participation ;
+  ccjourney:edgeKind "RECOMMENDS" .
+
+ccfj:edge_sender_recommends_cross_cultural_mission a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:multiplication_sender_multiplier_node ;
+  ccjourney:toNode ccfj:multiplication_cross_cultural_mission_participation ;
+  ccjourney:edgeKind "RECOMMENDS" .
+
+# Blockers
+ccfj:edge_training_blocked_by_fear a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:multiplication_reproducer_in_training_node ;
+  ccjourney:toNode ccfj:multiplication_barrier_fear ;
+  ccjourney:edgeKind "BLOCKED_BY" .
+
+ccfj:edge_training_blocked_by_no_equipping a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:multiplication_reproducer_in_training_node ;
+  ccjourney:toNode ccfj:multiplication_barrier_no_equipping ;
+  ccjourney:edgeKind "BLOCKED_BY" .
+
+ccfj:edge_disciple_maker_blocked_by_no_margin a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:multiplication_disciple_maker_node ;
+  ccjourney:toNode ccfj:multiplication_barrier_no_margin ;
+  ccjourney:edgeKind "BLOCKED_BY" .
+
+ccfj:edge_recipient_blocked_by_consumer_mindset a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:multiplication_recipient_node ;
+  ccjourney:toNode ccfj:multiplication_barrier_consumer_mindset ;
+  ccjourney:edgeKind "BLOCKED_BY" .
+
+# Resolutions
+ccfj:edge_fear_resolved_by_prayer_dependence a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:multiplication_barrier_fear ;
+  ccjourney:toNode ccfj:multiplication_action_prayer_dependence ;
+  ccjourney:edgeKind "RESOLVED_BY" .
+
+ccfj:edge_no_equipping_resolved_by_coaching a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:multiplication_barrier_no_equipping ;
+  ccjourney:toNode ccfj:multiplication_action_coaching ;
+  ccjourney:edgeKind "RESOLVED_BY" .
+
+ccfj:edge_no_equipping_resolved_by_simple_tools a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:multiplication_barrier_no_equipping ;
+  ccjourney:toNode ccfj:multiplication_action_simple_tools ;
+  ccjourney:edgeKind "RESOLVED_BY" .
+
+ccfj:edge_no_margin_resolved_by_simplify a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:multiplication_barrier_no_margin ;
+  ccjourney:toNode ccfj:multiplication_action_simplify_commitments ;
+  ccjourney:edgeKind "RESOLVED_BY" .
+

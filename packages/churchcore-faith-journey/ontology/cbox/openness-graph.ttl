@@ -56,3 +56,158 @@ ccfj:edge_openness_3_to_4 a ccjourney:JourneyEdge ;
   ccjourney:toNode ccfj:openness_public_identification_node ;
   ccjourney:edgeKind "NEXT_STAGE" .
 
+###
+# Biblical foundations detail (God draws; people respond)
+# Modeled as finer-grained nodes/edges that support pastoral interventions.
+###
+
+ccfj:openness_general_revelation a ccjourney:JourneyNode ;
+  cc:name "General revelation (creation)" .
+
+ccfj:openness_conscience_awakened a ccjourney:JourneyNode ;
+  cc:name "Conscience awakened" .
+
+ccfj:openness_life_circumstance_trigger a ccjourney:JourneyNode ;
+  cc:name "Life circumstance trigger" .
+
+ccfj:openness_divine_prompting a ccjourney:JourneyNode ;
+  cc:name "Divine prompting" .
+
+ccfj:openness_gospel_exposure a ccjourney:JourneyNode ;
+  cc:name "Gospel exposure" .
+
+ccfj:openness_gospel_clarity a ccjourney:JourneyNode ;
+  cc:name "Gospel clarity" .
+
+ccfj:openness_conviction a ccjourney:JourneyNode ;
+  cc:name "Conviction" .
+
+ccfj:openness_repentance a ccjourney:JourneyNode ;
+  cc:name "Repentance" .
+
+ccfj:openness_faith_in_christ a ccjourney:JourneyNode ;
+  cc:name "Faith in Christ" .
+
+ccfj:openness_baptism a ccjourney:JourneyNode ;
+  cc:name "Baptism" .
+
+ccfj:openness_testimony a ccjourney:JourneyNode ;
+  cc:name "Testimony / public declaration" .
+
+ccfj:openness_barrier_spiritual_suppression a ccjourney:JourneyNode ;
+  cc:name "Spiritual suppression / resistance" .
+
+ccfj:openness_barrier_misconceptions a ccjourney:JourneyNode ;
+  cc:name "Misconceptions / objections" .
+
+ccfj:openness_action_conversation a ccjourney:JourneyNode ;
+  cc:name "Conversation with a believer" .
+
+ccfj:openness_action_scripture_exposure a ccjourney:JourneyNode ;
+  cc:name "Scripture exposure" .
+
+ccfj:edge_unaware_supported_by_creation a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:openness_unaware_indifferent_node ;
+  ccjourney:toNode ccfj:openness_general_revelation ;
+  ccjourney:edgeKind "SUPPORTED_BY" .
+
+ccfj:edge_unaware_supported_by_conscience a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:openness_unaware_indifferent_node ;
+  ccjourney:toNode ccfj:openness_conscience_awakened ;
+  ccjourney:edgeKind "SUPPORTED_BY" .
+
+ccfj:edge_unaware_supported_by_life_circumstances a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:openness_unaware_indifferent_node ;
+  ccjourney:toNode ccfj:openness_life_circumstance_trigger ;
+  ccjourney:edgeKind "SUPPORTED_BY" .
+
+ccfj:edge_general_revelation_unlocks_curious a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:openness_general_revelation ;
+  ccjourney:toNode ccfj:openness_spiritually_curious_node ;
+  ccjourney:edgeKind "UNLOCKS" .
+
+ccfj:edge_conscience_unlocks_curious a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:openness_conscience_awakened ;
+  ccjourney:toNode ccfj:openness_spiritually_curious_node ;
+  ccjourney:edgeKind "UNLOCKS" .
+
+ccfj:edge_life_circumstances_unlocks_curious a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:openness_life_circumstance_trigger ;
+  ccjourney:toNode ccfj:openness_spiritually_curious_node ;
+  ccjourney:edgeKind "UNLOCKS" .
+
+ccfj:edge_curious_supported_by_prompting a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:openness_spiritually_curious_node ;
+  ccjourney:toNode ccfj:openness_divine_prompting ;
+  ccjourney:edgeKind "SUPPORTED_BY" .
+
+ccfj:edge_curious_to_gospel_exposure a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:openness_spiritually_curious_node ;
+  ccjourney:toNode ccfj:openness_gospel_exposure ;
+  ccjourney:edgeKind "RECOMMENDS" .
+
+ccfj:edge_gospel_exposure_to_clarity a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:openness_gospel_exposure ;
+  ccjourney:toNode ccfj:openness_gospel_clarity ;
+  ccjourney:edgeKind "UNLOCKS" .
+
+ccfj:edge_clarity_to_exploring_christ a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:openness_gospel_clarity ;
+  ccjourney:toNode ccfj:openness_exploring_christ_node ;
+  ccjourney:edgeKind "NEXT_STAGE" .
+
+ccfj:edge_exploring_to_conviction a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:openness_exploring_christ_node ;
+  ccjourney:toNode ccfj:openness_conviction ;
+  ccjourney:edgeKind "RECOMMENDS" .
+
+ccfj:edge_conviction_to_repentance a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:openness_conviction ;
+  ccjourney:toNode ccfj:openness_repentance ;
+  ccjourney:edgeKind "REQUIRES" .
+
+ccfj:edge_repentance_to_faith a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:openness_repentance ;
+  ccjourney:toNode ccfj:openness_faith_in_christ ;
+  ccjourney:edgeKind "REQUIRES" .
+
+ccfj:edge_faith_to_new_believer a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:openness_faith_in_christ ;
+  ccjourney:toNode ccfj:openness_new_believer_commitment_node ;
+  ccjourney:edgeKind "NEXT_STAGE" .
+
+ccfj:edge_new_believer_to_baptism a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:openness_new_believer_commitment_node ;
+  ccjourney:toNode ccfj:openness_baptism ;
+  ccjourney:edgeKind "RECOMMENDS" .
+
+ccfj:edge_baptism_to_testimony a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:openness_baptism ;
+  ccjourney:toNode ccfj:openness_testimony ;
+  ccjourney:edgeKind "RECOMMENDS" .
+
+ccfj:edge_testimony_to_public_identification a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:openness_testimony ;
+  ccjourney:toNode ccfj:openness_public_identification_node ;
+  ccjourney:edgeKind "NEXT_STAGE" .
+
+ccfj:edge_exploring_blocked_by_misconceptions a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:openness_exploring_christ_node ;
+  ccjourney:toNode ccfj:openness_barrier_misconceptions ;
+  ccjourney:edgeKind "BLOCKED_BY" .
+
+ccfj:edge_unaware_blocked_by_suppression a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:openness_unaware_indifferent_node ;
+  ccjourney:toNode ccfj:openness_barrier_spiritual_suppression ;
+  ccjourney:edgeKind "BLOCKED_BY" .
+
+ccfj:edge_misconceptions_resolved_by_conversation a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:openness_barrier_misconceptions ;
+  ccjourney:toNode ccfj:openness_action_conversation ;
+  ccjourney:edgeKind "RESOLVED_BY" .
+
+ccfj:edge_misconceptions_resolved_by_scripture a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:openness_barrier_misconceptions ;
+  ccjourney:toNode ccfj:openness_action_scripture_exposure ;
+  ccjourney:edgeKind "RESOLVED_BY" .
+
