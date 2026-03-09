@@ -5542,6 +5542,18 @@ export default {
     const cron = String((event as any).cron ?? "");
     const churchId = (env.CRAWL_CHURCH_ID ?? "calvarybible").trim() || "calvarybible";
     ctx.waitUntil(runScheduledCrawl(env, cron));
+    // Auto-queue missing sermon transcripts (bounded) so transcripts arrive without manual admin calls.
+    // Uses AssemblyAI queue+poll flow (requires ASSEMBLYAI_API_KEY).
+    try {
+      const enabled = String((env as any).TRANSCRIPTION_AUTO_QUEUE_ENABLED ?? "1").trim() === "1";
+      const apiKey = String((env as any).ASSEMBLYAI_API_KEY ?? "").trim();
+      if (enabled && apiKey) {
+        const limit = clampInt((env as any).TRANSCRIPTION_AUTO_QUEUE_LIMIT, 10, 1, 200);
+        ctx.waitUntil(queueMissingAssemblyAiJobs(env, { churchId, limit }));
+      }
+    } catch {
+      // best-effort
+    }
     ctx.waitUntil(processAssemblyAiJobs(env, { churchId, limit: 2 }));
     // Daily GraphDB sync (opt-in via GRAPHDB_SYNC_ENABLED=1)
     if (String(env.GRAPHDB_SYNC_ENABLED ?? "").trim() === "1" && cron.includes("15 3")) {

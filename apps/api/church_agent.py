@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import base64
+import asyncio
 import time
 import urllib.parse
 import urllib.request
@@ -1194,15 +1195,31 @@ async def _predict_journey_flows_with_sparql(
             },
         )
 
-    # Step 2: execute SPARQL via MCP
-    results: dict[str, Any] = {}
-    for q in qclean:
+    # Step 2: execute SPARQL via MCP (parallel).
+    async def _run_sparql_one(q: dict[str, str]) -> tuple[str, dict[str, Any]]:
+        name = str(q.get("name") or "").strip() or "q"
+        t0 = time.perf_counter()
         res = await _call_tool_json(
             tools,
             "churchcore_graphdb_sparql_query",
-            {"churchId": session.churchId, "query": q["query"], "accept": "application/sparql-results+json"},
+            {"churchId": session.churchId, "query": q.get("query") or "", "accept": "application/sparql-results+json"},
         )
-        results[q["name"]] = {"purpose": q.get("purpose"), "ok": bool(res and res.get("ok")), "result": res}
+        t1 = time.perf_counter()
+        return (
+            name,
+            {
+                "purpose": str(q.get("purpose") or "").strip(),
+                "ok": bool(res and res.get("ok")),
+                "result": res,
+                "timingMs": int(round((t1 - t0) * 1000.0)),
+            },
+        )
+
+    sparql_t0 = time.perf_counter()
+    pairs = await asyncio.gather(*[_run_sparql_one(q) for q in qclean])
+    sparql_t1 = time.perf_counter()
+    results: dict[str, Any] = {k: v for (k, v) in pairs}
+    sparql_total_ms = int(round((sparql_t1 - sparql_t0) * 1000.0))
 
     failed = [name for name, r in results.items() if not (isinstance(r, dict) and r.get("ok") is True)]
     if failed:
@@ -1246,10 +1263,12 @@ async def _predict_journey_flows_with_sparql(
         "- predict plausible TimeVaryingConcept/Manifestation/State changes (synthetic forecast)\n"
         "- recommend next actions (journey steps) per graph\n"
         "Return STRICT JSON ONLY with shape:\n"
-        '{\"ok\":true,\"asOf\":\"<iso>\",\"predictions\":[{\"graphId\":\"\",\"graphName\":\"\",\"current\":{\"nodeId\":\"\",\"title\":\"\"},\"predictedChanges\":[{\"timeHorizonDays\":7,\"stateIri\":null,\"stateLabel\":\"\",\"manifestationLabel\":\"\",\"confidence\":0.0,\"evidence\":[\"...\"]}],\"recommendedNextActions\":[{\"nodeId\":\"\",\"title\":\"\",\"edgeKind\":\"\",\"confidence\":0.0,\"reason\":\"\"}]}],\"sparqlUsed\":[\"q1\",\"q2\"]}\n'
+        '{\"ok\":true,\"asOf\":\"<iso>\",\"predictions\":[{\"graphId\":\"\",\"graphName\":\"\",\"current\":{\"nodeId\":\"\",\"title\":\"\"},\"predictedChanges\":[{\"timeHorizonDays\":7,\"stateIri\":null,\"stateLabel\":\"\",\"manifestationLabel\":\"\",\"confidence\":0.0,\"evidence\":[\"...\"],\"notes\":\"\"}],\"recommendedNextActions\":[{\"fromNodeId\":\"\",\"fromTitle\":\"\",\"toNodeId\":\"\",\"toTitle\":\"\",\"nodeId\":\"\",\"title\":\"\",\"edgeKind\":\"\",\"confidence\":0.0,\"reason\":\"\",\"evidence\":[\"...\"]}]}],\"sparqlUsed\":[\"q1\",\"q2\"]}\n'
         "Notes:\n"
         "- Keep predictions pastorally appropriate and avoid certainty language.\n"
         "- Ground recommendations in memory context (sermons, verses, completed steps) and in the journey graph structure.\n"
+        "- For each recommended next action, include a specific 'reason' and 2-6 short 'evidence' bullets.\n"
+        "- Always include graph grounding: fromNodeId/fromTitle should match current; toNodeId/toTitle should match the recommended node.\n"
     )
     user2 = json.dumps(
         {
@@ -1276,7 +1295,64 @@ async def _predict_journey_flows_with_sparql(
     if "sparqlUsed" not in j2:
         j2["sparqlUsed"] = [q["name"] for q in qclean]
 
+    # Attach lightweight debug summaries for transparency (no full SPARQL results).
+    queries_used: list[dict[str, Any]] = []
+    for q in qclean:
+        name = str(q.get("name") or "").strip()
+        if not name:
+            continue
+        r = results.get(name) if isinstance(results.get(name), dict) else {}
+        tool_res = (r or {}).get("result") if isinstance(r, dict) else None
+        ok = bool(isinstance(tool_res, dict) and tool_res.get("ok") is True)
+        bindings_count = None
+        if ok and isinstance(tool_res, dict):
+            payload = tool_res.get("result")
+            try:
+                if isinstance(payload, dict):
+                    bindings = payload.get("results", {}).get("bindings") if isinstance(payload.get("results"), dict) else None
+                    if isinstance(bindings, list):
+                        bindings_count = len(bindings)
+            except Exception:
+                bindings_count = None
+        queries_used.append(
+            {
+                "name": name,
+                "purpose": str(q.get("purpose") or "").strip(),
+                "ok": ok,
+                "querySnippet": str(q.get("query") or "").strip().replace("\n", " ")[:260],
+                "bindingsCount": bindings_count,
+                "timingMs": (r or {}).get("timingMs") if isinstance(r, dict) else None,
+            }
+        )
+    j2["sparqlDebug"] = {"totalTimingMs": sparql_total_ms, "queriesUsed": queries_used[:20]}
+
+    # Normalize/ensure graph grounding fields exist on recommended actions.
     preds = j2.get("predictions")
+    if isinstance(preds, list):
+        for p in preds:
+            if not isinstance(p, dict):
+                continue
+            cur = p.get("current") if isinstance(p.get("current"), dict) else {}
+            cur_id = str((cur or {}).get("nodeId") or "").strip()
+            cur_title = str((cur or {}).get("title") or "").strip()
+            recs = p.get("recommendedNextActions")
+            if not isinstance(recs, list):
+                continue
+            for a in recs:
+                if not isinstance(a, dict):
+                    continue
+                if cur_id and not str(a.get("fromNodeId") or "").strip():
+                    a["fromNodeId"] = cur_id
+                if cur_title and not str(a.get("fromTitle") or "").strip():
+                    a["fromTitle"] = cur_title
+                # Back-compat: if model only filled nodeId/title, mirror to toNodeId/toTitle.
+                node_id = str(a.get("toNodeId") or a.get("nodeId") or "").strip()
+                node_title = str(a.get("toTitle") or a.get("title") or "").strip()
+                if node_id:
+                    a["toNodeId"] = node_id
+                if node_title:
+                    a["toTitle"] = node_title
+
     n_preds = len(preds) if isinstance(preds, list) else 0
     return OutputEnvelope(
         message=f"SPARQL grounded journey prediction generated. graphs={n_preds}",

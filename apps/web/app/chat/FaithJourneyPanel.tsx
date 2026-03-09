@@ -225,6 +225,32 @@ export function FaithJourneyPanel(props: { identity: Identity; onClose: () => vo
               <button type="button" onClick={() => void runPrediction()} disabled={predicting} style={{ ...btn, background: "#0f172a" }}>
                 {predicting ? "Predicting…" : "Show predictive flows"}
               </button>
+              {prediction?.sparqlDebug && (prediction as any)?.sparqlDebug?.queriesUsed ? (
+                <details style={{ marginTop: 10 }}>
+                  <summary style={{ fontSize: 12, fontWeight: 800, color: "#0f172a", cursor: "pointer" }}>Debug (SPARQL)</summary>
+                  <div style={{ marginTop: 8, display: "grid", gap: 8 }}>
+                    {Array.isArray((prediction as any)?.sparqlDebug?.queriesUsed)
+                      ? ((prediction as any).sparqlDebug.queriesUsed as any[]).slice(0, 20).map((q: any, i: number) => (
+                          <div key={i} style={{ border: "1px solid #e2e8f0", borderRadius: 10, padding: 10, background: "#f8fafc" }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "baseline" }}>
+                              <div style={{ fontSize: 12, fontWeight: 900, color: "#0f172a" }}>{String(q?.name ?? `q${i + 1}`)}</div>
+                              <div style={{ fontSize: 12, color: "#64748b" }}>
+                                {q?.ok === true ? "ok" : "failed"}
+                                {typeof q?.bindingsCount === "number" ? ` · rows=${q.bindingsCount}` : ""}
+                              </div>
+                            </div>
+                            {q?.purpose ? <div style={{ marginTop: 4, fontSize: 12, color: "#475569" }}>{String(q.purpose)}</div> : null}
+                            {q?.querySnippet ? (
+                              <div style={{ marginTop: 6, fontSize: 11, color: "#334155", fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" }}>
+                                {String(q.querySnippet)}
+                              </div>
+                            ) : null}
+                          </div>
+                        ))
+                      : null}
+                  </div>
+                </details>
+              ) : null}
               {prediction?.predictions && Array.isArray(prediction.predictions) ? (
                 <div style={{ marginTop: 12, display: "grid", gap: 10 }}>
                   {prediction.predictions.slice(0, 6).map((p: any, idx: number) => {
@@ -244,6 +270,15 @@ export function FaithJourneyPanel(props: { identity: Identity; onClose: () => vo
                                 <div key={j} style={{ fontSize: 12, color: "#334155" }}>
                                   {String(c?.timeHorizonDays ?? 0)}d: {String(c?.stateLabel ?? "") || String(c?.manifestationLabel ?? "")}
                                   {typeof c?.confidence === "number" ? ` (conf ${c.confidence.toFixed(2)})` : ""}
+                                  {Array.isArray(c?.evidence) && c.evidence.length ? (
+                                    <div style={{ marginTop: 4, display: "grid", gap: 2, paddingLeft: 12 }}>
+                                      {c.evidence.slice(0, 4).map((e: any, k: number) => (
+                                        <div key={k} style={{ fontSize: 12, color: "#475569" }}>
+                                          - {String(e)}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  ) : null}
                                 </div>
                               ))}
                             </div>
@@ -255,8 +290,37 @@ export function FaithJourneyPanel(props: { identity: Identity; onClose: () => vo
                             <div style={{ marginTop: 6, display: "grid", gap: 6 }}>
                               {actions.slice(0, 4).map((a: any, j: number) => (
                                 <div key={j} style={{ fontSize: 12, color: "#334155" }}>
-                                  {String(a?.title ?? a?.nodeId ?? "")}
-                                  {typeof a?.confidence === "number" ? ` (conf ${a.confidence.toFixed(2)})` : ""}
+                                  <div>
+                                    {String(a?.title ?? a?.toTitle ?? a?.nodeId ?? a?.toNodeId ?? "")}
+                                    {typeof a?.confidence === "number" ? ` (conf ${a.confidence.toFixed(2)})` : ""}
+                                  </div>
+                                  {a?.reason ? (
+                                    <div style={{ marginTop: 2, fontSize: 12, color: "#475569" }}>
+                                      <strong>Why:</strong> {String(a.reason)}
+                                    </div>
+                                  ) : null}
+                                  {String(a?.fromNodeId ?? a?.fromTitle ?? "").trim() || String(a?.toNodeId ?? a?.toTitle ?? "").trim() ? (
+                                    <div style={{ marginTop: 2, fontSize: 12, color: "#475569" }}>
+                                      <strong>Graph:</strong>{" "}
+                                      {String(a?.fromTitle ?? "").trim() || String(a?.fromNodeId ?? "").trim()
+                                        ? `${String(a?.fromTitle ?? a?.fromNodeId ?? "")}`
+                                        : "?"}{" "}
+                                      →{" "}
+                                      {String(a?.toTitle ?? "").trim() || String(a?.toNodeId ?? "").trim()
+                                        ? `${String(a?.toTitle ?? a?.toNodeId ?? "")}`
+                                        : "?"}
+                                      {a?.edgeKind ? ` (${String(a.edgeKind)})` : ""}
+                                    </div>
+                                  ) : null}
+                                  {Array.isArray(a?.evidence) && a.evidence.length ? (
+                                    <div style={{ marginTop: 4, display: "grid", gap: 2, paddingLeft: 12 }}>
+                                      {a.evidence.slice(0, 4).map((e: any, k: number) => (
+                                        <div key={k} style={{ fontSize: 12, color: "#475569" }}>
+                                          - {String(e)}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  ) : null}
                                 </div>
                               ))}
                             </div>

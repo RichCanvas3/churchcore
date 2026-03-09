@@ -16,7 +16,9 @@
     "GRAPHDB_SYNC_ENABLED": "1",
     "GRAPHDB_CONTEXT_BASE": "https://churchcore.ai/graph/d1",
     "GRAPHDB_ID_BASE": "https://id.churchcore.ai",
-    "GRAPHDB_SYNC_BATCH": "200"
+    "GRAPHDB_SYNC_BATCH": "200",
+    "TRANSCRIPTION_AUTO_QUEUE_ENABLED": "1",
+    "TRANSCRIPTION_AUTO_QUEUE_LIMIT": "10"
   },
   "triggers": {
     "crons": [
