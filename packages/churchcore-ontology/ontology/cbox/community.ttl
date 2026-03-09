@@ -1,0 +1,51 @@
+@prefix cc: <https://ontology.churchcore.ai/cc#> .
+@prefix ccclass: <https://ontology.churchcore.ai/cc/class#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+
+<https://ontology.churchcore.ai/cc/cbox/community>
+  a owl:Ontology ;
+  rdfs:label "ChurchCore C-Box (community)" ;
+  rdfs:comment "Controlled vocabularies for groups and other community contexts (roles, statuses, invite statuses, participation statuses)." ;
+  owl:imports <https://ontology.churchcore.ai/cc> ;
+  owl:imports <http://www.w3.org/2004/02/skos/core> .
+
+ccclass:GroupMembershipRoleScheme a skos:ConceptScheme ;
+  skos:prefLabel "Group membership roles" .
+
+ccclass:group_role_member a skos:Concept ; skos:inScheme ccclass:GroupMembershipRoleScheme ; skos:notation "member" ; skos:prefLabel "Member" .
+ccclass:group_role_host a skos:Concept ; skos:inScheme ccclass:GroupMembershipRoleScheme ; skos:notation "host" ; skos:prefLabel "Host" .
+ccclass:group_role_leader a skos:Concept ; skos:inScheme ccclass:GroupMembershipRoleScheme ; skos:notation "leader" ; skos:prefLabel "Leader" .
+
+ccclass:GroupMembershipStatusScheme a skos:ConceptScheme ;
+  skos:prefLabel "Group membership statuses" .
+
+ccclass:group_status_active a skos:Concept ; skos:inScheme ccclass:GroupMembershipStatusScheme ; skos:notation "active" ; skos:prefLabel "Active" .
+ccclass:group_status_inactive a skos:Concept ; skos:inScheme ccclass:GroupMembershipStatusScheme ; skos:notation "inactive" ; skos:prefLabel "Inactive" .
+ccclass:group_status_pending a skos:Concept ; skos:inScheme ccclass:GroupMembershipStatusScheme ; skos:notation "pending" ; skos:prefLabel "Pending" .
+
+ccclass:GroupInviteStatusScheme a skos:ConceptScheme ;
+  skos:prefLabel "Group invite statuses" .
+
+ccclass:invite_status_pending a skos:Concept ; skos:inScheme ccclass:GroupInviteStatusScheme ; skos:notation "pending" ; skos:prefLabel "Pending" .
+ccclass:invite_status_accepted a skos:Concept ; skos:inScheme ccclass:GroupInviteStatusScheme ; skos:notation "accepted" ; skos:prefLabel "Accepted" .
+ccclass:invite_status_declined a skos:Concept ; skos:inScheme ccclass:GroupInviteStatusScheme ; skos:notation "declined" ; skos:prefLabel "Declined" .
+ccclass:invite_status_cancelled a skos:Concept ; skos:inScheme ccclass:GroupInviteStatusScheme ; skos:notation "cancelled" ; skos:prefLabel "Cancelled" .
+ccclass:invite_status_expired a skos:Concept ; skos:inScheme ccclass:GroupInviteStatusScheme ; skos:notation "expired" ; skos:prefLabel "Expired" .
+
+ccclass:PersonCommunityStatusScheme a skos:ConceptScheme ;
+  skos:prefLabel "Person-community statuses" .
+
+ccclass:community_status_pending a skos:Concept ; skos:inScheme ccclass:PersonCommunityStatusScheme ; skos:notation "pending" ; skos:prefLabel "Pending" .
+ccclass:community_status_active a skos:Concept ; skos:inScheme ccclass:PersonCommunityStatusScheme ; skos:notation "active" ; skos:prefLabel "Active" .
+ccclass:community_status_inactive a skos:Concept ; skos:inScheme ccclass:PersonCommunityStatusScheme ; skos:notation "inactive" ; skos:prefLabel "Inactive" .
+ccclass:community_status_attended a skos:Concept ; skos:inScheme ccclass:PersonCommunityStatusScheme ; skos:notation "attended" ; skos:prefLabel "Attended" .
+ccclass:community_status_completed a skos:Concept ; skos:inScheme ccclass:PersonCommunityStatusScheme ; skos:notation "completed" ; skos:prefLabel "Completed" .
+
+ccclass:PersonCommunityRoleScheme a skos:ConceptScheme ;
+  skos:prefLabel "Person-community roles" .
+
+ccclass:community_role_participant a skos:Concept ; skos:inScheme ccclass:PersonCommunityRoleScheme ; skos:notation "participant" ; skos:prefLabel "Participant" .
+ccclass:community_role_leader a skos:Concept ; skos:inScheme ccclass:PersonCommunityRoleScheme ; skos:notation "leader" ; skos:prefLabel "Leader" .
+

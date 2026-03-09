@@ -11,6 +11,19 @@ This module is a library of **shared classification schemes** (SKOS ConceptSchem
 - D1 enum-like fields (status/type/role)
 - knowledge base curation and retrieval filters
 
+## Organization (C-Box layout)
+
+`ontology/cbox/classifications.ttl` is an **index** that `owl:imports` focused C-Box modules:
+
+- `ontology/cbox/strategic-intent.ttl`
+- `ontology/cbox/journey.ttl`
+- `ontology/cbox/community.ttl`
+- `ontology/cbox/people-relationships.ttl`
+- `ontology/cbox/taxonomies.ttl` (org/ministry/topic/service/event/geography/language/audience/demographics/roles)
+- `ontology/cbox/ops-statuses.ttl` (app enums)
+- `ontology/cbox/state-categories.ttl` (typed state categories)
+- `ontology/cbox/situations.ttl` (situation types + participation roles)
+
 ## Pattern
 
 - A scheme is a `skos:ConceptScheme`

@@ -1,0 +1,27 @@
+@prefix cc: <https://ontology.churchcore.ai/cc#> .
+@prefix ccclass: <https://ontology.churchcore.ai/cc/class#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+
+<https://ontology.churchcore.ai/cc/cbox/people-relationships>
+  a owl:Ontology ;
+  rdfs:label "ChurchCore C-Box (people relationships)" ;
+  rdfs:comment "Controlled vocabularies for person-to-person relationship situations (relationship types and statuses)." ;
+  owl:imports <https://ontology.churchcore.ai/cc> ;
+  owl:imports <http://www.w3.org/2004/02/skos/core> .
+
+ccclass:PersonRelationshipTypeScheme a skos:ConceptScheme ;
+  skos:prefLabel "Person relationship types" .
+
+ccclass:rel_guardian a skos:Concept ; skos:inScheme ccclass:PersonRelationshipTypeScheme ; skos:notation "guardian" ; skos:prefLabel "Guardian" .
+ccclass:rel_spouse a skos:Concept ; skos:inScheme ccclass:PersonRelationshipTypeScheme ; skos:notation "spouse" ; skos:prefLabel "Spouse" .
+ccclass:rel_emergency_contact a skos:Concept ; skos:inScheme ccclass:PersonRelationshipTypeScheme ; skos:notation "emergency_contact" ; skos:prefLabel "Emergency contact" .
+ccclass:rel_authorized_pickup a skos:Concept ; skos:inScheme ccclass:PersonRelationshipTypeScheme ; skos:notation "authorized_pickup" ; skos:prefLabel "Authorized pickup" .
+
+ccclass:PersonRelationshipStatusScheme a skos:ConceptScheme ;
+  skos:prefLabel "Person relationship statuses" .
+
+ccclass:relstatus_active a skos:Concept ; skos:inScheme ccclass:PersonRelationshipStatusScheme ; skos:notation "active" ; skos:prefLabel "Active" .
+ccclass:relstatus_inactive a skos:Concept ; skos:inScheme ccclass:PersonRelationshipStatusScheme ; skos:notation "inactive" ; skos:prefLabel "Inactive" .
+

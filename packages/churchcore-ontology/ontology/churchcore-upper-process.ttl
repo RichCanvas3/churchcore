@@ -1,0 +1,20 @@
+@prefix ccproc: <https://ontology.churchcore.ai/cc/process#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+<https://ontology.churchcore.ai/cc/process>
+  a owl:Ontology ;
+  rdfs:label "ChurchCore Upper Ontology (process)" ;
+  rdfs:comment "Process module wrapper (imports T-Box/C-Box artifacts)." ;
+  owl:imports <https://ontology.churchcore.ai/cc/process/tbox> .
+
+@prefix cc: <https://ontology.churchcore.ai/cc#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+<https://ontology.churchcore.ai/cc/process>
+  a owl:Ontology ;
+  rdfs:label "ChurchCore Upper Ontology (process)" ;
+  rdfs:comment "Process module wrapper (imports T-Box/C-Box artifacts)." ;
+  owl:imports <https://ontology.churchcore.ai/cc/process/tbox> .
+

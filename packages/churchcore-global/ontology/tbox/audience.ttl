@@ -1,0 +1,33 @@
+@prefix cc: <https://ontology.churchcore.ai/cc#> .
+@prefix ccglobal: <https://ontology.churchcore.ai/cc/global#> .
+@prefix ccgclass: <https://ontology.churchcore.ai/cc/global/class#> .
+@prefix prov: <http://www.w3.org/ns/prov#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+
+<https://ontology.churchcore.ai/cc/global/tbox/audience>
+  a owl:Ontology ;
+  rdfs:label "ChurchCore-Global T-Box (audience)" ;
+  rdfs:comment "Audience/segmentation schema for ecosystem-scale benchmarking and discovery. Categories live in the Global C-Box." ;
+  owl:imports <https://ontology.churchcore.ai/cc/all> ;
+  owl:imports <http://www.w3.org/ns/prov-o-20130430> ;
+  owl:imports <http://www.w3.org/2004/02/skos/core> .
+
+ccglobal:AudienceSegment a owl:Class ;
+  rdfs:label "AudienceSegment" ;
+  rdfs:comment "A reusable audience/segment category used for discovery, benchmarking, and targeting (global/ecosystem scope)." ;
+  rdfs:subClassOf prov:Entity, skos:Concept .
+
+ccglobal:hasAudienceSegment a owl:ObjectProperty ;
+  rdfs:label "hasAudienceSegment" ;
+  rdfs:comment "Links an entity (org, initiative, assessment cohort, etc.) to an audience segment category (SKOS concept)." ;
+  rdfs:domain prov:Entity ;
+  rdfs:range ccglobal:AudienceSegment .
+
+ccglobal:audienceSegmentScheme a owl:ObjectProperty ;
+  rdfs:label "audienceSegmentScheme" ;
+  rdfs:comment "Links an AudienceSegment concept to its scheme; values SHOULD include ccgclass:AudienceSegmentScheme." ;
+  rdfs:domain ccglobal:AudienceSegment ;
+  rdfs:range skos:ConceptScheme .
+

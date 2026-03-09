@@ -1,0 +1,10 @@
+@prefix cc: <https://ontology.churchcore.ai/cc#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+<https://ontology.churchcore.ai/cc/state>
+  a owl:Ontology ;
+  rdfs:label "ChurchCore Upper Ontology (state)" ;
+  rdfs:comment "State module wrapper (imports T-Box/C-Box artifacts)." ;
+  owl:imports <https://ontology.churchcore.ai/cc/state/tbox> .
+

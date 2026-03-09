@@ -7,7 +7,9 @@
   rdfs:comment "Master import file for ChurchCore-Congregation (Local-C) modules." ;
   owl:imports
     <https://ontology.churchcore.ai/cc/congregation/tbox/ops>,
+    <https://ontology.churchcore.ai/cc/congregation/tbox/audience>,
     <https://ontology.churchcore.ai/cc/congregation/cbox/ministry-categories>,
+    <https://ontology.churchcore.ai/cc/congregation/cbox/audience-segments>,
     <https://ontology.churchcore.ai/cc/congregation/cbox/service-types>,
     <https://ontology.churchcore.ai/cc/congregation/cbox/attendance-statuses> .
 

@@ -1,0 +1,82 @@
+@prefix cc: <https://ontology.churchcore.ai/cc#> .
+@prefix ccclass: <https://ontology.churchcore.ai/cc/class#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+
+<https://ontology.churchcore.ai/cc/cbox/ops-statuses>
+  a owl:Ontology ;
+  rdfs:label "ChurchCore C-Box (operational statuses)" ;
+  rdfs:comment "Controlled vocabularies that mirror operational statuses/types used by apps (enum-like values), kept in the upper C-Box for reuse." ;
+  owl:imports <https://ontology.churchcore.ai/cc> ;
+  owl:imports <http://www.w3.org/2004/02/skos/core> .
+
+ccclass:ChatThreadStatusScheme a skos:ConceptScheme ; skos:prefLabel "Chat thread statuses" .
+ccclass:thread_status_active a skos:Concept ; skos:inScheme ccclass:ChatThreadStatusScheme ; skos:notation "active" ; skos:prefLabel "Active" .
+ccclass:thread_status_archived a skos:Concept ; skos:inScheme ccclass:ChatThreadStatusScheme ; skos:notation "archived" ; skos:prefLabel "Archived" .
+
+ccclass:ChatMessageSenderTypeScheme a skos:ConceptScheme ; skos:prefLabel "Chat message sender types" .
+ccclass:sender_user a skos:Concept ; skos:inScheme ccclass:ChatMessageSenderTypeScheme ; skos:notation "user" ; skos:prefLabel "User" .
+ccclass:sender_assistant a skos:Concept ; skos:inScheme ccclass:ChatMessageSenderTypeScheme ; skos:notation "assistant" ; skos:prefLabel "Assistant" .
+ccclass:sender_system a skos:Concept ; skos:inScheme ccclass:ChatMessageSenderTypeScheme ; skos:notation "system" ; skos:prefLabel "System" .
+
+ccclass:PhoneVerificationStatusScheme a skos:ConceptScheme ; skos:prefLabel "Phone verification statuses" .
+ccclass:phone_status_pending a skos:Concept ; skos:inScheme ccclass:PhoneVerificationStatusScheme ; skos:notation "pending" ; skos:prefLabel "Pending" .
+ccclass:phone_status_verified a skos:Concept ; skos:inScheme ccclass:PhoneVerificationStatusScheme ; skos:notation "verified" ; skos:prefLabel "Verified" .
+ccclass:phone_status_expired a skos:Concept ; skos:inScheme ccclass:PhoneVerificationStatusScheme ; skos:notation "expired" ; skos:prefLabel "Expired" .
+
+ccclass:CheckinSessionStatusScheme a skos:ConceptScheme ; skos:prefLabel "Check-in session statuses" .
+ccclass:checkin_session_open a skos:Concept ; skos:inScheme ccclass:CheckinSessionStatusScheme ; skos:notation "open" ; skos:prefLabel "Open" .
+ccclass:checkin_session_complete a skos:Concept ; skos:inScheme ccclass:CheckinSessionStatusScheme ; skos:notation "complete" ; skos:prefLabel "Complete" .
+ccclass:checkin_session_cancelled a skos:Concept ; skos:inScheme ccclass:CheckinSessionStatusScheme ; skos:notation "cancelled" ; skos:prefLabel "Cancelled" .
+
+ccclass:CheckinItemStatusScheme a skos:ConceptScheme ; skos:prefLabel "Check-in item statuses" .
+ccclass:checkin_item_checked_in a skos:Concept ; skos:inScheme ccclass:CheckinItemStatusScheme ; skos:notation "checked_in" ; skos:prefLabel "Checked in" .
+ccclass:checkin_item_checked_out a skos:Concept ; skos:inScheme ccclass:CheckinItemStatusScheme ; skos:notation "checked_out" ; skos:prefLabel "Checked out" .
+
+ccclass:CheckinPassStatusScheme a skos:ConceptScheme ; skos:prefLabel "Check-in pass token statuses" .
+ccclass:pass_status_active a skos:Concept ; skos:inScheme ccclass:CheckinPassStatusScheme ; skos:notation "active" ; skos:prefLabel "Active" .
+ccclass:pass_status_revoked a skos:Concept ; skos:inScheme ccclass:CheckinPassStatusScheme ; skos:notation "revoked" ; skos:prefLabel "Revoked" .
+ccclass:pass_status_expired a skos:Concept ; skos:inScheme ccclass:CheckinPassStatusScheme ; skos:notation "expired" ; skos:prefLabel "Expired" .
+
+ccclass:EventRegistrationStatusScheme a skos:ConceptScheme ; skos:prefLabel "Event registration statuses" .
+ccclass:registration_registered a skos:Concept ; skos:inScheme ccclass:EventRegistrationStatusScheme ; skos:notation "registered" ; skos:prefLabel "Registered" .
+ccclass:registration_cancelled a skos:Concept ; skos:inScheme ccclass:EventRegistrationStatusScheme ; skos:notation "cancelled" ; skos:prefLabel "Cancelled" .
+ccclass:registration_attended a skos:Concept ; skos:inScheme ccclass:EventRegistrationStatusScheme ; skos:notation "attended" ; skos:prefLabel "Attended" .
+
+ccclass:OutreachCampaignStatusScheme a skos:ConceptScheme ; skos:prefLabel "Outreach campaign statuses" .
+ccclass:outreach_active a skos:Concept ; skos:inScheme ccclass:OutreachCampaignStatusScheme ; skos:notation "active" ; skos:prefLabel "Active" .
+ccclass:outreach_paused a skos:Concept ; skos:inScheme ccclass:OutreachCampaignStatusScheme ; skos:notation "paused" ; skos:prefLabel "Paused" .
+ccclass:outreach_completed a skos:Concept ; skos:inScheme ccclass:OutreachCampaignStatusScheme ; skos:notation "completed" ; skos:prefLabel "Completed" .
+
+ccclass:TranscriptionProviderScheme a skos:ConceptScheme ; skos:prefLabel "Transcription providers" .
+ccclass:provider_assemblyai a skos:Concept ; skos:inScheme ccclass:TranscriptionProviderScheme ; skos:notation "assemblyai" ; skos:prefLabel "AssemblyAI" .
+ccclass:provider_openai a skos:Concept ; skos:inScheme ccclass:TranscriptionProviderScheme ; skos:notation "openai" ; skos:prefLabel "OpenAI" .
+ccclass:provider_other a skos:Concept ; skos:inScheme ccclass:TranscriptionProviderScheme ; skos:notation "other" ; skos:prefLabel "Other" .
+
+ccclass:TranscriptionJobStatusScheme a skos:ConceptScheme ; skos:prefLabel "Transcription job statuses" .
+ccclass:job_queued a skos:Concept ; skos:inScheme ccclass:TranscriptionJobStatusScheme ; skos:notation "queued" ; skos:prefLabel "Queued" .
+ccclass:job_processing a skos:Concept ; skos:inScheme ccclass:TranscriptionJobStatusScheme ; skos:notation "processing" ; skos:prefLabel "Processing" .
+ccclass:job_completed a skos:Concept ; skos:inScheme ccclass:TranscriptionJobStatusScheme ; skos:notation "completed" ; skos:prefLabel "Completed" .
+ccclass:job_failed a skos:Concept ; skos:inScheme ccclass:TranscriptionJobStatusScheme ; skos:notation "failed" ; skos:prefLabel "Failed" .
+
+ccclass:BibleReadingItemKindScheme a skos:ConceptScheme ; skos:prefLabel "Bible reading item kinds" .
+ccclass:br_kind_reading a skos:Concept ; skos:inScheme ccclass:BibleReadingItemKindScheme ; skos:notation "reading" ; skos:prefLabel "Reading" .
+ccclass:br_kind_daily_verse a skos:Concept ; skos:inScheme ccclass:BibleReadingItemKindScheme ; skos:notation "daily_verse" ; skos:prefLabel "Daily verse" .
+ccclass:br_kind_reflection a skos:Concept ; skos:inScheme ccclass:BibleReadingItemKindScheme ; skos:notation "reflection" ; skos:prefLabel "Reflection" .
+
+ccclass:BibleReadingProgressStatusScheme a skos:ConceptScheme ; skos:prefLabel "Bible reading progress statuses" .
+ccclass:br_status_started a skos:Concept ; skos:inScheme ccclass:BibleReadingProgressStatusScheme ; skos:notation "started" ; skos:prefLabel "Started" .
+ccclass:br_status_completed a skos:Concept ; skos:inScheme ccclass:BibleReadingProgressStatusScheme ; skos:notation "completed" ; skos:prefLabel "Completed" .
+
+ccclass:RequestStatusScheme a skos:ConceptScheme ; skos:prefLabel "Request statuses" .
+ccclass:req_open a skos:Concept ; skos:inScheme ccclass:RequestStatusScheme ; skos:notation "open" ; skos:prefLabel "Open" .
+ccclass:req_assigned a skos:Concept ; skos:inScheme ccclass:RequestStatusScheme ; skos:notation "assigned" ; skos:prefLabel "Assigned" .
+ccclass:req_escalated a skos:Concept ; skos:inScheme ccclass:RequestStatusScheme ; skos:notation "escalated" ; skos:prefLabel "Escalated" .
+ccclass:req_closed a skos:Concept ; skos:inScheme ccclass:RequestStatusScheme ; skos:notation "closed" ; skos:prefLabel "Closed" .
+
+ccclass:FollowupStatusScheme a skos:ConceptScheme ; skos:prefLabel "Followup statuses" .
+ccclass:followup_open a skos:Concept ; skos:inScheme ccclass:FollowupStatusScheme ; skos:notation "open" ; skos:prefLabel "Open" .
+ccclass:followup_done a skos:Concept ; skos:inScheme ccclass:FollowupStatusScheme ; skos:notation "done" ; skos:prefLabel "Done" .
+ccclass:followup_cancelled a skos:Concept ; skos:inScheme ccclass:FollowupStatusScheme ; skos:notation "cancelled" ; skos:prefLabel "Cancelled" .
+

@@ -1,0 +1,34 @@
+@prefix cc: <https://ontology.churchcore.ai/cc#> .
+@prefix ccclass: <https://ontology.churchcore.ai/cc/class#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+
+<https://ontology.churchcore.ai/cc/cbox/strategic-intent>
+  a owl:Ontology ;
+  rdfs:label "ChurchCore C-Box (strategic intent)" ;
+  rdfs:comment "Controlled vocabularies for strategic intent artifacts and how they relate (purpose/mission/vision/strategy/goals/values/beliefs)." ;
+  owl:imports <https://ontology.churchcore.ai/cc> ;
+  owl:imports <http://www.w3.org/2004/02/skos/core> .
+
+ccclass:StrategicIntentTypeScheme a skos:ConceptScheme ;
+  skos:prefLabel "Strategic intent types" .
+
+ccclass:intent_purpose a skos:Concept ; skos:inScheme ccclass:StrategicIntentTypeScheme ; skos:notation "purpose" ; skos:prefLabel "Purpose" .
+ccclass:intent_vision a skos:Concept ; skos:inScheme ccclass:StrategicIntentTypeScheme ; skos:notation "vision" ; skos:prefLabel "Vision" .
+ccclass:intent_mission a skos:Concept ; skos:inScheme ccclass:StrategicIntentTypeScheme ; skos:notation "mission" ; skos:prefLabel "Mission" .
+ccclass:intent_strategy a skos:Concept ; skos:inScheme ccclass:StrategicIntentTypeScheme ; skos:notation "strategy" ; skos:prefLabel "Strategy" .
+ccclass:intent_aim a skos:Concept ; skos:inScheme ccclass:StrategicIntentTypeScheme ; skos:notation "aim" ; skos:prefLabel "Aim" .
+ccclass:intent_goal a skos:Concept ; skos:inScheme ccclass:StrategicIntentTypeScheme ; skos:notation "goal" ; skos:prefLabel "Goal" .
+ccclass:intent_objective a skos:Concept ; skos:inScheme ccclass:StrategicIntentTypeScheme ; skos:notation "objective" ; skos:prefLabel "Objective" .
+ccclass:intent_value a skos:Concept ; skos:inScheme ccclass:StrategicIntentTypeScheme ; skos:notation "value" ; skos:prefLabel "Core value" .
+ccclass:intent_belief a skos:Concept ; skos:inScheme ccclass:StrategicIntentTypeScheme ; skos:notation "belief" ; skos:prefLabel "Core belief" .
+
+ccclass:StrategicIntentLinkTypeScheme a skos:ConceptScheme ;
+  skos:prefLabel "Strategic intent link types" .
+
+ccclass:intentlink_supports a skos:Concept ; skos:inScheme ccclass:StrategicIntentLinkTypeScheme ; skos:notation "supports" ; skos:prefLabel "Supports" .
+ccclass:intentlink_drives a skos:Concept ; skos:inScheme ccclass:StrategicIntentLinkTypeScheme ; skos:notation "drives" ; skos:prefLabel "Drives" .
+ccclass:intentlink_implements a skos:Concept ; skos:inScheme ccclass:StrategicIntentLinkTypeScheme ; skos:notation "implements" ; skos:prefLabel "Implements" .
+ccclass:intentlink_measures a skos:Concept ; skos:inScheme ccclass:StrategicIntentLinkTypeScheme ; skos:notation "measures" ; skos:prefLabel "Measures" .
+

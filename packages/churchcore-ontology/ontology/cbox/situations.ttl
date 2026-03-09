@@ -1,0 +1,39 @@
+@prefix cc: <https://ontology.churchcore.ai/cc#> .
+@prefix ccsit: <https://ontology.churchcore.ai/cc/situation#> .
+@prefix ccclass: <https://ontology.churchcore.ai/cc/class#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+
+<https://ontology.churchcore.ai/cc/cbox/situations>
+  a owl:Ontology ;
+  rdfs:label "ChurchCore C-Box (situations)" ;
+  rdfs:comment "Situation-related controlled vocabularies: situation types and common participation role categories." ;
+  owl:imports <https://ontology.churchcore.ai/cc/situation/tbox> ;
+  owl:imports <http://www.w3.org/2004/02/skos/core> .
+
+ccclass:SituationTypeScheme a skos:ConceptScheme ;
+  skos:prefLabel "Situation types" .
+
+ccclass:sit_membership a skos:Concept ; skos:inScheme ccclass:SituationTypeScheme ; skos:notation "membership" ; skos:prefLabel "Membership situation" .
+ccclass:sit_relationship a skos:Concept ; skos:inScheme ccclass:SituationTypeScheme ; skos:notation "relationship" ; skos:prefLabel "Relationship situation" .
+ccclass:sit_participation a skos:Concept ; skos:inScheme ccclass:SituationTypeScheme ; skos:notation "participation" ; skos:prefLabel "Participation situation" .
+ccclass:sit_association a skos:Concept ; skos:inScheme ccclass:SituationTypeScheme ; skos:notation "association" ; skos:prefLabel "Association situation" .
+ccclass:sit_generation a skos:Concept ; skos:inScheme ccclass:SituationTypeScheme ; skos:notation "generation" ; skos:prefLabel "Generation situation" .
+ccclass:sit_usage a skos:Concept ; skos:inScheme ccclass:SituationTypeScheme ; skos:notation "usage" ; skos:prefLabel "Usage situation" .
+ccclass:sit_communication a skos:Concept ; skos:inScheme ccclass:SituationTypeScheme ; skos:notation "communication" ; skos:prefLabel "Communication situation" .
+ccclass:sit_effect a skos:Concept ; skos:inScheme ccclass:SituationTypeScheme ; skos:notation "effect" ; skos:prefLabel "Effect situation" .
+ccclass:sit_enablement a skos:Concept ; skos:inScheme ccclass:SituationTypeScheme ; skos:notation "enablement" ; skos:prefLabel "Enablement situation" .
+ccclass:sit_alliance a skos:Concept ; skos:inScheme ccclass:SituationTypeScheme ; skos:notation "alliance" ; skos:prefLabel "Alliance situation" .
+
+ccclass:ParticipationRoleScheme a skos:ConceptScheme ;
+  skos:prefLabel "Participation roles" .
+
+ccclass:part_role_participant a skos:Concept ; skos:inScheme ccclass:ParticipationRoleScheme ; skos:notation "participant" ; skos:prefLabel "Participant" .
+ccclass:part_role_attendee a skos:Concept ; skos:inScheme ccclass:ParticipationRoleScheme ; skos:notation "attendee" ; skos:prefLabel "Attendee" .
+ccclass:part_role_organizer a skos:Concept ; skos:inScheme ccclass:ParticipationRoleScheme ; skos:notation "organizer" ; skos:prefLabel "Organizer" .
+ccclass:part_role_leader a skos:Concept ; skos:inScheme ccclass:ParticipationRoleScheme ; skos:notation "leader" ; skos:prefLabel "Leader" .
+ccclass:part_role_host a skos:Concept ; skos:inScheme ccclass:ParticipationRoleScheme ; skos:notation "host" ; skos:prefLabel "Host" .
+ccclass:part_role_speaker a skos:Concept ; skos:inScheme ccclass:ParticipationRoleScheme ; skos:notation "speaker" ; skos:prefLabel "Speaker" .
+ccclass:part_role_volunteer a skos:Concept ; skos:inScheme ccclass:ParticipationRoleScheme ; skos:notation "volunteer" ; skos:prefLabel "Volunteer" .
+

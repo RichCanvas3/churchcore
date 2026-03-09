@@ -1,6 +1,7 @@
 @prefix cc: <https://ontology.churchcore.ai/cc#> .
 @prefix ccsit: <https://ontology.churchcore.ai/cc/situation#> .
 @prefix at: <https://agentictrust.io/ontology/core#> .
+@prefix prov: <http://www.w3.org/ns/prov#> .
 @prefix owl: <http://www.w3.org/2002/07/owl#> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
@@ -18,13 +19,222 @@ ccsit:ChurchSituation a owl:Class ;
   rdfs:comment "Church-domain situation (membership, relationship, participation), modeled as a reified context (Entity) not an event." ;
   rdfs:subClassOf at:Situation .
 
+ccsit:ChurchSituationSpecification a owl:Class ;
+  rdfs:label "ChurchSituationSpecification" ;
+  rdfs:comment "Specification (schema/role constraints) for a ChurchSituation, modeled as an AgenticTrust SituationDescription (Plan) rather than an occurrence." ;
+  rdfs:subClassOf at:SituationDescription .
+
 ccsit:MembershipSituation a owl:Class ;
   rdfs:label "MembershipSituation" ;
   rdfs:subClassOf ccsit:ChurchSituation .
 
+ccsit:MembershipSituationSpecification a owl:Class ;
+  rdfs:label "MembershipSituationSpecification" ;
+  rdfs:subClassOf ccsit:ChurchSituationSpecification .
+
 ccsit:RelationshipSituation a owl:Class ;
   rdfs:label "RelationshipSituation" ;
   rdfs:subClassOf ccsit:ChurchSituation, at:RelationshipSituation .
+
+ccsit:RelationshipSituationSpecification a owl:Class ;
+  rdfs:label "RelationshipSituationSpecification" ;
+  rdfs:subClassOf ccsit:ChurchSituationSpecification .
+
+ccsit:ParticipationSituation a owl:Class ;
+  rdfs:label "ParticipationSituation" ;
+  rdfs:comment "Reified context that connects an Agent to an Activity (participation in a happening)." ;
+  rdfs:subClassOf ccsit:ChurchSituation .
+
+ccsit:ParticipationSituationSpecification a owl:Class ;
+  rdfs:label "ParticipationSituationSpecification" ;
+  rdfs:comment "Specification for a ParticipationSituation (what roles participate in what kind of activity), distinct from the occurrence." ;
+  rdfs:subClassOf ccsit:ChurchSituationSpecification .
+
+ccsit:AssociationSituation a owl:Class ;
+  rdfs:label "AssociationSituation" ;
+  rdfs:comment "Reified PROV association motif: Activity ↔ Agent (cf. prov:wasAssociatedWith). Kept distinct from AllianceSituation." ;
+  rdfs:subClassOf ccsit:ChurchSituation .
+
+ccsit:AssociationSituationSpecification a owl:Class ;
+  rdfs:label "AssociationSituationSpecification" ;
+  rdfs:subClassOf ccsit:ChurchSituationSpecification .
+
+ccsit:GenerationSituation a owl:Class ;
+  rdfs:label "GenerationSituation" ;
+  rdfs:comment "Reified PROV generation motif: Activity → Entity (cf. prov:generated / prov:wasGeneratedBy)." ;
+  rdfs:subClassOf ccsit:ChurchSituation .
+
+ccsit:GenerationSituationSpecification a owl:Class ;
+  rdfs:label "GenerationSituationSpecification" ;
+  rdfs:subClassOf ccsit:ChurchSituationSpecification .
+
+ccsit:UsageSituation a owl:Class ;
+  rdfs:label "UsageSituation" ;
+  rdfs:comment "Reified PROV usage motif: Entity → Activity (cf. prov:used)." ;
+  rdfs:subClassOf ccsit:ChurchSituation .
+
+ccsit:UsageSituationSpecification a owl:Class ;
+  rdfs:label "UsageSituationSpecification" ;
+  rdfs:subClassOf ccsit:ChurchSituationSpecification .
+
+ccsit:CommunicationSituation a owl:Class ;
+  rdfs:label "CommunicationSituation" ;
+  rdfs:comment "Reified PROV communication motif: Activity → Activity (cf. prov:wasInformedBy)." ;
+  rdfs:subClassOf ccsit:ChurchSituation .
+
+ccsit:CommunicationSituationSpecification a owl:Class ;
+  rdfs:label "CommunicationSituationSpecification" ;
+  rdfs:subClassOf ccsit:ChurchSituationSpecification .
+
+ccsit:EffectSituation a owl:Class ;
+  rdfs:label "EffectSituation" ;
+  rdfs:comment "Reified effect motif: Activity results in an Entity representing a state/manifestation outcome." ;
+  rdfs:subClassOf ccsit:ChurchSituation .
+
+ccsit:EffectSituationSpecification a owl:Class ;
+  rdfs:label "EffectSituationSpecification" ;
+  rdfs:subClassOf ccsit:ChurchSituationSpecification .
+
+ccsit:EnablementSituation a owl:Class ;
+  rdfs:label "EnablementSituation" ;
+  rdfs:comment "Reified enablement motif: an Entity representing a state/manifestation enables an Activity." ;
+  rdfs:subClassOf ccsit:ChurchSituation .
+
+ccsit:EnablementSituationSpecification a owl:Class ;
+  rdfs:label "EnablementSituationSpecification" ;
+  rdfs:subClassOf ccsit:ChurchSituationSpecification .
+
+ccsit:AllianceSituation a owl:Class ;
+  rdfs:label "AllianceSituation" ;
+  rdfs:comment "Reified partnership context between organizations (distinct from PROV association of Activity↔Agent)." ;
+  rdfs:subClassOf ccsit:ChurchSituation .
+
+ccsit:AllianceSituationSpecification a owl:Class ;
+  rdfs:label "AllianceSituationSpecification" ;
+  rdfs:subClassOf ccsit:ChurchSituationSpecification .
+
+### Generic link properties (situation → involved things)
+
+ccsit:hasAgent a owl:ObjectProperty ;
+  rdfs:label "hasAgent" ;
+  rdfs:domain at:Situation ;
+  rdfs:range prov:Agent .
+
+ccsit:hasActivity a owl:ObjectProperty ;
+  rdfs:label "hasActivity" ;
+  rdfs:domain at:Situation ;
+  rdfs:range prov:Activity .
+
+ccsit:hasEntity a owl:ObjectProperty ;
+  rdfs:label "hasEntity" ;
+  rdfs:domain at:Situation ;
+  rdfs:range prov:Entity .
+
+### ParticipationSituation links
+
+ccsit:participationAgent a owl:ObjectProperty ;
+  rdfs:label "participationAgent" ;
+  rdfs:domain ccsit:ParticipationSituation ;
+  rdfs:range prov:Agent ;
+  rdfs:subPropertyOf ccsit:hasAgent .
+
+ccsit:participationActivity a owl:ObjectProperty ;
+  rdfs:label "participationActivity" ;
+  rdfs:domain ccsit:ParticipationSituation ;
+  rdfs:range prov:Activity ;
+  rdfs:subPropertyOf ccsit:hasActivity .
+
+### AssociationSituation links (Activity ↔ Agent)
+
+ccsit:associationActivity a owl:ObjectProperty ;
+  rdfs:label "associationActivity" ;
+  rdfs:domain ccsit:AssociationSituation ;
+  rdfs:range prov:Activity ;
+  rdfs:subPropertyOf ccsit:hasActivity .
+
+ccsit:associatedAgent a owl:ObjectProperty ;
+  rdfs:label "associatedAgent" ;
+  rdfs:domain ccsit:AssociationSituation ;
+  rdfs:range prov:Agent ;
+  rdfs:subPropertyOf ccsit:hasAgent .
+
+### GenerationSituation links (Activity → Entity)
+
+ccsit:generationActivity a owl:ObjectProperty ;
+  rdfs:label "generationActivity" ;
+  rdfs:domain ccsit:GenerationSituation ;
+  rdfs:range prov:Activity ;
+  rdfs:subPropertyOf ccsit:hasActivity .
+
+ccsit:generatedEntity a owl:ObjectProperty ;
+  rdfs:label "generatedEntity" ;
+  rdfs:domain ccsit:GenerationSituation ;
+  rdfs:range prov:Entity ;
+  rdfs:subPropertyOf ccsit:hasEntity .
+
+### UsageSituation links (Entity → Activity)
+
+ccsit:usedEntity a owl:ObjectProperty ;
+  rdfs:label "usedEntity" ;
+  rdfs:domain ccsit:UsageSituation ;
+  rdfs:range prov:Entity ;
+  rdfs:subPropertyOf ccsit:hasEntity .
+
+ccsit:usageActivity a owl:ObjectProperty ;
+  rdfs:label "usageActivity" ;
+  rdfs:domain ccsit:UsageSituation ;
+  rdfs:range prov:Activity ;
+  rdfs:subPropertyOf ccsit:hasActivity .
+
+### CommunicationSituation links (Activity → Activity)
+
+ccsit:communicatingActivity a owl:ObjectProperty ;
+  rdfs:label "communicatingActivity" ;
+  rdfs:domain ccsit:CommunicationSituation ;
+  rdfs:range prov:Activity ;
+  rdfs:subPropertyOf ccsit:hasActivity .
+
+ccsit:informedByActivity a owl:ObjectProperty ;
+  rdfs:label "informedByActivity" ;
+  rdfs:domain ccsit:CommunicationSituation ;
+  rdfs:range prov:Activity ;
+  rdfs:subPropertyOf ccsit:hasActivity .
+
+### EffectSituation links (Activity → outcome Entity)
+
+ccsit:effectActivity a owl:ObjectProperty ;
+  rdfs:label "effectActivity" ;
+  rdfs:domain ccsit:EffectSituation ;
+  rdfs:range prov:Activity ;
+  rdfs:subPropertyOf ccsit:hasActivity .
+
+ccsit:effectEntity a owl:ObjectProperty ;
+  rdfs:label "effectEntity" ;
+  rdfs:domain ccsit:EffectSituation ;
+  rdfs:range prov:Entity ;
+  rdfs:subPropertyOf ccsit:hasEntity .
+
+### EnablementSituation links (enabling Entity → Activity)
+
+ccsit:enablingEntity a owl:ObjectProperty ;
+  rdfs:label "enablingEntity" ;
+  rdfs:domain ccsit:EnablementSituation ;
+  rdfs:range prov:Entity ;
+  rdfs:subPropertyOf ccsit:hasEntity .
+
+ccsit:enabledActivity a owl:ObjectProperty ;
+  rdfs:label "enabledActivity" ;
+  rdfs:domain ccsit:EnablementSituation ;
+  rdfs:range prov:Activity ;
+  rdfs:subPropertyOf ccsit:hasActivity .
+
+### AllianceSituation links (Organization ↔ Organization)
+
+ccsit:allianceOrg a owl:ObjectProperty ;
+  rdfs:label "allianceOrg" ;
+  rdfs:domain ccsit:AllianceSituation ;
+  rdfs:range prov:Organization ;
+  rdfs:subPropertyOf ccsit:hasAgent .
 
 ccsit:validFrom a owl:DatatypeProperty ;
   rdfs:label "validFrom" ;

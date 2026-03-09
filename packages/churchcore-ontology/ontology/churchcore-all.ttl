@@ -10,6 +10,9 @@
     <https://ontology.churchcore.ai/cc/prov>,
     <https://ontology.churchcore.ai/cc/class>,
     <https://ontology.churchcore.ai/cc/situation>,
+    <https://ontology.churchcore.ai/cc/state>,
+    <https://ontology.churchcore.ai/cc/process>,
+    <https://ontology.churchcore.ai/cc/intent>,
     <https://ontology.churchcore.ai/cc/community>,
     <https://ontology.churchcore.ai/cc/journey>,
     <https://ontology.churchcore.ai/cc/commerce> .

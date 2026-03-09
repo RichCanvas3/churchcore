@@ -1,0 +1,132 @@
+@prefix cc: <https://ontology.churchcore.ai/cc#> .
+@prefix ccintent: <https://ontology.churchcore.ai/cc/intent#> .
+@prefix ccsit: <https://ontology.churchcore.ai/cc/situation#> .
+@prefix ccclass: <https://ontology.churchcore.ai/cc/class#> .
+@prefix prov: <http://www.w3.org/ns/prov#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<https://ontology.churchcore.ai/cc/intent/tbox>
+  a owl:Ontology ;
+  rdfs:label "ChurchCore T-Box (intent)" ;
+  rdfs:comment "Faith-neutral intent model aligned to PROV-O and the ChurchCore spec/exec split. Supports explicit intent, inferred intent, and strategic intent structures." ;
+  owl:imports <https://ontology.churchcore.ai/cc> ;
+  owl:imports <https://ontology.churchcore.ai/cc/situation/tbox> ;
+  owl:imports <https://ontology.churchcore.ai/cc/state/tbox> ;
+  owl:imports <http://www.w3.org/ns/prov-o-20130430> ;
+  owl:imports <http://www.w3.org/2004/02/skos/core> .
+
+ccintent:Intent a owl:Class ;
+  rdfs:label "Intent" ;
+  rdfs:comment "An intent-bearing entity (aim, goal, desired future), attributable and provenance-carrying." ;
+  rdfs:subClassOf prov:Entity .
+
+ccintent:StrategicIntent a owl:Class ;
+  rdfs:label "StrategicIntent" ;
+  rdfs:comment "Durable strategic intent artifacts such as purpose/mission/vision/strategy/goals/values/beliefs." ;
+  rdfs:subClassOf ccintent:Intent .
+
+ccintent:Goal a owl:Class ;
+  rdfs:label "Goal" ;
+  rdfs:comment "A concrete goal intent (often measurable, time-scoped, and linked to a target state)." ;
+  rdfs:subClassOf ccintent:Intent .
+
+ccintent:Belief a owl:Class ;
+  rdfs:label "Belief" ;
+  rdfs:comment "A belief/value statement that can constrain or motivate actions and goals. Modeled as an intent-bearing artifact for consistency with provenance and linkage." ;
+  rdfs:subClassOf ccintent:Intent .
+
+ccintent:InferredIntent a owl:Class ;
+  rdfs:label "InferredIntent" ;
+  rdfs:comment "An intent inferred from evidence (communications, actions, situations), with explicit provenance and confidence." ;
+  rdfs:subClassOf ccintent:Intent .
+
+### Intent linkage properties
+
+ccintent:aboutAgent a owl:ObjectProperty ;
+  rdfs:label "aboutAgent" ;
+  rdfs:domain ccintent:Intent ;
+  rdfs:range prov:Agent .
+
+ccintent:aboutOrganization a owl:ObjectProperty ;
+  rdfs:label "aboutOrganization" ;
+  rdfs:domain ccintent:Intent ;
+  rdfs:range prov:Organization ;
+  rdfs:subPropertyOf ccintent:aboutAgent .
+
+ccintent:aboutSituation a owl:ObjectProperty ;
+  rdfs:label "aboutSituation" ;
+  rdfs:domain ccintent:Intent ;
+  rdfs:range ccsit:ChurchSituation .
+
+ccintent:relatesToActivityRole a owl:ObjectProperty ;
+  rdfs:label "relatesToActivityRole" ;
+  rdfs:comment "Links an intent to an ActivityRole (specification-side: the way things are done)." ;
+  rdfs:domain ccintent:Intent ;
+  rdfs:range cc:ActivityRole .
+
+ccintent:relatesToActivity a owl:ObjectProperty ;
+  rdfs:label "relatesToActivity" ;
+  rdfs:comment "Links an intent to an Activity occurrence (execution-side: what happened)." ;
+  rdfs:domain ccintent:Intent ;
+  rdfs:range prov:Activity .
+
+ccintent:targetsState a owl:ObjectProperty ;
+  rdfs:label "targetsState" ;
+  rdfs:comment "Links an intent to a desired State category (often TerminalState for goal completion)." ;
+  rdfs:domain ccintent:Intent ;
+  rdfs:range cc:State .
+
+ccintent:hasStrategicIntentType a owl:ObjectProperty ;
+  rdfs:label "hasStrategicIntentType" ;
+  rdfs:comment "Category for a StrategicIntent; values SHOULD be SKOS concepts from ccclass:StrategicIntentTypeScheme." ;
+  rdfs:domain ccintent:StrategicIntent ;
+  rdfs:range <http://www.w3.org/2004/02/skos/core#Concept> .
+
+ccintent:hasIntentLinkType a owl:ObjectProperty ;
+  rdfs:label "hasIntentLinkType" ;
+  rdfs:comment "Category for how one strategic intent relates to another; values SHOULD be SKOS concepts from ccclass:StrategicIntentLinkTypeScheme." ;
+  rdfs:domain prov:Entity ;
+  rdfs:range <http://www.w3.org/2004/02/skos/core#Concept> .
+
+ccintent:relatedIntent a owl:ObjectProperty ;
+  rdfs:label "relatedIntent" ;
+  rdfs:comment "Links one intent artifact to another (e.g., mission supports vision; goal implements strategy). Link types can be qualified with ccintent:hasIntentLinkType on a reified relationship entity when needed." ;
+  rdfs:domain ccintent:Intent ;
+  rdfs:range ccintent:Intent .
+
+### Inference provenance (InferredIntent)
+
+ccintent:confidence a owl:DatatypeProperty ;
+  rdfs:label "confidence" ;
+  rdfs:comment "Confidence score for inferred intent (0..1 as decimal by convention)." ;
+  rdfs:domain ccintent:InferredIntent ;
+  rdfs:range xsd:decimal .
+
+ccintent:inferredFromEntity a owl:ObjectProperty ;
+  rdfs:label "inferredFromEntity" ;
+  rdfs:comment "Evidence entity used to infer this intent (e.g., a message, document, prior assertion, manifestation)." ;
+  rdfs:domain ccintent:InferredIntent ;
+  rdfs:range prov:Entity .
+
+ccintent:inferredFromActivity a owl:ObjectProperty ;
+  rdfs:label "inferredFromActivity" ;
+  rdfs:comment "Evidence activity used to infer this intent (e.g., an observed action or conversation activity)." ;
+  rdfs:domain ccintent:InferredIntent ;
+  rdfs:range prov:Activity .
+
+ccintent:inferredByActivity a owl:ObjectProperty ;
+  rdfs:label "inferredByActivity" ;
+  rdfs:comment "The inference activity (human or automated) that generated the inferred intent." ;
+  rdfs:domain ccintent:InferredIntent ;
+  rdfs:range prov:Activity ;
+  rdfs:subPropertyOf prov:wasGeneratedBy .
+
+ccintent:inferredAtTime a owl:DatatypeProperty ;
+  rdfs:label "inferredAtTime" ;
+  rdfs:comment "Timestamp when the inference occurred." ;
+  rdfs:domain ccintent:InferredIntent ;
+  rdfs:range xsd:dateTime ;
+  rdfs:subPropertyOf prov:generatedAtTime .
+

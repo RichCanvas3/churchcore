@@ -34,6 +34,16 @@ graph TB
   CC --> CC_CONG
 ```
 
+## Website → repo crosswalk
+
+The repo ontologies are the **normative source**, while the website is treated as a **conceptual design backlog**.
+
+See `crosswalk.md` for a mapping of:
+
+- website concept → target package (upper/global/congregation)
+- T-Box vs C-Box placement
+- which underlying model(s) overlap (PROV-O, p-plan/EP-PLAN, AgenticTrust)
+
 ## Core patterns
 
 ### 1) Specification vs execution (plans vs actuals)

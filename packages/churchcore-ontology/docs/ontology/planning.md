@@ -37,3 +37,12 @@ You can model a church workflow as:
 
 Then query “what’s missing” by finding planned steps with no corresponding executed activity in a time window.
 
+## ProcessRole / Process (beyond steps)
+
+The website’s “ProcessRole vs Process” framing is modeled explicitly in `cc/process`:
+
+- **ProcessRole**: a plan-level bundle of steps (`cc:ActivityRole`) and state categories (preconditions/effects)
+- **Process**: an execution-level bundle of activities and entities (including `cc:Manifestation`)
+
+See `process.md` for diagrams and query patterns.
+

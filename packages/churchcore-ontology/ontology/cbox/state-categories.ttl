@@ -1,0 +1,47 @@
+@prefix cc: <https://ontology.churchcore.ai/cc#> .
+@prefix ccclass: <https://ontology.churchcore.ai/cc/class#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+
+<https://ontology.churchcore.ai/cc/cbox/state-categories>
+  a owl:Ontology ;
+  rdfs:label "ChurchCore C-Box (state categories)" ;
+  rdfs:comment "Starter state categories as controlled vocabulary. Each state is both a SKOS concept (in a scheme) and a typed cc:State individual (Terminal/NonTerminal/Conjunctive)." ;
+  owl:imports <https://ontology.churchcore.ai/cc/state/tbox> ;
+  owl:imports <http://www.w3.org/2004/02/skos/core> .
+
+ccclass:StateCategoryScheme a skos:ConceptScheme ;
+  skos:prefLabel "State categories" .
+
+# Generic categories (starter set)
+ccclass:state_active a skos:Concept, cc:NonTerminalState ;
+  skos:inScheme ccclass:StateCategoryScheme ;
+  skos:notation "active" ;
+  skos:prefLabel "Active" .
+
+ccclass:state_inactive a skos:Concept, cc:NonTerminalState ;
+  skos:inScheme ccclass:StateCategoryScheme ;
+  skos:notation "inactive" ;
+  skos:prefLabel "Inactive" .
+
+ccclass:state_pending a skos:Concept, cc:NonTerminalState ;
+  skos:inScheme ccclass:StateCategoryScheme ;
+  skos:notation "pending" ;
+  skos:prefLabel "Pending" .
+
+ccclass:state_completed a skos:Concept, cc:TerminalState ;
+  skos:inScheme ccclass:StateCategoryScheme ;
+  skos:notation "completed" ;
+  skos:prefLabel "Completed" .
+
+ccclass:state_cancelled a skos:Concept, cc:TerminalState ;
+  skos:inScheme ccclass:StateCategoryScheme ;
+  skos:notation "cancelled" ;
+  skos:prefLabel "Cancelled" .
+
+ccclass:state_blocked a skos:Concept, cc:NonTerminalState ;
+  skos:inScheme ccclass:StateCategoryScheme ;
+  skos:notation "blocked" ;
+  skos:prefLabel "Blocked" .
+

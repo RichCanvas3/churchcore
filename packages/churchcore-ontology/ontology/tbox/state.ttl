@@ -1,0 +1,72 @@
+@prefix cc: <https://ontology.churchcore.ai/cc#> .
+@prefix prov: <http://www.w3.org/ns/prov#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<https://ontology.churchcore.ai/cc/state/tbox>
+  a owl:Ontology ;
+  rdfs:label "ChurchCore T-Box (state)" ;
+  rdfs:comment "State-based behavioristics primitives: time-varying concepts, manifestations, and state categories. Designed to pair with ActivityRole vs Activity and with Effect/Enablement situations." ;
+  owl:imports <https://ontology.churchcore.ai/cc> ;
+  owl:imports <http://www.w3.org/ns/prov-o-20130430> .
+
+cc:TimeVaryingConcept a owl:Class ;
+  rdfs:label "TimeVaryingConcept" ;
+  rdfs:comment "An identity that persists through time while its manifestations change (continuant-like). Modeled as a PROV Entity so it can be described/provenanced." ;
+  rdfs:subClassOf prov:Entity .
+
+cc:Manifestation a owl:Class ;
+  rdfs:label "Manifestation" ;
+  rdfs:comment "A time-indexed realization/snapshot of a TimeVaryingConcept (occurs/changes over time). Modeled as a PROV Entity so it can be generated/used by Activities." ;
+  rdfs:subClassOf prov:Entity .
+
+cc:State a owl:Class ;
+  rdfs:label "State" ;
+  rdfs:comment "A reusable state category that can classify a Manifestation (e.g., preconditions/effects and progression semantics)." ;
+  rdfs:subClassOf prov:Entity .
+
+cc:TerminalState a owl:Class ;
+  rdfs:label "TerminalState" ;
+  rdfs:comment "A state category that represents a destination/outcome (no further progression required to satisfy a process role)." ;
+  rdfs:subClassOf cc:State .
+
+cc:NonTerminalState a owl:Class ;
+  rdfs:label "NonTerminalState" ;
+  rdfs:comment "A state category that represents an intermediate/continuing condition (typically enabling further activities)." ;
+  rdfs:subClassOf cc:State .
+
+cc:ConjunctiveState a owl:Class ;
+  rdfs:label "ConjunctiveState" ;
+  rdfs:comment "A state category representing a conjunction of multiple state conditions (used for preconditions/effects)." ;
+  rdfs:subClassOf cc:State .
+
+cc:hasManifestation a owl:ObjectProperty ;
+  rdfs:label "hasManifestation" ;
+  rdfs:domain cc:TimeVaryingConcept ;
+  rdfs:range cc:Manifestation .
+
+cc:manifestationOf a owl:ObjectProperty ;
+  rdfs:label "manifestationOf" ;
+  rdfs:domain cc:Manifestation ;
+  rdfs:range cc:TimeVaryingConcept ;
+  owl:inverseOf cc:hasManifestation .
+
+cc:hasState a owl:ObjectProperty ;
+  rdfs:label "hasState" ;
+  rdfs:domain cc:Manifestation ;
+  rdfs:range cc:State .
+
+cc:stateOf a owl:ObjectProperty ;
+  rdfs:label "stateOf" ;
+  rdfs:domain cc:State ;
+  rdfs:range cc:Manifestation ;
+  owl:inverseOf cc:hasState .
+
+cc:manifestedAtTime a owl:DatatypeProperty ;
+  rdfs:label "manifestedAtTime" ;
+  rdfs:comment "Timestamp for a manifestation snapshot. When possible, prefer using PROV generation time on the same entity; this provides a stable ChurchCore predicate for simple querying." ;
+  rdfs:domain cc:Manifestation ;
+  rdfs:range xsd:dateTime ;
+  rdfs:subPropertyOf prov:generatedAtTime .
+

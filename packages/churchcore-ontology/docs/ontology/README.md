@@ -13,8 +13,12 @@ ChurchCore adds a church-domain upper ontology on top of:
 ## Quick navigation
 
 - `overview.md`: design patterns + layering + query patterns
+- `crosswalk.md`: website → repo mapping (concept → package → T/C box → overlap model)
 - `core.md`: core classes + “specification vs execution” (ActivityRole)
 - `situations.md`: ChurchSituation / MembershipSituation / RelationshipSituation
+- `state.md`: TimeVaryingConcept / Manifestation / State (terminal vs non-terminal)
+- `process.md`: ProcessRole / Process (plan bundles vs execution bundles)
+- `intent.md`: Intent / InferredIntent / StrategicIntent (purpose/mission/goals/beliefs)
 - `community.md`: Groups + GroupMembershipSituation
 - `planning.md`: Plan/Step/Variable (P-Plan + EP-PLAN alignment)
 - `journey.md`: Journey graph + per-person state/events

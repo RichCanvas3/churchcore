@@ -1,0 +1,27 @@
+@prefix cccongclass: <https://ontology.churchcore.ai/cc/congregation/class#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+
+<https://ontology.churchcore.ai/cc/congregation/cbox/audience-segments>
+  a owl:Ontology ;
+  rdfs:label "ChurchCore-Congregation C-Box (audience segments)" ;
+  rdfs:comment "Congregation-local audience/segment categories for programs, communications, and services. Keep as controlled vocabulary (SKOS)." ;
+  owl:imports <http://www.w3.org/2004/02/skos/core> .
+
+cccongclass:AudienceSegmentScheme a skos:ConceptScheme ;
+  skos:prefLabel "Audience segments (congregation)" .
+
+# Congregation-facing segments (starter set)
+cccongclass:audience_new_here a skos:Concept ; skos:inScheme cccongclass:AudienceSegmentScheme ; skos:notation "new_here" ; skos:prefLabel "New here" .
+cccongclass:audience_seekers a skos:Concept ; skos:inScheme cccongclass:AudienceSegmentScheme ; skos:notation "seekers" ; skos:prefLabel "Seekers / exploring" .
+cccongclass:audience_members a skos:Concept ; skos:inScheme cccongclass:AudienceSegmentScheme ; skos:notation "members" ; skos:prefLabel "Members" .
+cccongclass:audience_volunteers a skos:Concept ; skos:inScheme cccongclass:AudienceSegmentScheme ; skos:notation "volunteers" ; skos:prefLabel "Volunteers / serving team" .
+
+# Life-stage oriented segments (starter set)
+cccongclass:audience_kids a skos:Concept ; skos:inScheme cccongclass:AudienceSegmentScheme ; skos:notation "kids" ; skos:prefLabel "Kids" .
+cccongclass:audience_students a skos:Concept ; skos:inScheme cccongclass:AudienceSegmentScheme ; skos:notation "students" ; skos:prefLabel "Students" .
+cccongclass:audience_young_adults a skos:Concept ; skos:inScheme cccongclass:AudienceSegmentScheme ; skos:notation "young_adults" ; skos:prefLabel "Young adults" .
+cccongclass:audience_adults a skos:Concept ; skos:inScheme cccongclass:AudienceSegmentScheme ; skos:notation "adults" ; skos:prefLabel "Adults" .
+cccongclass:audience_seniors a skos:Concept ; skos:inScheme cccongclass:AudienceSegmentScheme ; skos:notation "seniors" ; skos:prefLabel "Seniors" .
+
