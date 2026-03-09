@@ -6,6 +6,12 @@
   rdfs:label "ChurchCore People Groups C-Box" ;
   rdfs:comment "C-Box index for people group controlled vocabularies and canonical graphs." ;
   owl:imports
+    <https://ontology.churchcore.ai/cc/people-groups/cbox/religions>,
+    <https://ontology.churchcore.ai/cc/people-groups/cbox/gospel-progress-levels>,
+    <https://ontology.churchcore.ai/cc/people-groups/cbox/scripture-statuses>,
+    <https://ontology.churchcore.ai/cc/people-groups/cbox/mission-engagement-states>,
     <https://ontology.churchcore.ai/cc/people-groups/cbox/people-group-faith-phases>,
+    <https://ontology.churchcore.ai/cc/people-groups/cbox/movement-stages>,
+    <https://ontology.churchcore.ai/cc/people-groups/cbox/movement-stage-graph>,
     <https://ontology.churchcore.ai/cc/people-groups/cbox/people-group-faith-journey-graph> .
 

@@ -1,0 +1,50 @@
+@prefix cc: <https://ontology.churchcore.ai/cc#> .
+@prefix ccjourney: <https://ontology.churchcore.ai/cc/journey#> .
+@prefix cccong: <https://ontology.churchcore.ai/cc/congregation#> .
+@prefix cccongclass: <https://ontology.churchcore.ai/cc/congregation/class#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+<https://ontology.churchcore.ai/cc/congregation/cbox/congregation-lifecycle-graph>
+  a owl:Ontology ;
+  rdfs:label "ChurchCore-Congregation C-Box (congregation lifecycle graph)" ;
+  rdfs:comment "Canonical congregation lifecycle graph aligned to congregation lifecycle state categories." ;
+  owl:imports <https://ontology.churchcore.ai/cc/all> ;
+  owl:imports <https://ontology.churchcore.ai/cc/journey/tbox> ;
+  owl:imports <https://ontology.churchcore.ai/cc/cbox/journey> ;
+  owl:imports <https://ontology.churchcore.ai/cc/congregation/cbox/congregation-lifecycle-states> .
+
+cccong:journey_congregation_lifecycle_v1 a ccjourney:JourneyGraph ;
+  cc:name "Congregation lifecycle (v1)" .
+
+cccong:cong_stage_church_plant_node a ccjourney:JourneyNode ;
+  cc:name "Church plant" ;
+  ccjourney:representsState cccongclass:cong_stage_church_plant .
+
+cccong:cong_stage_growing_church_node a ccjourney:JourneyNode ;
+  cc:name "Growing church" ;
+  ccjourney:representsState cccongclass:cong_stage_growing_church .
+
+cccong:cong_stage_reproducing_church_node a ccjourney:JourneyNode ;
+  cc:name "Reproducing church" ;
+  ccjourney:representsState cccongclass:cong_stage_reproducing_church .
+
+cccong:cong_stage_sending_church_node a ccjourney:JourneyNode ;
+  cc:name "Sending church" ;
+  ccjourney:representsState cccongclass:cong_stage_sending_church .
+
+cccong:edge_plant_to_growing a ccjourney:JourneyEdge ;
+  ccjourney:fromNode cccong:cong_stage_church_plant_node ;
+  ccjourney:toNode cccong:cong_stage_growing_church_node ;
+  ccjourney:edgeKind "NEXT_STAGE" .
+
+cccong:edge_growing_to_reproducing a ccjourney:JourneyEdge ;
+  ccjourney:fromNode cccong:cong_stage_growing_church_node ;
+  ccjourney:toNode cccong:cong_stage_reproducing_church_node ;
+  ccjourney:edgeKind "NEXT_STAGE" .
+
+cccong:edge_reproducing_to_sending a ccjourney:JourneyEdge ;
+  ccjourney:fromNode cccong:cong_stage_reproducing_church_node ;
+  ccjourney:toNode cccong:cong_stage_sending_church_node ;
+  ccjourney:edgeKind "NEXT_STAGE" .
+

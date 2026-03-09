@@ -1,0 +1,39 @@
+@prefix ccpgclass: <https://ontology.churchcore.ai/cc/people-groups/class#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+
+<https://ontology.churchcore.ai/cc/people-groups/cbox/gospel-progress-levels>
+  a owl:Ontology ;
+  rdfs:label "ChurchCore People Groups C-Box (gospel progress levels)" ;
+  rdfs:comment "Starter gospel progress level categories (coarse dataset classifications). Distinct from the Phase 0–7 trajectory model." ;
+  owl:imports <http://www.w3.org/2004/02/skos/core> .
+
+ccpgclass:GospelProgressScheme a skos:ConceptScheme ;
+  skos:prefLabel "Gospel progress levels" .
+
+ccpgclass:progress_unreached a skos:Concept ;
+  skos:inScheme ccpgclass:GospelProgressScheme ;
+  skos:notation "unreached" ;
+  skos:prefLabel "Unreached" .
+
+ccpgclass:progress_minimally_reached a skos:Concept ;
+  skos:inScheme ccpgclass:GospelProgressScheme ;
+  skos:notation "minimally_reached" ;
+  skos:prefLabel "Minimally reached" .
+
+ccpgclass:progress_superficially_reached a skos:Concept ;
+  skos:inScheme ccpgclass:GospelProgressScheme ;
+  skos:notation "superficially_reached" ;
+  skos:prefLabel "Superficially reached" .
+
+ccpgclass:progress_partially_reached a skos:Concept ;
+  skos:inScheme ccpgclass:GospelProgressScheme ;
+  skos:notation "partially_reached" ;
+  skos:prefLabel "Partially reached" .
+
+ccpgclass:progress_significantly_reached a skos:Concept ;
+  skos:inScheme ccpgclass:GospelProgressScheme ;
+  skos:notation "significantly_reached" ;
+  skos:prefLabel "Significantly reached" .
+

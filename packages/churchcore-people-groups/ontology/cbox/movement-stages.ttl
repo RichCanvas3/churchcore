@@ -1,0 +1,41 @@
+@prefix cc: <https://ontology.churchcore.ai/cc#> .
+@prefix ccpgclass: <https://ontology.churchcore.ai/cc/people-groups/class#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+
+<https://ontology.churchcore.ai/cc/people-groups/cbox/movement-stages>
+  a owl:Ontology ;
+  rdfs:label "ChurchCore People Groups C-Box (movement stages)" ;
+  rdfs:comment "Optional movement-stage overlay for mission strategists (pre/seed/emerging/established/sending). These are state categories for classifying manifestations." ;
+  owl:imports <https://ontology.churchcore.ai/cc/state/tbox> ;
+  owl:imports <http://www.w3.org/2004/02/skos/core> .
+
+ccpgclass:MovementStageScheme a skos:ConceptScheme ;
+  skos:prefLabel "Movement stages" .
+
+ccpgclass:movement_pre_movement a skos:Concept, cc:NonTerminalState ;
+  skos:inScheme ccpgclass:MovementStageScheme ;
+  skos:notation "pre_movement" ;
+  skos:prefLabel "Pre-movement" .
+
+ccpgclass:movement_seed_movement a skos:Concept, cc:NonTerminalState ;
+  skos:inScheme ccpgclass:MovementStageScheme ;
+  skos:notation "seed_movement" ;
+  skos:prefLabel "Seed movement" .
+
+ccpgclass:movement_emerging_movement a skos:Concept, cc:NonTerminalState ;
+  skos:inScheme ccpgclass:MovementStageScheme ;
+  skos:notation "emerging_movement" ;
+  skos:prefLabel "Emerging movement" .
+
+ccpgclass:movement_established_movement a skos:Concept, cc:NonTerminalState ;
+  skos:inScheme ccpgclass:MovementStageScheme ;
+  skos:notation "established_movement" ;
+  skos:prefLabel "Established movement" .
+
+ccpgclass:movement_global_sending_movement a skos:Concept, cc:NonTerminalState ;
+  skos:inScheme ccpgclass:MovementStageScheme ;
+  skos:notation "global_sending_movement" ;
+  skos:prefLabel "Global sending movement" .
+

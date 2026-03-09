@@ -254,3 +254,385 @@ ccfj:journey_edge_confession_to_new_believer a ccjourney:JourneyEdge ;
   ccjourney:toNode ccfj:journey_stage_new_believer ;
   ccjourney:edgeKind "NEXT_STAGE" .
 
+###
+# Stage 4 (New believer) — finer-grained subgraph
+###
+
+ccfj:journey_new_believer_assurance a ccjourney:JourneyNode ; cc:name "Assurance and identity in Christ" .
+ccfj:journey_new_believer_bible_basics a ccjourney:JourneyNode ; cc:name "Bible basics" .
+ccfj:journey_new_believer_prayer_basics a ccjourney:JourneyNode ; cc:name "Prayer basics" .
+ccfj:journey_new_believer_worship_gathering a ccjourney:JourneyNode ; cc:name "Regular gathering and worship" .
+ccfj:journey_new_believer_baptism a ccjourney:JourneyNode ; cc:name "Baptism" .
+ccfj:journey_new_believer_barrier_doubt a ccjourney:JourneyNode ; cc:name "Doubt / instability" .
+ccfj:journey_new_believer_barrier_isolation a ccjourney:JourneyNode ; cc:name "Isolation" .
+ccfj:journey_new_believer_action_followup a ccjourney:JourneyNode ; cc:name "Follow-up and pastoral care" .
+ccfj:journey_new_believer_action_foundations_course a ccjourney:JourneyNode ; cc:name "Foundations course" .
+
+ccfj:journey_edge_stage_new_believer_to_assurance a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:journey_stage_new_believer ;
+  ccjourney:toNode ccfj:journey_new_believer_assurance ;
+  ccjourney:edgeKind "UNLOCKS" .
+
+ccfj:journey_edge_assurance_to_bible_basics a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:journey_new_believer_assurance ;
+  ccjourney:toNode ccfj:journey_new_believer_bible_basics ;
+  ccjourney:edgeKind "RECOMMENDS" .
+
+ccfj:journey_edge_assurance_to_prayer_basics a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:journey_new_believer_assurance ;
+  ccjourney:toNode ccfj:journey_new_believer_prayer_basics ;
+  ccjourney:edgeKind "RECOMMENDS" .
+
+ccfj:journey_edge_bible_basics_to_foundations_course a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:journey_new_believer_bible_basics ;
+  ccjourney:toNode ccfj:journey_new_believer_action_foundations_course ;
+  ccjourney:edgeKind "UNLOCKS" .
+
+ccfj:journey_edge_prayer_basics_to_gathering a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:journey_new_believer_prayer_basics ;
+  ccjourney:toNode ccfj:journey_new_believer_worship_gathering ;
+  ccjourney:edgeKind "RECOMMENDS" .
+
+ccfj:journey_edge_gathering_to_baptism a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:journey_new_believer_worship_gathering ;
+  ccjourney:toNode ccfj:journey_new_believer_baptism ;
+  ccjourney:edgeKind "RECOMMENDS" .
+
+ccfj:journey_edge_new_believer_blocked_by_isolation a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:journey_stage_new_believer ;
+  ccjourney:toNode ccfj:journey_new_believer_barrier_isolation ;
+  ccjourney:edgeKind "BLOCKED_BY" .
+
+ccfj:journey_edge_isolation_resolved_by_followup a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:journey_new_believer_barrier_isolation ;
+  ccjourney:toNode ccfj:journey_new_believer_action_followup ;
+  ccjourney:edgeKind "RESOLVED_BY" .
+
+ccfj:journey_edge_new_believer_blocked_by_doubt a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:journey_stage_new_believer ;
+  ccjourney:toNode ccfj:journey_new_believer_barrier_doubt ;
+  ccjourney:edgeKind "BLOCKED_BY" .
+
+ccfj:journey_edge_doubt_resolved_by_followup a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:journey_new_believer_barrier_doubt ;
+  ccjourney:toNode ccfj:journey_new_believer_action_followup ;
+  ccjourney:edgeKind "RESOLVED_BY" .
+
+ccfj:journey_edge_foundations_to_connected a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:journey_new_believer_action_foundations_course ;
+  ccjourney:toNode ccfj:journey_stage_connected ;
+  ccjourney:edgeKind "NEXT_STAGE" .
+
+###
+# Stage 5 (Connected) — finer-grained subgraph
+###
+
+ccfj:journey_connected_small_group a ccjourney:JourneyNode ; cc:name "Connected to a small group" .
+ccfj:journey_connected_friendships a ccjourney:JourneyNode ; cc:name "Meaningful friendships" .
+ccfj:journey_connected_regular_participation a ccjourney:JourneyNode ; cc:name "Regular participation" .
+ccfj:journey_connected_accountability a ccjourney:JourneyNode ; cc:name "Accountability and encouragement" .
+ccfj:journey_connected_barrier_busyness a ccjourney:JourneyNode ; cc:name "Busyness / inconsistency" .
+ccfj:journey_connected_barrier_unresolved_conflict a ccjourney:JourneyNode ; cc:name "Unresolved conflict" .
+ccfj:journey_connected_action_connect_team a ccjourney:JourneyNode ; cc:name "Connect team follow-up" .
+ccfj:journey_connected_action_reconciliation a ccjourney:JourneyNode ; cc:name "Reconciliation and peacemaking" .
+
+ccfj:journey_edge_stage_connected_to_small_group a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:journey_stage_connected ;
+  ccjourney:toNode ccfj:journey_connected_small_group ;
+  ccjourney:edgeKind "RECOMMENDS" .
+
+ccfj:journey_edge_small_group_to_friendships a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:journey_connected_small_group ;
+  ccjourney:toNode ccfj:journey_connected_friendships ;
+  ccjourney:edgeKind "UNLOCKS" .
+
+ccfj:journey_edge_friendships_to_participation a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:journey_connected_friendships ;
+  ccjourney:toNode ccfj:journey_connected_regular_participation ;
+  ccjourney:edgeKind "UNLOCKS" .
+
+ccfj:journey_edge_participation_to_accountability a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:journey_connected_regular_participation ;
+  ccjourney:toNode ccfj:journey_connected_accountability ;
+  ccjourney:edgeKind "RECOMMENDS" .
+
+ccfj:journey_edge_connected_blocked_by_busyness a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:journey_stage_connected ;
+  ccjourney:toNode ccfj:journey_connected_barrier_busyness ;
+  ccjourney:edgeKind "BLOCKED_BY" .
+
+ccfj:journey_edge_busyness_resolved_by_connect_team a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:journey_connected_barrier_busyness ;
+  ccjourney:toNode ccfj:journey_connected_action_connect_team ;
+  ccjourney:edgeKind "RESOLVED_BY" .
+
+ccfj:journey_edge_connected_blocked_by_conflict a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:journey_stage_connected ;
+  ccjourney:toNode ccfj:journey_connected_barrier_unresolved_conflict ;
+  ccjourney:edgeKind "BLOCKED_BY" .
+
+ccfj:journey_edge_conflict_resolved_by_reconciliation a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:journey_connected_barrier_unresolved_conflict ;
+  ccjourney:toNode ccfj:journey_connected_action_reconciliation ;
+  ccjourney:edgeKind "RESOLVED_BY" .
+
+ccfj:journey_edge_accountability_to_growing_disciple a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:journey_connected_accountability ;
+  ccjourney:toNode ccfj:journey_stage_growing_disciple ;
+  ccjourney:edgeKind "NEXT_STAGE" .
+
+###
+# Stage 6 (Growing disciple) — finer-grained subgraph
+###
+
+ccfj:journey_growing_disciple_spiritual_disciplines a ccjourney:JourneyNode ; cc:name "Spiritual disciplines" .
+ccfj:journey_growing_disciple_doctrine_foundations a ccjourney:JourneyNode ; cc:name "Doctrine foundations" .
+ccfj:journey_growing_disciple_obedience_steps a ccjourney:JourneyNode ; cc:name "Obedience and repentance rhythms" .
+ccfj:journey_growing_disciple_generosity a ccjourney:JourneyNode ; cc:name "Generosity and stewardship" .
+ccfj:journey_growing_disciple_mission_posture a ccjourney:JourneyNode ; cc:name "Mission posture" .
+ccfj:journey_growing_disciple_barrier_plateau a ccjourney:JourneyNode ; cc:name "Plateau / stagnation" .
+ccfj:journey_growing_disciple_barrier_hidden_sin a ccjourney:JourneyNode ; cc:name "Hidden sin / lack of accountability" .
+ccfj:journey_growing_disciple_action_mentor a ccjourney:JourneyNode ; cc:name "Mentoring / spiritual direction" .
+ccfj:journey_growing_disciple_action_rule_of_life a ccjourney:JourneyNode ; cc:name "Rule of life" .
+
+ccfj:journey_edge_stage_growing_disciple_to_disciplines a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:journey_stage_growing_disciple ;
+  ccjourney:toNode ccfj:journey_growing_disciple_spiritual_disciplines ;
+  ccjourney:edgeKind "UNLOCKS" .
+
+ccfj:journey_edge_disciplines_to_rule_of_life a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:journey_growing_disciple_spiritual_disciplines ;
+  ccjourney:toNode ccfj:journey_growing_disciple_action_rule_of_life ;
+  ccjourney:edgeKind "RECOMMENDS" .
+
+ccfj:journey_edge_disciplines_to_doctrine a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:journey_growing_disciple_spiritual_disciplines ;
+  ccjourney:toNode ccfj:journey_growing_disciple_doctrine_foundations ;
+  ccjourney:edgeKind "RECOMMENDS" .
+
+ccfj:journey_edge_doctrine_to_obedience a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:journey_growing_disciple_doctrine_foundations ;
+  ccjourney:toNode ccfj:journey_growing_disciple_obedience_steps ;
+  ccjourney:edgeKind "UNLOCKS" .
+
+ccfj:journey_edge_obedience_to_generosity a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:journey_growing_disciple_obedience_steps ;
+  ccjourney:toNode ccfj:journey_growing_disciple_generosity ;
+  ccjourney:edgeKind "RECOMMENDS" .
+
+ccfj:journey_edge_obedience_to_mission_posture a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:journey_growing_disciple_obedience_steps ;
+  ccjourney:toNode ccfj:journey_growing_disciple_mission_posture ;
+  ccjourney:edgeKind "RECOMMENDS" .
+
+ccfj:journey_edge_growing_disciple_blocked_by_plateau a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:journey_stage_growing_disciple ;
+  ccjourney:toNode ccfj:journey_growing_disciple_barrier_plateau ;
+  ccjourney:edgeKind "BLOCKED_BY" .
+
+ccfj:journey_edge_plateau_resolved_by_mentor a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:journey_growing_disciple_barrier_plateau ;
+  ccjourney:toNode ccfj:journey_growing_disciple_action_mentor ;
+  ccjourney:edgeKind "RESOLVED_BY" .
+
+ccfj:journey_edge_growing_disciple_blocked_by_hidden_sin a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:journey_stage_growing_disciple ;
+  ccjourney:toNode ccfj:journey_growing_disciple_barrier_hidden_sin ;
+  ccjourney:edgeKind "BLOCKED_BY" .
+
+ccfj:journey_edge_hidden_sin_resolved_by_accountability a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:journey_growing_disciple_barrier_hidden_sin ;
+  ccjourney:toNode ccfj:journey_connected_accountability ;
+  ccjourney:edgeKind "RESOLVED_BY" .
+
+ccfj:journey_edge_mission_posture_to_serving a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:journey_growing_disciple_mission_posture ;
+  ccjourney:toNode ccfj:journey_stage_serving ;
+  ccjourney:edgeKind "NEXT_STAGE" .
+
+###
+# Stage 7 (Serving) — finer-grained subgraph
+###
+
+ccfj:journey_serving_discover_gifts a ccjourney:JourneyNode ; cc:name "Discover gifts and passions" .
+ccfj:journey_serving_join_team a ccjourney:JourneyNode ; cc:name "Join a serving team" .
+ccfj:journey_serving_training a ccjourney:JourneyNode ; cc:name "Training and onboarding" .
+ccfj:journey_serving_faithfulness a ccjourney:JourneyNode ; cc:name "Faithful service over time" .
+ccfj:journey_serving_barrier_burnout a ccjourney:JourneyNode ; cc:name "Burnout" .
+ccfj:journey_serving_barrier_misalignment a ccjourney:JourneyNode ; cc:name "Role misalignment" .
+ccfj:journey_serving_action_coach a ccjourney:JourneyNode ; cc:name "Coaching and support" .
+ccfj:journey_serving_action_sabbath_rhythm a ccjourney:JourneyNode ; cc:name "Rest and sabbath rhythm" .
+
+ccfj:journey_edge_stage_serving_to_discover_gifts a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:journey_stage_serving ;
+  ccjourney:toNode ccfj:journey_serving_discover_gifts ;
+  ccjourney:edgeKind "UNLOCKS" .
+
+ccfj:journey_edge_discover_gifts_to_join_team a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:journey_serving_discover_gifts ;
+  ccjourney:toNode ccfj:journey_serving_join_team ;
+  ccjourney:edgeKind "RECOMMENDS" .
+
+ccfj:journey_edge_join_team_to_training a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:journey_serving_join_team ;
+  ccjourney:toNode ccfj:journey_serving_training ;
+  ccjourney:edgeKind "UNLOCKS" .
+
+ccfj:journey_edge_training_to_faithfulness a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:journey_serving_training ;
+  ccjourney:toNode ccfj:journey_serving_faithfulness ;
+  ccjourney:edgeKind "UNLOCKS" .
+
+ccfj:journey_edge_serving_blocked_by_burnout a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:journey_stage_serving ;
+  ccjourney:toNode ccfj:journey_serving_barrier_burnout ;
+  ccjourney:edgeKind "BLOCKED_BY" .
+
+ccfj:journey_edge_burnout_resolved_by_sabbath a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:journey_serving_barrier_burnout ;
+  ccjourney:toNode ccfj:journey_serving_action_sabbath_rhythm ;
+  ccjourney:edgeKind "RESOLVED_BY" .
+
+ccfj:journey_edge_serving_blocked_by_misalignment a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:journey_stage_serving ;
+  ccjourney:toNode ccfj:journey_serving_barrier_misalignment ;
+  ccjourney:edgeKind "BLOCKED_BY" .
+
+ccfj:journey_edge_misalignment_resolved_by_coach a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:journey_serving_barrier_misalignment ;
+  ccjourney:toNode ccfj:journey_serving_action_coach ;
+  ccjourney:edgeKind "RESOLVED_BY" .
+
+ccfj:journey_edge_faithfulness_to_multiplying a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:journey_serving_faithfulness ;
+  ccjourney:toNode ccfj:journey_stage_multiplying ;
+  ccjourney:edgeKind "NEXT_STAGE" .
+
+###
+# Stage 8 (Multiplying) — finer-grained subgraph
+###
+
+ccfj:journey_multiplying_share_faith a ccjourney:JourneyNode ; cc:name "Share faith" .
+ccfj:journey_multiplying_disciple_one a ccjourney:JourneyNode ; cc:name "Disciple one person" .
+ccfj:journey_multiplying_disciple_group a ccjourney:JourneyNode ; cc:name "Disciple a small group" .
+ccfj:journey_multiplying_apprentice_leader a ccjourney:JourneyNode ; cc:name "Apprentice a leader" .
+ccfj:journey_multiplying_missional_habits a ccjourney:JourneyNode ; cc:name "Missional habits" .
+ccfj:journey_multiplying_barrier_fear a ccjourney:JourneyNode ; cc:name "Fear / reluctance" .
+ccfj:journey_multiplying_barrier_no_tools a ccjourney:JourneyNode ; cc:name "Lack of tools" .
+ccfj:journey_multiplying_action_training a ccjourney:JourneyNode ; cc:name "Evangelism and disciple-making training" .
+ccfj:journey_multiplying_action_prayer_partner a ccjourney:JourneyNode ; cc:name "Prayer partner" .
+
+ccfj:journey_edge_stage_multiplying_to_share_faith a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:journey_stage_multiplying ;
+  ccjourney:toNode ccfj:journey_multiplying_share_faith ;
+  ccjourney:edgeKind "UNLOCKS" .
+
+ccfj:journey_edge_share_faith_to_disciple_one a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:journey_multiplying_share_faith ;
+  ccjourney:toNode ccfj:journey_multiplying_disciple_one ;
+  ccjourney:edgeKind "UNLOCKS" .
+
+ccfj:journey_edge_disciple_one_to_disciple_group a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:journey_multiplying_disciple_one ;
+  ccjourney:toNode ccfj:journey_multiplying_disciple_group ;
+  ccjourney:edgeKind "RECOMMENDS" .
+
+ccfj:journey_edge_disciple_group_to_apprentice_leader a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:journey_multiplying_disciple_group ;
+  ccjourney:toNode ccfj:journey_multiplying_apprentice_leader ;
+  ccjourney:edgeKind "RECOMMENDS" .
+
+ccfj:journey_edge_share_faith_supported_by_prayer_partner a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:journey_multiplying_share_faith ;
+  ccjourney:toNode ccfj:journey_multiplying_action_prayer_partner ;
+  ccjourney:edgeKind "SUPPORTED_BY" .
+
+ccfj:journey_edge_multiplying_blocked_by_fear a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:journey_stage_multiplying ;
+  ccjourney:toNode ccfj:journey_multiplying_barrier_fear ;
+  ccjourney:edgeKind "BLOCKED_BY" .
+
+ccfj:journey_edge_fear_resolved_by_prayer_partner a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:journey_multiplying_barrier_fear ;
+  ccjourney:toNode ccfj:journey_multiplying_action_prayer_partner ;
+  ccjourney:edgeKind "RESOLVED_BY" .
+
+ccfj:journey_edge_multiplying_blocked_by_no_tools a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:journey_stage_multiplying ;
+  ccjourney:toNode ccfj:journey_multiplying_barrier_no_tools ;
+  ccjourney:edgeKind "BLOCKED_BY" .
+
+ccfj:journey_edge_no_tools_resolved_by_training a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:journey_multiplying_barrier_no_tools ;
+  ccjourney:toNode ccfj:journey_multiplying_action_training ;
+  ccjourney:edgeKind "RESOLVED_BY" .
+
+ccfj:journey_edge_multiplying_to_missional_habits a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:journey_stage_multiplying ;
+  ccjourney:toNode ccfj:journey_multiplying_missional_habits ;
+  ccjourney:edgeKind "RECOMMENDS" .
+
+ccfj:journey_edge_apprentice_leader_to_leader a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:journey_multiplying_apprentice_leader ;
+  ccjourney:toNode ccfj:journey_stage_leader ;
+  ccjourney:edgeKind "NEXT_STAGE" .
+
+###
+# Stage 9 (Leader) — finer-grained subgraph
+###
+
+ccfj:journey_leader_character a ccjourney:JourneyNode ; cc:name "Character and integrity" .
+ccfj:journey_leader_shepherding a ccjourney:JourneyNode ; cc:name "Shepherding and care" .
+ccfj:journey_leader_teaching a ccjourney:JourneyNode ; cc:name "Teaching and formation" .
+ccfj:journey_leader_develop_others a ccjourney:JourneyNode ; cc:name "Develop leaders" .
+ccfj:journey_leader_mission_send a ccjourney:JourneyNode ; cc:name "Send others on mission" .
+ccfj:journey_leader_barrier_pride a ccjourney:JourneyNode ; cc:name "Pride / self-reliance" .
+ccfj:journey_leader_barrier_overload a ccjourney:JourneyNode ; cc:name "Overload" .
+ccfj:journey_leader_action_accountability a ccjourney:JourneyNode ; cc:name "Elder/coach accountability" .
+ccfj:journey_leader_action_delegate a ccjourney:JourneyNode ; cc:name "Delegate and empower" .
+
+ccfj:journey_edge_stage_leader_to_character a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:journey_stage_leader ;
+  ccjourney:toNode ccfj:journey_leader_character ;
+  ccjourney:edgeKind "UNLOCKS" .
+
+ccfj:journey_edge_character_to_shepherding a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:journey_leader_character ;
+  ccjourney:toNode ccfj:journey_leader_shepherding ;
+  ccjourney:edgeKind "UNLOCKS" .
+
+ccfj:journey_edge_shepherding_to_teaching a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:journey_leader_shepherding ;
+  ccjourney:toNode ccfj:journey_leader_teaching ;
+  ccjourney:edgeKind "RECOMMENDS" .
+
+ccfj:journey_edge_teaching_to_develop_others a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:journey_leader_teaching ;
+  ccjourney:toNode ccfj:journey_leader_develop_others ;
+  ccjourney:edgeKind "UNLOCKS" .
+
+ccfj:journey_edge_develop_others_to_send a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:journey_leader_develop_others ;
+  ccjourney:toNode ccfj:journey_leader_mission_send ;
+  ccjourney:edgeKind "RECOMMENDS" .
+
+ccfj:journey_edge_leader_blocked_by_pride a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:journey_stage_leader ;
+  ccjourney:toNode ccfj:journey_leader_barrier_pride ;
+  ccjourney:edgeKind "BLOCKED_BY" .
+
+ccfj:journey_edge_pride_resolved_by_accountability a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:journey_leader_barrier_pride ;
+  ccjourney:toNode ccfj:journey_leader_action_accountability ;
+  ccjourney:edgeKind "RESOLVED_BY" .
+
+ccfj:journey_edge_leader_blocked_by_overload a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:journey_stage_leader ;
+  ccjourney:toNode ccfj:journey_leader_barrier_overload ;
+  ccjourney:edgeKind "BLOCKED_BY" .
+
+ccfj:journey_edge_overload_resolved_by_delegate a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccfj:journey_leader_barrier_overload ;
+  ccjourney:toNode ccfj:journey_leader_action_delegate ;
+  ccjourney:edgeKind "RESOLVED_BY" .
+

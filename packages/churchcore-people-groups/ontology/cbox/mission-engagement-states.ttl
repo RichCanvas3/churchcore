@@ -1,0 +1,34 @@
+@prefix ccpgclass: <https://ontology.churchcore.ai/cc/people-groups/class#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+
+<https://ontology.churchcore.ai/cc/people-groups/cbox/mission-engagement-states>
+  a owl:Ontology ;
+  rdfs:label "ChurchCore People Groups C-Box (mission engagement states)" ;
+  rdfs:comment "Starter mission engagement categories (unengaged/engaged/church planting/movement)." ;
+  owl:imports <http://www.w3.org/2004/02/skos/core> .
+
+ccpgclass:MissionEngagementScheme a skos:ConceptScheme ;
+  skos:prefLabel "Mission engagement states" .
+
+ccpgclass:engagement_unengaged a skos:Concept ;
+  skos:inScheme ccpgclass:MissionEngagementScheme ;
+  skos:notation "unengaged" ;
+  skos:prefLabel "Unengaged" .
+
+ccpgclass:engagement_engaged a skos:Concept ;
+  skos:inScheme ccpgclass:MissionEngagementScheme ;
+  skos:notation "engaged" ;
+  skos:prefLabel "Engaged" .
+
+ccpgclass:engagement_church_planting a skos:Concept ;
+  skos:inScheme ccpgclass:MissionEngagementScheme ;
+  skos:notation "church_planting" ;
+  skos:prefLabel "Church planting" .
+
+ccpgclass:engagement_movement a skos:Concept ;
+  skos:inScheme ccpgclass:MissionEngagementScheme ;
+  skos:notation "movement" ;
+  skos:prefLabel "Movement" .
+

@@ -9,6 +9,19 @@ Sources:
 
 This package models **people groups** and a canonical **7-phase gospel progress** system.\n\nPhase is intended to be tracked over time using ChurchCore’s **TimeVaryingConcept → Manifestations → State categories** pattern.
 
+## Core concept
+
+A `ccpg:PeopleGroup` is modeled as a `cc:TimeVaryingConcept` (PGAC).\n\nCountry-specific presences (PGIC) are modeled as `ccpg:PeopleGroupPresence` (a `cc:Manifestation`) so you can attach time-indexed population, progress, engagement, and scripture access signals.
+
+## Additional dimensions (starter)
+
+- **Joshua Project hierarchy**: `ccpg:AffinityBloc` → `ccpg:PeopleCluster` → `ccpg:PeopleGroup`
+- **Language**: `ccpg:LanguageFamily` / `ccpg:Language` / `ccpg:Dialect`
+- **Religion** (C-Box): `ontology/cbox/religions.ttl`
+- **Gospel progress levels** (C-Box): `ontology/cbox/gospel-progress-levels.ttl`
+- **Scripture access** (C-Box): `ontology/cbox/scripture-statuses.ttl`
+- **Mission engagement** (C-Box): `ontology/cbox/mission-engagement-states.ttl`
+
 ## Phase model (0–7)
 
 - Phase 0 — Unengaged
@@ -19,6 +32,13 @@ This package models **people groups** and a canonical **7-phase gospel progress*
 - Phase 5 — Reproducing churches
 - Phase 6 — Multiplying movement
 - Phase 7 — Cross-cultural sending
+
+## Optional movement stages
+
+This package also includes an optional movement-stage overlay (pre/seed/emerging/established/sending), modeled as state categories:
+
+- C-Box: `ontology/cbox/movement-stages.ttl`
+- C-Box graph: `ontology/cbox/movement-stage-graph.ttl`
 
 ## How to represent “current phase” (A-Box)
 

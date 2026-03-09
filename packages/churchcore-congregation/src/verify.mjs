@@ -14,6 +14,8 @@ const required = [
   'ontology/cbox/empty.ttl',
   'ontology/cbox/ministry-categories.ttl',
   'ontology/cbox/audience-segments.ttl',
+  'ontology/cbox/congregation-lifecycle-states.ttl',
+  'ontology/cbox/congregation-lifecycle-graph.ttl',
   'ontology/cbox/program-categories.ttl',
   'ontology/cbox/service-types.ttl',
   'ontology/cbox/attendance-statuses.ttl',

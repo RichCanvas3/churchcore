@@ -1,0 +1,34 @@
+@prefix ccpgclass: <https://ontology.churchcore.ai/cc/people-groups/class#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+
+<https://ontology.churchcore.ai/cc/people-groups/cbox/scripture-statuses>
+  a owl:Ontology ;
+  rdfs:label "ChurchCore People Groups C-Box (scripture statuses)" ;
+  rdfs:comment "Starter scripture access categories for people groups." ;
+  owl:imports <http://www.w3.org/2004/02/skos/core> .
+
+ccpgclass:ScriptureStatusScheme a skos:ConceptScheme ;
+  skos:prefLabel "Scripture statuses" .
+
+ccpgclass:scripture_none a skos:Concept ;
+  skos:inScheme ccpgclass:ScriptureStatusScheme ;
+  skos:notation "none" ;
+  skos:prefLabel "No scripture" .
+
+ccpgclass:scripture_portion a skos:Concept ;
+  skos:inScheme ccpgclass:ScriptureStatusScheme ;
+  skos:notation "portion" ;
+  skos:prefLabel "Portion" .
+
+ccpgclass:scripture_new_testament a skos:Concept ;
+  skos:inScheme ccpgclass:ScriptureStatusScheme ;
+  skos:notation "new_testament" ;
+  skos:prefLabel "New Testament" .
+
+ccpgclass:scripture_full_bible a skos:Concept ;
+  skos:inScheme ccpgclass:ScriptureStatusScheme ;
+  skos:notation "full_bible" ;
+  skos:prefLabel "Full Bible" .
+

@@ -19,6 +19,7 @@ This package defines **local church operations** concepts that derive from the C
 - `ops.md`: local ops schema (small groups, ministries, facilities)
 - `audience.md`: audience/segment schema + local segment taxonomies
 - `journey.md`: pointers to the canonical faith journey package
+- `lifecycle.md`: congregation lifecycle stages (plant → growing → reproducing → sending)
 - `sparql-queries.md`: practical GraphDB queries (patterns)
 
 ## GraphDB conventions

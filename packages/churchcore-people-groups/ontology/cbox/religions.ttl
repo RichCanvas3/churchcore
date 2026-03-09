@@ -1,0 +1,44 @@
+@prefix ccpgclass: <https://ontology.churchcore.ai/cc/people-groups/class#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+
+<https://ontology.churchcore.ai/cc/people-groups/cbox/religions>
+  a owl:Ontology ;
+  rdfs:label "ChurchCore People Groups C-Box (religions)" ;
+  rdfs:comment "Starter religion categories for people group primary religion tagging." ;
+  owl:imports <http://www.w3.org/2004/02/skos/core> .
+
+ccpgclass:ReligionScheme a skos:ConceptScheme ;
+  skos:prefLabel "Religions" .
+
+ccpgclass:religion_islam a skos:Concept ;
+  skos:inScheme ccpgclass:ReligionScheme ;
+  skos:notation "islam" ;
+  skos:prefLabel "Islam" .
+
+ccpgclass:religion_hinduism a skos:Concept ;
+  skos:inScheme ccpgclass:ReligionScheme ;
+  skos:notation "hinduism" ;
+  skos:prefLabel "Hinduism" .
+
+ccpgclass:religion_buddhism a skos:Concept ;
+  skos:inScheme ccpgclass:ReligionScheme ;
+  skos:notation "buddhism" ;
+  skos:prefLabel "Buddhism" .
+
+ccpgclass:religion_christianity a skos:Concept ;
+  skos:inScheme ccpgclass:ReligionScheme ;
+  skos:notation "christianity" ;
+  skos:prefLabel "Christianity" .
+
+ccpgclass:religion_folk_religion a skos:Concept ;
+  skos:inScheme ccpgclass:ReligionScheme ;
+  skos:notation "folk_religion" ;
+  skos:prefLabel "Folk religion" .
+
+ccpgclass:religion_non_religious a skos:Concept ;
+  skos:inScheme ccpgclass:ReligionScheme ;
+  skos:notation "non_religious" ;
+  skos:prefLabel "Non-religious" .
+

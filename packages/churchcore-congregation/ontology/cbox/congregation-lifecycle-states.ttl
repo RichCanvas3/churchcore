@@ -1,0 +1,36 @@
+@prefix cc: <https://ontology.churchcore.ai/cc#> .
+@prefix cccongclass: <https://ontology.churchcore.ai/cc/congregation/class#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+
+<https://ontology.churchcore.ai/cc/congregation/cbox/congregation-lifecycle-states>
+  a owl:Ontology ;
+  rdfs:label "ChurchCore-Congregation C-Box (congregation lifecycle states)" ;
+  rdfs:comment "Congregation lifecycle/maturity state categories (church plant → growing → reproducing → sending). Intended to classify Manifestations for a congregation-as-TimeVaryingConcept." ;
+  owl:imports <https://ontology.churchcore.ai/cc/state/tbox> ;
+  owl:imports <http://www.w3.org/2004/02/skos/core> .
+
+cccongclass:CongregationLifecycleScheme a skos:ConceptScheme ;
+  skos:prefLabel "Congregation lifecycle stages" .
+
+cccongclass:cong_stage_church_plant a skos:Concept, cc:NonTerminalState ;
+  skos:inScheme cccongclass:CongregationLifecycleScheme ;
+  skos:notation "church_plant" ;
+  skos:prefLabel "Church plant" .
+
+cccongclass:cong_stage_growing_church a skos:Concept, cc:NonTerminalState ;
+  skos:inScheme cccongclass:CongregationLifecycleScheme ;
+  skos:notation "growing_church" ;
+  skos:prefLabel "Growing church" .
+
+cccongclass:cong_stage_reproducing_church a skos:Concept, cc:NonTerminalState ;
+  skos:inScheme cccongclass:CongregationLifecycleScheme ;
+  skos:notation "reproducing_church" ;
+  skos:prefLabel "Reproducing church" .
+
+cccongclass:cong_stage_sending_church a skos:Concept, cc:NonTerminalState ;
+  skos:inScheme cccongclass:CongregationLifecycleScheme ;
+  skos:notation "sending_church" ;
+  skos:prefLabel "Sending church" .
+

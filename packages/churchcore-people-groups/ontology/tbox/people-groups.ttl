@@ -3,6 +3,7 @@
 @prefix prov: <http://www.w3.org/ns/prov#> .
 @prefix owl: <http://www.w3.org/2002/07/owl#> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
 <https://ontology.churchcore.ai/cc/people-groups/tbox/people-groups>
@@ -15,8 +16,32 @@
 
 ccpg:PeopleGroup a owl:Class ;
   rdfs:label "PeopleGroup" ;
-  rdfs:comment "A people group identity (ethnolinguistic, diaspora, national, regional, etc.) modeled as a TimeVaryingConcept so its manifestations can track gospel progress phases over time." ;
+  rdfs:comment "A people group identity (PGAC): the largest group within which the gospel can spread as a church-planting movement without encountering barriers of understanding or acceptance (language/culture/religion/social identity). Modeled as a TimeVaryingConcept so its manifestations can track gospel progress over time." ;
   rdfs:subClassOf cc:TimeVaryingConcept .
+
+###
+# Joshua Project-style hierarchy
+###
+
+ccpg:AffinityBloc a owl:Class ;
+  rdfs:label "AffinityBloc" ;
+  rdfs:comment "High-level affinity bloc grouping people clusters." ;
+  rdfs:subClassOf cc:Resource .
+
+ccpg:PeopleCluster a owl:Class ;
+  rdfs:label "PeopleCluster" ;
+  rdfs:comment "Mid-level people cluster grouping people groups." ;
+  rdfs:subClassOf cc:Resource .
+
+ccpg:partOfAffinityBloc a owl:ObjectProperty ;
+  rdfs:label "partOfAffinityBloc" ;
+  rdfs:domain ccpg:PeopleCluster ;
+  rdfs:range ccpg:AffinityBloc .
+
+ccpg:partOfPeopleCluster a owl:ObjectProperty ;
+  rdfs:label "partOfPeopleCluster" ;
+  rdfs:domain ccpg:PeopleGroup ;
+  rdfs:range ccpg:PeopleCluster .
 
 ccpg:EthnolinguisticGroup a owl:Class ;
   rdfs:label "EthnolinguisticGroup" ;
@@ -35,6 +60,10 @@ ccpg:Region a owl:Class ;
   rdfs:label "Region" ;
   rdfs:subClassOf ccpg:PeopleGroup .
 
+ccpg:Continent a owl:Class ;
+  rdfs:label "Continent" ;
+  rdfs:subClassOf ccpg:PeopleGroup .
+
 ccpg:City a owl:Class ;
   rdfs:label "City" ;
   rdfs:subClassOf ccpg:PeopleGroup .
@@ -44,6 +73,127 @@ ccpg:locatedIn a owl:ObjectProperty ;
   rdfs:comment "Location containment for people-group scopes (e.g., group located in region; diaspora located in nation/city)." ;
   rdfs:domain ccpg:PeopleGroup ;
   rdfs:range ccpg:PeopleGroup .
+
+###
+# PGIC: People group in country (presence/manifestation)
+###
+
+ccpg:PeopleGroupPresence a owl:Class ;
+  rdfs:label "PeopleGroupPresence" ;
+  rdfs:comment "A country-specific presence of a people group (PGIC). Modeled as a Manifestation so it can be time-indexed and classified (phase/progress/engagement/scripture access)." ;
+  rdfs:subClassOf cc:Manifestation .
+
+ccpg:presenceOfPeopleGroup a owl:ObjectProperty ;
+  rdfs:label "presenceOfPeopleGroup" ;
+  rdfs:domain ccpg:PeopleGroupPresence ;
+  rdfs:range ccpg:PeopleGroup ;
+  rdfs:subPropertyOf cc:manifestationOf .
+
+ccpg:presenceInCountry a owl:ObjectProperty ;
+  rdfs:label "presenceInCountry" ;
+  rdfs:domain ccpg:PeopleGroupPresence ;
+  rdfs:range ccpg:Nation .
+
+###
+# Language ontology
+###
+
+ccpg:LanguageFamily a owl:Class ;
+  rdfs:label "LanguageFamily" ;
+  rdfs:subClassOf cc:Resource .
+
+ccpg:Language a owl:Class ;
+  rdfs:label "Language" ;
+  rdfs:comment "Language (often sourced from SIL/Ethnologue). Stored as Resource so it can carry codes and metadata." ;
+  rdfs:subClassOf cc:Resource .
+
+ccpg:Dialect a owl:Class ;
+  rdfs:label "Dialect" ;
+  rdfs:subClassOf ccpg:Language .
+
+ccpg:partOfLanguageFamily a owl:ObjectProperty ;
+  rdfs:label "partOfLanguageFamily" ;
+  rdfs:domain ccpg:Language ;
+  rdfs:range ccpg:LanguageFamily .
+
+ccpg:speaksLanguage a owl:ObjectProperty ;
+  rdfs:label "speaksLanguage" ;
+  rdfs:domain ccpg:PeopleGroup ;
+  rdfs:range ccpg:Language .
+
+ccpg:iso639_3 a owl:DatatypeProperty ;
+  rdfs:label "iso639_3" ;
+  rdfs:domain ccpg:Language ;
+  rdfs:range xsd:string .
+
+###
+# Religion ontology (categories)
+###
+
+ccpg:primaryReligion a owl:ObjectProperty ;
+  rdfs:label "primaryReligion" ;
+  rdfs:comment "Primary/dominant religion category (SKOS concept). Prefer values in the ccpgclass:ReligionScheme C-Box." ;
+  rdfs:domain ccpg:PeopleGroup ;
+  rdfs:range skos:Concept .
+
+###
+# Gospel progress ontology (categories)
+###
+
+ccpg:hasGospelProgressLevel a owl:ObjectProperty ;
+  rdfs:label "hasGospelProgressLevel" ;
+  rdfs:comment "Gospel progress level category (SKOS concept). Prefer values in the ccpgclass:GospelProgressScheme C-Box." ;
+  rdfs:domain ccpg:PeopleGroupPresence ;
+  rdfs:range skos:Concept .
+
+ccpg:percentEvangelical a owl:DatatypeProperty ;
+  rdfs:label "percentEvangelical" ;
+  rdfs:domain ccpg:PeopleGroupPresence ;
+  rdfs:range xsd:decimal .
+
+ccpg:percentChristianAdherent a owl:DatatypeProperty ;
+  rdfs:label "percentChristianAdherent" ;
+  rdfs:domain ccpg:PeopleGroupPresence ;
+  rdfs:range xsd:decimal .
+
+###
+# Mission engagement ontology (categories)
+###
+
+ccpg:hasMissionEngagementState a owl:ObjectProperty ;
+  rdfs:label "hasMissionEngagementState" ;
+  rdfs:comment "Engagement state category (SKOS concept). Prefer values in the ccpgclass:MissionEngagementScheme C-Box." ;
+  rdfs:domain ccpg:PeopleGroupPresence ;
+  rdfs:range skos:Concept .
+
+###
+# Scripture access ontology (categories)
+###
+
+ccpg:hasScriptureStatus a owl:ObjectProperty ;
+  rdfs:label "hasScriptureStatus" ;
+  rdfs:comment "Scripture access category (SKOS concept). Prefer values in the ccpgclass:ScriptureStatusScheme C-Box." ;
+  rdfs:domain ccpg:PeopleGroupPresence ;
+  rdfs:range skos:Concept .
+
+###
+# Population ontology (presence-level)
+###
+
+ccpg:totalPopulation a owl:DatatypeProperty ;
+  rdfs:label "totalPopulation" ;
+  rdfs:domain ccpg:PeopleGroupPresence ;
+  rdfs:range xsd:integer .
+
+ccpg:urbanPopulation a owl:DatatypeProperty ;
+  rdfs:label "urbanPopulation" ;
+  rdfs:domain ccpg:PeopleGroupPresence ;
+  rdfs:range xsd:integer .
+
+ccpg:ruralPopulation a owl:DatatypeProperty ;
+  rdfs:label "ruralPopulation" ;
+  rdfs:domain ccpg:PeopleGroupPresence ;
+  rdfs:range xsd:integer .
 
 ccpg:populationEstimate a owl:DatatypeProperty ;
   rdfs:label "populationEstimate" ;

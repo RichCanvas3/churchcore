@@ -1,0 +1,59 @@
+@prefix cc: <https://ontology.churchcore.ai/cc#> .
+@prefix ccjourney: <https://ontology.churchcore.ai/cc/journey#> .
+@prefix ccpg: <https://ontology.churchcore.ai/cc/people-groups#> .
+@prefix ccpgclass: <https://ontology.churchcore.ai/cc/people-groups/class#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+<https://ontology.churchcore.ai/cc/people-groups/cbox/movement-stage-graph>
+  a owl:Ontology ;
+  rdfs:label "ChurchCore People Groups C-Box (movement stage graph)" ;
+  rdfs:comment "Optional canonical movement-stage graph aligned to movement-stage state categories." ;
+  owl:imports <https://ontology.churchcore.ai/cc/all> ;
+  owl:imports <https://ontology.churchcore.ai/cc/journey/tbox> ;
+  owl:imports <https://ontology.churchcore.ai/cc/cbox/journey> ;
+  owl:imports <https://ontology.churchcore.ai/cc/people-groups/cbox/movement-stages> .
+
+ccpg:journey_movement_stages_v1 a ccjourney:JourneyGraph ;
+  cc:name "Movement stages (v1)" .
+
+ccpg:movement_pre_node a ccjourney:JourneyNode ;
+  cc:name "Pre-movement" ;
+  ccjourney:representsState ccpgclass:movement_pre_movement .
+
+ccpg:movement_seed_node a ccjourney:JourneyNode ;
+  cc:name "Seed movement" ;
+  ccjourney:representsState ccpgclass:movement_seed_movement .
+
+ccpg:movement_emerging_node a ccjourney:JourneyNode ;
+  cc:name "Emerging movement" ;
+  ccjourney:representsState ccpgclass:movement_emerging_movement .
+
+ccpg:movement_established_node a ccjourney:JourneyNode ;
+  cc:name "Established movement" ;
+  ccjourney:representsState ccpgclass:movement_established_movement .
+
+ccpg:movement_sending_node a ccjourney:JourneyNode ;
+  cc:name "Global sending movement" ;
+  ccjourney:representsState ccpgclass:movement_global_sending_movement .
+
+ccpg:edge_pre_to_seed a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccpg:movement_pre_node ;
+  ccjourney:toNode ccpg:movement_seed_node ;
+  ccjourney:edgeKind "NEXT_STAGE" .
+
+ccpg:edge_seed_to_emerging a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccpg:movement_seed_node ;
+  ccjourney:toNode ccpg:movement_emerging_node ;
+  ccjourney:edgeKind "NEXT_STAGE" .
+
+ccpg:edge_emerging_to_established a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccpg:movement_emerging_node ;
+  ccjourney:toNode ccpg:movement_established_node ;
+  ccjourney:edgeKind "NEXT_STAGE" .
+
+ccpg:edge_established_to_sending a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccpg:movement_established_node ;
+  ccjourney:toNode ccpg:movement_sending_node ;
+  ccjourney:edgeKind "NEXT_STAGE" .
+

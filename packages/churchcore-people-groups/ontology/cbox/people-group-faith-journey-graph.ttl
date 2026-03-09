@@ -84,3 +84,239 @@ ccpg:edge_6_to_7 a ccjourney:JourneyEdge ;
   ccjourney:toNode ccpg:pg_phase_7_node ;
   ccjourney:edgeKind "NEXT_STAGE" .
 
+###
+# Finer-grained nodes (v1) to support “what’s next?” guidance
+###
+
+# Phase 0 — Unengaged
+ccpg:pg_unengaged_research a ccjourney:JourneyNode ; cc:name "Research and discovery" .
+ccpg:pg_unengaged_prayer_awareness a ccjourney:JourneyNode ; cc:name "Prayer and awareness" .
+ccpg:pg_unengaged_barrier_no_owner a ccjourney:JourneyNode ; cc:name "No responsible owner" .
+
+ccpg:edge_phase0_to_research a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccpg:pg_phase_0_node ;
+  ccjourney:toNode ccpg:pg_unengaged_research ;
+  ccjourney:edgeKind "RECOMMENDS" .
+
+ccpg:edge_phase0_to_prayer a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccpg:pg_phase_0_node ;
+  ccjourney:toNode ccpg:pg_unengaged_prayer_awareness ;
+  ccjourney:edgeKind "RECOMMENDS" .
+
+ccpg:edge_phase0_blocked_by_no_owner a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccpg:pg_phase_0_node ;
+  ccjourney:toNode ccpg:pg_unengaged_barrier_no_owner ;
+  ccjourney:edgeKind "BLOCKED_BY" .
+
+# Phase 1 — Adoption
+ccpg:pg_adoption_commitment a ccjourney:JourneyNode ; cc:name "Adoption commitment" .
+ccpg:pg_adoption_strategy a ccjourney:JourneyNode ; cc:name "Strategy formation" .
+ccpg:pg_adoption_team_formed a ccjourney:JourneyNode ; cc:name "Team formed and resourced" .
+ccpg:pg_adoption_entry_preparation a ccjourney:JourneyNode ; cc:name "Entry preparation" .
+
+ccpg:edge_phase1_to_commitment a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccpg:pg_phase_1_node ;
+  ccjourney:toNode ccpg:pg_adoption_commitment ;
+  ccjourney:edgeKind "UNLOCKS" .
+
+ccpg:edge_commitment_to_strategy a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccpg:pg_adoption_commitment ;
+  ccjourney:toNode ccpg:pg_adoption_strategy ;
+  ccjourney:edgeKind "REQUIRES" .
+
+ccpg:edge_strategy_to_team a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccpg:pg_adoption_strategy ;
+  ccjourney:toNode ccpg:pg_adoption_team_formed ;
+  ccjourney:edgeKind "REQUIRES" .
+
+ccpg:edge_team_to_entry_prep a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccpg:pg_adoption_team_formed ;
+  ccjourney:toNode ccpg:pg_adoption_entry_preparation ;
+  ccjourney:edgeKind "REQUIRES" .
+
+ccpg:edge_entry_prep_to_phase2 a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccpg:pg_adoption_entry_preparation ;
+  ccjourney:toNode ccpg:pg_phase_2_node ;
+  ccjourney:edgeKind "NEXT_STAGE" .
+
+# Phase 2 — Gospel presence
+ccpg:pg_presence_entry a ccjourney:JourneyNode ; cc:name "Sustained entry presence" .
+ccpg:pg_presence_relationships a ccjourney:JourneyNode ; cc:name "Relational trust and access" .
+ccpg:pg_presence_contextualization a ccjourney:JourneyNode ; cc:name "Contextualization" .
+ccpg:pg_presence_translation_started a ccjourney:JourneyNode ; cc:name "Translation started" .
+ccpg:pg_presence_evangelism_activity a ccjourney:JourneyNode ; cc:name "Evangelism activity" .
+ccpg:pg_presence_barrier_persecution a ccjourney:JourneyNode ; cc:name "Opposition/persecution" .
+
+ccpg:edge_phase2_to_entry a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccpg:pg_phase_2_node ;
+  ccjourney:toNode ccpg:pg_presence_entry ;
+  ccjourney:edgeKind "UNLOCKS" .
+
+ccpg:edge_entry_to_relationships a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccpg:pg_presence_entry ;
+  ccjourney:toNode ccpg:pg_presence_relationships ;
+  ccjourney:edgeKind "REQUIRES" .
+
+ccpg:edge_relationships_to_evangelism a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccpg:pg_presence_relationships ;
+  ccjourney:toNode ccpg:pg_presence_evangelism_activity ;
+  ccjourney:edgeKind "UNLOCKS" .
+
+ccpg:edge_relationships_to_contextualization a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccpg:pg_presence_relationships ;
+  ccjourney:toNode ccpg:pg_presence_contextualization ;
+  ccjourney:edgeKind "RECOMMENDS" .
+
+ccpg:edge_contextualization_to_translation a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccpg:pg_presence_contextualization ;
+  ccjourney:toNode ccpg:pg_presence_translation_started ;
+  ccjourney:edgeKind "RECOMMENDS" .
+
+ccpg:edge_phase2_blocked_by_persecution a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccpg:pg_phase_2_node ;
+  ccjourney:toNode ccpg:pg_presence_barrier_persecution ;
+  ccjourney:edgeKind "BLOCKED_BY" .
+
+ccpg:edge_evangelism_to_phase3 a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccpg:pg_presence_evangelism_activity ;
+  ccjourney:toNode ccpg:pg_phase_3_node ;
+  ccjourney:edgeKind "NEXT_STAGE" .
+
+# Phase 3 — Disciples emerging
+ccpg:pg_emerging_believers a ccjourney:JourneyNode ; cc:name "Believers emerging" .
+ccpg:pg_emerging_baptism a ccjourney:JourneyNode ; cc:name "Baptism and public identification" .
+ccpg:pg_emerging_discipleship a ccjourney:JourneyNode ; cc:name "Foundational discipleship" .
+ccpg:pg_emerging_gatherings a ccjourney:JourneyNode ; cc:name "Small gatherings" .
+ccpg:pg_emerging_barrier_syncretism a ccjourney:JourneyNode ; cc:name "Syncretism risk" .
+
+ccpg:edge_phase3_to_believers a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccpg:pg_phase_3_node ;
+  ccjourney:toNode ccpg:pg_emerging_believers ;
+  ccjourney:edgeKind "UNLOCKS" .
+
+ccpg:edge_believers_to_baptism a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccpg:pg_emerging_believers ;
+  ccjourney:toNode ccpg:pg_emerging_baptism ;
+  ccjourney:edgeKind "RECOMMENDS" .
+
+ccpg:edge_believers_to_discipleship a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccpg:pg_emerging_believers ;
+  ccjourney:toNode ccpg:pg_emerging_discipleship ;
+  ccjourney:edgeKind "REQUIRES" .
+
+ccpg:edge_discipleship_to_gatherings a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccpg:pg_emerging_discipleship ;
+  ccjourney:toNode ccpg:pg_emerging_gatherings ;
+  ccjourney:edgeKind "UNLOCKS" .
+
+ccpg:edge_phase3_blocked_by_syncretism a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccpg:pg_phase_3_node ;
+  ccjourney:toNode ccpg:pg_emerging_barrier_syncretism ;
+  ccjourney:edgeKind "BLOCKED_BY" .
+
+ccpg:edge_gatherings_to_phase4 a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccpg:pg_emerging_gatherings ;
+  ccjourney:toNode ccpg:pg_phase_4_node ;
+  ccjourney:edgeKind "NEXT_STAGE" .
+
+# Phase 4 — Local church
+ccpg:pg_local_church_indigenous_leaders a ccjourney:JourneyNode ; cc:name "Indigenous leaders" .
+ccpg:pg_local_church_regular_worship a ccjourney:JourneyNode ; cc:name "Regular worship and teaching" .
+ccpg:pg_local_church_scripture_access a ccjourney:JourneyNode ; cc:name "Scripture access" .
+ccpg:pg_local_church_barrier_dependency a ccjourney:JourneyNode ; cc:name "External dependency" .
+
+ccpg:edge_phase4_to_indigenous_leaders a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccpg:pg_phase_4_node ;
+  ccjourney:toNode ccpg:pg_local_church_indigenous_leaders ;
+  ccjourney:edgeKind "REQUIRES" .
+
+ccpg:edge_indigenous_leaders_to_regular_worship a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccpg:pg_local_church_indigenous_leaders ;
+  ccjourney:toNode ccpg:pg_local_church_regular_worship ;
+  ccjourney:edgeKind "UNLOCKS" .
+
+ccpg:edge_regular_worship_to_scripture_access a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccpg:pg_local_church_regular_worship ;
+  ccjourney:toNode ccpg:pg_local_church_scripture_access ;
+  ccjourney:edgeKind "SUPPORTED_BY" .
+
+ccpg:edge_phase4_blocked_by_dependency a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccpg:pg_phase_4_node ;
+  ccjourney:toNode ccpg:pg_local_church_barrier_dependency ;
+  ccjourney:edgeKind "BLOCKED_BY" .
+
+ccpg:edge_regular_worship_to_phase5 a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccpg:pg_local_church_regular_worship ;
+  ccjourney:toNode ccpg:pg_phase_5_node ;
+  ccjourney:edgeKind "NEXT_STAGE" .
+
+# Phase 5 — Reproducing churches
+ccpg:pg_reproducing_second_generation a ccjourney:JourneyNode ; cc:name "Second-generation churches" .
+ccpg:pg_reproducing_indigenous_missionaries a ccjourney:JourneyNode ; cc:name "Indigenous missionaries emerging" .
+ccpg:pg_reproducing_training_pipeline a ccjourney:JourneyNode ; cc:name "Leadership training pipeline" .
+
+ccpg:edge_phase5_to_second_generation a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccpg:pg_phase_5_node ;
+  ccjourney:toNode ccpg:pg_reproducing_second_generation ;
+  ccjourney:edgeKind "UNLOCKS" .
+
+ccpg:edge_second_generation_to_training_pipeline a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccpg:pg_reproducing_second_generation ;
+  ccjourney:toNode ccpg:pg_reproducing_training_pipeline ;
+  ccjourney:edgeKind "RECOMMENDS" .
+
+ccpg:edge_training_pipeline_to_indigenous_missionaries a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccpg:pg_reproducing_training_pipeline ;
+  ccjourney:toNode ccpg:pg_reproducing_indigenous_missionaries ;
+  ccjourney:edgeKind "UNLOCKS" .
+
+ccpg:edge_indigenous_missionaries_to_phase6 a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccpg:pg_reproducing_indigenous_missionaries ;
+  ccjourney:toNode ccpg:pg_phase_6_node ;
+  ccjourney:edgeKind "NEXT_STAGE" .
+
+# Phase 6 — Multiplying movement
+ccpg:pg_multiplying_multigenerational a ccjourney:JourneyNode ; cc:name "Multi-generation reproduction" .
+ccpg:pg_multiplying_networks a ccjourney:JourneyNode ; cc:name "Network multiplication" .
+ccpg:pg_multiplying_theology_health a ccjourney:JourneyNode ; cc:name "Durable theology and practice" .
+
+ccpg:edge_phase6_to_multigenerational a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccpg:pg_phase_6_node ;
+  ccjourney:toNode ccpg:pg_multiplying_multigenerational ;
+  ccjourney:edgeKind "UNLOCKS" .
+
+ccpg:edge_multigenerational_to_networks a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccpg:pg_multiplying_multigenerational ;
+  ccjourney:toNode ccpg:pg_multiplying_networks ;
+  ccjourney:edgeKind "UNLOCKS" .
+
+ccpg:edge_networks_to_theology_health a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccpg:pg_multiplying_networks ;
+  ccjourney:toNode ccpg:pg_multiplying_theology_health ;
+  ccjourney:edgeKind "RECOMMENDS" .
+
+ccpg:edge_theology_health_to_phase7 a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccpg:pg_multiplying_theology_health ;
+  ccjourney:toNode ccpg:pg_phase_7_node ;
+  ccjourney:edgeKind "NEXT_STAGE" .
+
+# Phase 7 — Cross-cultural sending
+ccpg:pg_sending_cross_cultural_workers a ccjourney:JourneyNode ; cc:name "Cross-cultural workers sent" .
+ccpg:pg_sending_partnerships a ccjourney:JourneyNode ; cc:name "Cross-cultural partnerships" .
+ccpg:pg_sending_training_centers a ccjourney:JourneyNode ; cc:name "Training and sending centers" .
+
+ccpg:edge_phase7_to_workers_sent a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccpg:pg_phase_7_node ;
+  ccjourney:toNode ccpg:pg_sending_cross_cultural_workers ;
+  ccjourney:edgeKind "UNLOCKS" .
+
+ccpg:edge_workers_sent_to_partnerships a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccpg:pg_sending_cross_cultural_workers ;
+  ccjourney:toNode ccpg:pg_sending_partnerships ;
+  ccjourney:edgeKind "RECOMMENDS" .
+
+ccpg:edge_partnerships_to_training_centers a ccjourney:JourneyEdge ;
+  ccjourney:fromNode ccpg:pg_sending_partnerships ;
+  ccjourney:toNode ccpg:pg_sending_training_centers ;
+  ccjourney:edgeKind "RECOMMENDS" .
+
