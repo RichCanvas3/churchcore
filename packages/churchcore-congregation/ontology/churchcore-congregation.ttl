@@ -1,0 +1,10 @@
+@prefix cccong: <https://ontology.churchcore.ai/cc/congregation#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+<https://ontology.churchcore.ai/cc/congregation>
+  a owl:Ontology ;
+  rdfs:label "ChurchCore-Congregation Ontology (Local-C)" ;
+  rdfs:comment "Local church operations: congregations, campuses, services, ministries, small groups, volunteer teams, facilities, rooms, check-in, etc." ;
+  owl:imports <https://ontology.churchcore.ai/cc/congregation/all> .
+

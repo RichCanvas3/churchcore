@@ -1,0 +1,20 @@
+@prefix ccglobal: <https://ontology.churchcore.ai/cc/global#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+<https://ontology.churchcore.ai/cc/global/cbox/denominations>
+  a owl:Ontology ;
+  rdfs:label "ChurchCore-Global C-Box (denominations)" ;
+  rdfs:comment "Category instances for denomination families and major denominations (starter set)." ;
+  owl:imports <https://ontology.churchcore.ai/cc/global/tbox/ecosystem> .
+
+# Category instances (C-Box)
+ccglobal:Denom_Baptist a ccglobal:Denomination ; rdfs:label "Baptist" .
+ccglobal:Denom_Presbyterian a ccglobal:Denomination ; rdfs:label "Presbyterian / Reformed" .
+ccglobal:Denom_Methodist a ccglobal:Denomination ; rdfs:label "Methodist" .
+ccglobal:Denom_Lutheran a ccglobal:Denomination ; rdfs:label "Lutheran" .
+ccglobal:Denom_Anglican a ccglobal:Denomination ; rdfs:label "Anglican" .
+ccglobal:Denom_Catholic a ccglobal:Denomination ; rdfs:label "Roman Catholic" .
+ccglobal:Denom_EasternOrthodox a ccglobal:Denomination ; rdfs:label "Eastern Orthodox" .
+ccglobal:Denom_Nondenominational a ccglobal:Denomination ; rdfs:label "Non-denominational" .
+

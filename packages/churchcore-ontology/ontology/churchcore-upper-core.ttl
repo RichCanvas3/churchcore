@@ -1,74 +1,10 @@
 @prefix cc: <https://ontology.churchcore.ai/cc#> .
-@prefix at: <https://agentictrust.io/ontology/core#> .
-@prefix ep-plan: <https://w3id.org/ep-plan#> .
-@prefix prov: <http://www.w3.org/ns/prov#> .
-@prefix p-plan: <http://purl.org/net/p-plan#> .
 @prefix owl: <http://www.w3.org/2002/07/owl#> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
-@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
 <https://ontology.churchcore.ai/cc>
   a owl:Ontology ;
   rdfs:label "ChurchCore Upper Ontology (core)" ;
-  rdfs:comment "New ChurchCore upper ontology, based on RichCanvas ChurchCore Ontology principles (Prov-O + EP-PLAN patterns; clear separation of specification vs execution)." ;
-  owl:imports <https://agentictrust.io/ontology/core> ;
-  owl:imports <https://agentictrust.io/ontology/core/trust> ;
-  owl:imports <https://w3id.org/ep-plan> ;
-  owl:imports <http://www.w3.org/ns/prov-o-20130430> ;
-  owl:imports <http://purl.org/net/p-plan> .
-
-### Core agent types
-
-cc:Person a owl:Class ;
-  rdfs:label "Person" ;
-  rdfs:subClassOf prov:Person .
-
-cc:Organization a owl:Class ;
-  rdfs:label "Organization" ;
-  rdfs:subClassOf prov:Organization, at:Organization .
-
-cc:Church a owl:Class ;
-  rdfs:label "LocalChurch" ;
-  rdfs:subClassOf cc:Organization .
-
-cc:Campus a owl:Class ;
-  rdfs:label "Campus" ;
-  rdfs:subClassOf cc:Organization .
-
-### Core entity types
-
-cc:Resource a owl:Class ;
-  rdfs:label "Resource" ;
-  rdfs:subClassOf prov:Entity .
-
-### Core activity types
-
-cc:Activity a owl:Class ;
-  rdfs:label "Activity" ;
-  rdfs:subClassOf prov:Activity, ep-plan:Activity .
-
-### “Way things are done” vs “Doing of things”
-### (RichCanvas principle: separate specification/template from operational execution)
-
-cc:ActivityRole a owl:Class ;
-  rdfs:label "ActivityRole" ;
-  rdfs:comment "Specification of a type of activity (the way things are done), distinct from an executed Activity occurrence." ;
-  rdfs:subClassOf p-plan:Step, ep-plan:Step .
-
-cc:correspondsToRole a owl:ObjectProperty ;
-  rdfs:label "correspondsToRole" ;
-  rdfs:domain cc:Activity ;
-  rdfs:range cc:ActivityRole ;
-  rdfs:comment "Links an executed Activity to its ActivityRole (specification)." ;
-  rdfs:subPropertyOf ep-plan:correspondsToStep .
-
-### Common descriptive properties
-
-cc:name a owl:DatatypeProperty ;
-  rdfs:label "name" ;
-  rdfs:range xsd:string .
-
-cc:description a owl:DatatypeProperty ;
-  rdfs:label "description" ;
-  rdfs:range xsd:string .
+  rdfs:comment "ChurchCore upper ontology (faith-neutral). Wrapper that imports T-Box/C-Box artifacts." ;
+  owl:imports <https://ontology.churchcore.ai/cc/tbox/core> .
 

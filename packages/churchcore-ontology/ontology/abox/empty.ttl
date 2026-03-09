@@ -1,0 +1,8 @@
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+<https://ontology.churchcore.ai/cc/abox>
+  a owl:Ontology ;
+  rdfs:label "ChurchCore A-Box (placeholder)" ;
+  rdfs:comment "A-Box: real-world instance assertions are typically stored in per-church named graphs, not in this repo." .
+

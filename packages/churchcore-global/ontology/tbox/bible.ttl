@@ -1,0 +1,27 @@
+@prefix cc: <https://ontology.churchcore.ai/cc#> .
+@prefix ccbible: <https://ontology.churchcore.ai/cc/global/bible#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<https://ontology.churchcore.ai/cc/global/tbox/bible>
+  a owl:Ontology ;
+  rdfs:label "ChurchCore-Global T-Box (Bible references)" ;
+  rdfs:comment "Schema for Bible reference structures (no translation text). This is Big-C shared Christian reference structure." ;
+  owl:imports <https://ontology.churchcore.ai/cc> .
+
+ccbible:BibleReferenceSet a owl:Class ;
+  rdfs:label "BibleReferenceSet" ;
+  rdfs:subClassOf cc:Resource .
+
+ccbible:reference a owl:DatatypeProperty ;
+  rdfs:label "reference" ;
+  rdfs:comment "A human-readable Bible reference like 'John 3:16-18' (no translation text)." ;
+  rdfs:domain ccbible:BibleReferenceSet ;
+  rdfs:range xsd:string .
+
+ccbible:topic a owl:DatatypeProperty ;
+  rdfs:label "topic" ;
+  rdfs:domain ccbible:BibleReferenceSet ;
+  rdfs:range xsd:string .
+

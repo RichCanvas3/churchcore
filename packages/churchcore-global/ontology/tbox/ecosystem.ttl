@@ -1,0 +1,57 @@
+@prefix cc: <https://ontology.churchcore.ai/cc#> .
+@prefix ccglobal: <https://ontology.churchcore.ai/cc/global#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<https://ontology.churchcore.ai/cc/global/tbox/ecosystem>
+  a owl:Ontology ;
+  rdfs:label "ChurchCore-Global T-Box (ecosystem)" ;
+  rdfs:comment "Schema for Big-C ecosystem entities: denominations, mission agencies, initiatives, movements, people groups." ;
+  owl:imports <https://ontology.churchcore.ai/cc> .
+
+ccglobal:Denomination a owl:Class ;
+  rdfs:label "Denomination" ;
+  rdfs:comment "A supra-church denominational body (or denomination family) spanning many congregations." ;
+  rdfs:subClassOf cc:Organization .
+
+ccglobal:MissionAgency a owl:Class ;
+  rdfs:label "MissionAgency" ;
+  rdfs:comment "A Big-C mission agency (translation org, missions sending org, etc.)." ;
+  rdfs:subClassOf cc:Organization .
+
+ccglobal:GlobalInitiative a owl:Class ;
+  rdfs:label "GlobalInitiative" ;
+  rdfs:comment "A Big-C initiative or movement coordinating work across congregations/regions." ;
+  rdfs:subClassOf cc:Organization .
+
+ccglobal:PeopleGroup a owl:Class ;
+  rdfs:label "PeopleGroup" ;
+  rdfs:comment "A people group used in global missions/research datasets (macro-scale). Modeled as a Resource entity." ;
+  rdfs:subClassOf cc:Resource .
+
+ccglobal:Movement a owl:Class ;
+  rdfs:label "Movement" ;
+  rdfs:subClassOf cc:Organization .
+
+ccglobal:Network a owl:Class ;
+  rdfs:label "Network" ;
+  rdfs:subClassOf cc:Organization .
+
+ccglobal:participatesIn a owl:ObjectProperty ;
+  rdfs:label "participatesIn" ;
+  rdfs:comment "A congregation participates in a Big-C initiative/movement/network." ;
+  rdfs:domain cc:Organization ;
+  rdfs:range ccglobal:GlobalInitiative .
+
+ccglobal:supportsOrganization a owl:ObjectProperty ;
+  rdfs:label "supportsOrganization" ;
+  rdfs:comment "A congregation supports a Big-C organization (e.g., mission agency) financially or through partnership." ;
+  rdfs:domain cc:Organization ;
+  rdfs:range cc:Organization .
+
+ccglobal:praysForPeopleGroup a owl:ObjectProperty ;
+  rdfs:label "praysForPeopleGroup" ;
+  rdfs:domain cc:Organization ;
+  rdfs:range ccglobal:PeopleGroup .
+

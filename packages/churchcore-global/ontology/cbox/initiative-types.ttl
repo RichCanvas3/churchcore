@@ -1,0 +1,21 @@
+@prefix ccgclass: <https://ontology.churchcore.ai/cc/global/class#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+
+<https://ontology.churchcore.ai/cc/global/cbox/initiative-types>
+  a owl:Ontology ;
+  rdfs:label "ChurchCore-Global C-Box (initiative types)" ;
+  rdfs:comment "Category instances for global initiatives/movements (starter set)." ;
+  owl:imports <http://www.w3.org/2004/02/skos/core> .
+
+ccgclass:GlobalInitiativeTypeScheme a skos:ConceptScheme ;
+  skos:prefLabel "Global initiative types" .
+
+ccgclass:init_translation a skos:Concept ; skos:inScheme ccgclass:GlobalInitiativeTypeScheme ; skos:notation "translation" ; skos:prefLabel "Bible translation" .
+ccgclass:init_church_planting a skos:Concept ; skos:inScheme ccgclass:GlobalInitiativeTypeScheme ; skos:notation "church_planting" ; skos:prefLabel "Church planting" .
+ccgclass:init_relief_development a skos:Concept ; skos:inScheme ccgclass:GlobalInitiativeTypeScheme ; skos:notation "relief_development" ; skos:prefLabel "Relief & development" .
+ccgclass:init_theological_education a skos:Concept ; skos:inScheme ccgclass:GlobalInitiativeTypeScheme ; skos:notation "theological_education" ; skos:prefLabel "Theological education" .
+ccgclass:init_evangelism a skos:Concept ; skos:inScheme ccgclass:GlobalInitiativeTypeScheme ; skos:notation "evangelism" ; skos:prefLabel "Evangelism" .
+ccgclass:init_disciple_making a skos:Concept ; skos:inScheme ccgclass:GlobalInitiativeTypeScheme ; skos:notation "disciple_making" ; skos:prefLabel "Disciple-making movement" .
+

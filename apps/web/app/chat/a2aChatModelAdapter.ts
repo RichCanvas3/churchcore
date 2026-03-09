@@ -50,13 +50,13 @@ async function* readSseEvents(res: Response): AsyncGenerator<SseEvent> {
 export function makeA2AChatModelAdapter(args: {
   session: Session;
   threadId: string;
-  provider?: "langgraph" | "gloo";
-  glooMode?: "general" | "grounded" | "auto";
+  provider?: "langgraph" | "ai_gateway";
+  aiGatewayMode?: "general" | "grounded" | "auto";
   onFinalEnvelope?: (env: OutputEnvelope | null) => void;
 }): ChatModelAdapter {
   const { session, threadId, onFinalEnvelope } = args;
   const provider = args.provider ?? "langgraph";
-  const glooMode = args.glooMode ?? "grounded";
+  const aiGatewayMode = args.aiGatewayMode ?? "grounded";
 
   function appendUiToolSnippets(text: string, tools: Array<{ toolId: string; title?: string }>) {
     const ids = tools.map((t) => String(t.toolId || "").trim()).filter(Boolean);
@@ -71,7 +71,7 @@ export function makeA2AChatModelAdapter(args: {
       const userText = extractTextFromMessage(last);
       if (!userText.trim()) return;
 
-      const endpoint = provider === "gloo" ? "/api/a2a/chat/gloo/stream" : "/api/a2a/chat/stream";
+      const endpoint = provider === "ai_gateway" ? "/api/a2a/chat/ai_gateway/stream" : "/api/a2a/chat/stream";
       const res = await fetch(endpoint, {
         method: "POST",
         headers: { "content-type": "application/json", accept: "text/event-stream" },
@@ -89,7 +89,7 @@ export function makeA2AChatModelAdapter(args: {
           message: userText,
           skill: "chat",
           args: null,
-          ...(provider === "gloo" ? { mode: glooMode } : {}),
+          ...(provider === "ai_gateway" ? { mode: aiGatewayMode } : {}),
         }),
       });
 

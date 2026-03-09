@@ -16,26 +16,28 @@ from .mcp_tools import load_mcp_tools_from_env
 from .models import Input, NextAction, OutputEnvelope, Session
 
 
-_gloo_token_cache: dict[str, Any] = {"token": None, "expires_at": 0.0}
+_ai_gateway_token_cache: dict[str, Any] = {"token": None, "expires_at": 0.0}
 
 
-def _gloo_access_token() -> str:
+def _ai_gateway_access_token() -> str:
     """
-    OAuth2 client-credentials token for Gloo Completions V2.
+    OAuth2 client-credentials token for the external AI gateway.
     Cached in-process; refreshes ~60s early.
     """
     now = time.time()
-    token = _gloo_token_cache.get("token")
-    expires_at = float(_gloo_token_cache.get("expires_at") or 0.0)
+    token = _ai_gateway_token_cache.get("token")
+    expires_at = float(_ai_gateway_token_cache.get("expires_at") or 0.0)
     if isinstance(token, str) and token and now < (expires_at - 60.0):
         return token
 
-    client_id = (os.environ.get("GLOO_CLIENT_ID") or "").strip()
-    client_secret = (os.environ.get("GLOO_CLIENT_SECRET") or "").strip()
+    client_id = (os.environ.get("AI_GATEWAY_CLIENT_ID") or "").strip()
+    client_secret = (os.environ.get("AI_GATEWAY_CLIENT_SECRET") or "").strip()
     if not client_id or not client_secret:
-        raise RuntimeError("Missing GLOO_CLIENT_ID / GLOO_CLIENT_SECRET")
+        raise RuntimeError("Missing AI_GATEWAY_CLIENT_ID / AI_GATEWAY_CLIENT_SECRET")
 
-    token_url = (os.environ.get("GLOO_TOKEN_URL") or "https://platform.ai.gloo.com/oauth2/token").strip()
+    token_url = (os.environ.get("AI_GATEWAY_TOKEN_URL") or "").strip()
+    if not token_url:
+        raise RuntimeError("Missing AI_GATEWAY_TOKEN_URL")
     form = urllib.parse.urlencode({"grant_type": "client_credentials", "scope": "api/access"}).encode("utf-8")
     basic = base64.b64encode(f"{client_id}:{client_secret}".encode("utf-8")).decode("ascii")
     req = urllib.request.Request(
@@ -55,23 +57,23 @@ def _gloo_access_token() -> str:
 
     access_token = str(data.get("access_token") or "").strip()
     if not access_token:
-        raise RuntimeError("Gloo token exchange failed (missing access_token)")
+        raise RuntimeError("AI gateway token exchange failed (missing access_token)")
 
     # Spec says tokens expire in ~1h. Respect expires_in if provided.
     expires_in = data.get("expires_in")
     ttl = float(expires_in) if isinstance(expires_in, (int, float)) else 3600.0
-    _gloo_token_cache["token"] = access_token
-    _gloo_token_cache["expires_at"] = now + max(60.0, ttl)
+    _ai_gateway_token_cache["token"] = access_token
+    _ai_gateway_token_cache["expires_at"] = now + max(60.0, ttl)
     return access_token
 
 
 def _llm_provider() -> str:
     raw = (os.environ.get("LLM_PROVIDER") or "").strip().lower()
-    if raw in {"openai", "gloo"}:
+    if raw in {"openai", "ai_gateway"}:
         return raw
-    # If Gloo is configured, prefer it by default.
-    if (os.environ.get("GLOO_CLIENT_ID") or "").strip() and (os.environ.get("GLOO_CLIENT_SECRET") or "").strip():
-        return "gloo"
+    # If the AI gateway is configured, prefer it by default.
+    if (os.environ.get("AI_GATEWAY_CLIENT_ID") or "").strip() and (os.environ.get("AI_GATEWAY_CLIENT_SECRET") or "").strip():
+        return "ai_gateway"
     return "openai"
 
 
@@ -80,17 +82,20 @@ def get_chat_model(*, temperature: Optional[float] = None) -> ChatOpenAI:
     Single switch-point for model provider in LangSmith-deployed langserver.
 
     Env:
-      - LLM_PROVIDER: "gloo" | "openai" (if unset: prefer gloo when configured)
+      - LLM_PROVIDER: "ai_gateway" | "openai" (if unset: prefer ai_gateway when configured)
       - OPENAI_MODEL (default "gpt-5.2")
-      - GLOO_MODEL (default "gloo-openai-gpt-5-mini")
-      - GLOO_BASE_URL (default "https://platform.ai.gloo.com/ai/v2")
-      - GLOO_CLIENT_ID / GLOO_CLIENT_SECRET (required for gloo)
+      - AI_GATEWAY_MODEL (required when ai_gateway)
+      - AI_GATEWAY_BASE_URL (required when ai_gateway)
+      - AI_GATEWAY_TOKEN_URL (required when ai_gateway)
+      - AI_GATEWAY_CLIENT_ID / AI_GATEWAY_CLIENT_SECRET (required when ai_gateway)
     """
     provider = _llm_provider()
-    if provider == "gloo":
-        base_url = (os.environ.get("GLOO_BASE_URL") or "https://platform.ai.gloo.com/ai/v2").strip()
-        model = (os.environ.get("GLOO_MODEL") or "gloo-openai-gpt-5-mini").strip()
-        token = _gloo_access_token()
+    if provider == "ai_gateway":
+        base_url = (os.environ.get("AI_GATEWAY_BASE_URL") or "").strip()
+        model = (os.environ.get("AI_GATEWAY_MODEL") or "").strip()
+        if not base_url or not model:
+            raise RuntimeError("Missing AI_GATEWAY_BASE_URL / AI_GATEWAY_MODEL")
+        token = _ai_gateway_access_token()
         kwargs: dict[str, Any] = {"model": model, "api_key": token, "base_url": base_url}
         if isinstance(temperature, (int, float)):
             kwargs["temperature"] = float(temperature)
@@ -1196,7 +1201,7 @@ async def handle_seeker_skill(
 
     if skill == "weekly_podcast.analyze":
         provider = _llm_provider()
-        model_name = os.environ.get("GLOO_MODEL", "gloo-openai-gpt-5-mini") if provider == "gloo" else os.environ.get("OPENAI_MODEL", "gpt-5.2")
+        model_name = os.environ.get("AI_GATEWAY_MODEL", "ai-gateway") if provider == "ai_gateway" else os.environ.get("OPENAI_MODEL", "gpt-5.2")
         model = get_chat_model()
         src = str(args.get("source_text") or "").strip()
         if len(src) < 20:
@@ -1248,7 +1253,7 @@ async def handle_seeker_skill(
 
     if skill == "sermon.compare":
         provider = _llm_provider()
-        model_name = os.environ.get("GLOO_MODEL", "gloo-openai-gpt-5-mini") if provider == "gloo" else os.environ.get("OPENAI_MODEL", "gpt-5.2")
+        model_name = os.environ.get("AI_GATEWAY_MODEL", "ai-gateway") if provider == "ai_gateway" else os.environ.get("OPENAI_MODEL", "gpt-5.2")
         model = get_chat_model()
         sermons = args.get("sermons")
         sermons_list = sermons if isinstance(sermons, list) else []

@@ -1,0 +1,95 @@
+@prefix cc: <https://ontology.churchcore.ai/cc#> .
+@prefix ccglobal: <https://ontology.churchcore.ai/cc/global#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<https://ontology.churchcore.ai/cc/global/tbox/measurement>
+  a owl:Ontology ;
+  rdfs:label "ChurchCore-Global T-Box (measurement + benchmarking)" ;
+  rdfs:comment "Schema for ecosystem measurement, benchmarking, and comparative groupings (circles/cohorts). This is intentionally product-neutral." ;
+  owl:imports <https://ontology.churchcore.ai/cc> .
+
+### Comparative groupings (communities of organizations)
+
+ccglobal:Circle a owl:Class ;
+  rdfs:label "Circle" ;
+  rdfs:comment "A community of organizations used for collaboration and/or benchmarking comparison." ;
+  rdfs:subClassOf cc:Organization .
+
+ccglobal:memberOrganization a owl:ObjectProperty ;
+  rdfs:label "memberOrganization" ;
+  rdfs:comment "An organization that is a member of a circle." ;
+  rdfs:domain ccglobal:Circle ;
+  rdfs:range cc:Organization .
+
+ccglobal:BenchmarkCohort a owl:Class ;
+  rdfs:label "BenchmarkCohort" ;
+  rdfs:comment "A comparison cohort definition (e.g., geography- or type-based) used to compute benchmarks." ;
+  rdfs:subClassOf cc:Resource .
+
+ccglobal:inCohort a owl:ObjectProperty ;
+  rdfs:label "inCohort" ;
+  rdfs:domain cc:Organization ;
+  rdfs:range ccglobal:BenchmarkCohort .
+
+### Assessments + results
+
+ccglobal:AssessmentInstrument a owl:Class ;
+  rdfs:label "AssessmentInstrument" ;
+  rdfs:comment "A defined instrument/questionnaire used to measure one or more dimensions." ;
+  rdfs:subClassOf cc:Resource .
+
+ccglobal:AssessmentRun a owl:Class ;
+  rdfs:label "AssessmentRun" ;
+  rdfs:comment "A run/execution of an assessment instrument for an organization or population." ;
+  rdfs:subClassOf cc:Activity .
+
+ccglobal:Metric a owl:Class ;
+  rdfs:label "Metric" ;
+  rdfs:comment "A measured variable or scored metric (may be derived from an assessment)." ;
+  rdfs:subClassOf cc:Resource .
+
+ccglobal:Dimension a owl:Class ;
+  rdfs:label "Dimension" ;
+  rdfs:comment "A conceptual dimension used to group metrics and interpret results (e.g., flourishing or church health dimensions)." ;
+  rdfs:subClassOf cc:Resource .
+
+ccglobal:measuresDimension a owl:ObjectProperty ;
+  rdfs:label "measuresDimension" ;
+  rdfs:domain ccglobal:Metric ;
+  rdfs:range ccglobal:Dimension .
+
+ccglobal:producedMetric a owl:ObjectProperty ;
+  rdfs:label "producedMetric" ;
+  rdfs:domain ccglobal:AssessmentRun ;
+  rdfs:range ccglobal:Metric .
+
+ccglobal:scoreValue a owl:DatatypeProperty ;
+  rdfs:label "scoreValue" ;
+  rdfs:comment "A normalized score (implementation-specific; often 0..1 or 0..100)." ;
+  rdfs:domain ccglobal:Metric ;
+  rdfs:range xsd:decimal .
+
+ccglobal:measuredAt a owl:DatatypeProperty ;
+  rdfs:label "measuredAt" ;
+  rdfs:domain ccglobal:Metric ;
+  rdfs:range xsd:dateTime .
+
+### Reporting artifacts
+
+ccglobal:Dashboard a owl:Class ;
+  rdfs:label "Dashboard" ;
+  rdfs:comment "A presentation resource that groups metrics for a specific audience." ;
+  rdfs:subClassOf cc:Resource .
+
+ccglobal:Report a owl:Class ;
+  rdfs:label "Report" ;
+  rdfs:comment "A report resource derived from one or more assessment runs and/or metrics." ;
+  rdfs:subClassOf cc:Resource .
+
+ccglobal:reportsOn a owl:ObjectProperty ;
+  rdfs:label "reportsOn" ;
+  rdfs:domain ccglobal:Report ;
+  rdfs:range ccglobal:AssessmentRun .
+

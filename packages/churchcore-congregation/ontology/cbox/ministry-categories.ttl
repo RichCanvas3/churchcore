@@ -1,0 +1,24 @@
+@prefix cccongclass: <https://ontology.churchcore.ai/cc/congregation/class#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+
+<https://ontology.churchcore.ai/cc/congregation/cbox/ministry-categories>
+  a owl:Ontology ;
+  rdfs:label "ChurchCore-Congregation C-Box (ministry categories)" ;
+  rdfs:comment "Ministry category scheme for congregation-level ministry areas (starter set)." ;
+  owl:imports <http://www.w3.org/2004/02/skos/core> .
+
+cccongclass:MinistryCategoryScheme a skos:ConceptScheme ;
+  skos:prefLabel "Ministry categories" .
+
+cccongclass:ministry_kids a skos:Concept ; skos:inScheme cccongclass:MinistryCategoryScheme ; skos:notation "kids" ; skos:prefLabel "Kids ministry" .
+cccongclass:ministry_students a skos:Concept ; skos:inScheme cccongclass:MinistryCategoryScheme ; skos:notation "students" ; skos:prefLabel "Student ministry" .
+cccongclass:ministry_young_adults a skos:Concept ; skos:inScheme cccongclass:MinistryCategoryScheme ; skos:notation "young_adults" ; skos:prefLabel "Young adults" .
+cccongclass:ministry_worship a skos:Concept ; skos:inScheme cccongclass:MinistryCategoryScheme ; skos:notation "worship" ; skos:prefLabel "Worship ministry" .
+cccongclass:ministry_groups a skos:Concept ; skos:inScheme cccongclass:MinistryCategoryScheme ; skos:notation "groups" ; skos:prefLabel "Groups / community" .
+cccongclass:ministry_care a skos:Concept ; skos:inScheme cccongclass:MinistryCategoryScheme ; skos:notation "care" ; skos:prefLabel "Care / pastoral support" .
+cccongclass:ministry_outreach a skos:Concept ; skos:inScheme cccongclass:MinistryCategoryScheme ; skos:notation "outreach" ; skos:prefLabel "Outreach" .
+cccongclass:ministry_prayer a skos:Concept ; skos:inScheme cccongclass:MinistryCategoryScheme ; skos:notation "prayer" ; skos:prefLabel "Prayer" .
+cccongclass:ministry_admin_ops a skos:Concept ; skos:inScheme cccongclass:MinistryCategoryScheme ; skos:notation "admin_ops" ; skos:prefLabel "Administration / operations" .
+

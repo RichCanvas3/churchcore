@@ -1,0 +1,22 @@
+@prefix ccgclass: <https://ontology.churchcore.ai/cc/global/class#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+
+<https://ontology.churchcore.ai/cc/global/cbox/flourishing-dimensions>
+  a owl:Ontology ;
+  rdfs:label "ChurchCore-Global C-Box (flourishing dimensions)" ;
+  rdfs:comment "Category scheme for high-level flourishing dimensions used in ecosystem measurement and benchmarking." ;
+  owl:imports <http://www.w3.org/2004/02/skos/core> .
+
+ccgclass:HumanFlourishingDimensionScheme a skos:ConceptScheme ;
+  skos:prefLabel "Human flourishing dimensions" .
+
+ccgclass:flourishing_spiritual a skos:Concept ; skos:inScheme ccgclass:HumanFlourishingDimensionScheme ; skos:notation "spiritual" ; skos:prefLabel "Spiritual well-being" .
+ccgclass:flourishing_relationships a skos:Concept ; skos:inScheme ccgclass:HumanFlourishingDimensionScheme ; skos:notation "relationships" ; skos:prefLabel "Relationships" .
+ccgclass:flourishing_emotional a skos:Concept ; skos:inScheme ccgclass:HumanFlourishingDimensionScheme ; skos:notation "emotional" ; skos:prefLabel "Emotional health" .
+ccgclass:flourishing_physical a skos:Concept ; skos:inScheme ccgclass:HumanFlourishingDimensionScheme ; skos:notation "physical" ; skos:prefLabel "Physical health" .
+ccgclass:flourishing_vocational a skos:Concept ; skos:inScheme ccgclass:HumanFlourishingDimensionScheme ; skos:notation "vocational" ; skos:prefLabel "Vocational purpose" .
+ccgclass:flourishing_financial a skos:Concept ; skos:inScheme ccgclass:HumanFlourishingDimensionScheme ; skos:notation "financial" ; skos:prefLabel "Financial stability" .
+ccgclass:flourishing_civic a skos:Concept ; skos:inScheme ccgclass:HumanFlourishingDimensionScheme ; skos:notation "civic" ; skos:prefLabel "Community / civic engagement" .
+

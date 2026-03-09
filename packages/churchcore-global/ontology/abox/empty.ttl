@@ -1,0 +1,8 @@
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+<https://ontology.churchcore.ai/cc/global/abox>
+  a owl:Ontology ;
+  rdfs:label "ChurchCore-Global A-Box (placeholder)" ;
+  rdfs:comment "A-Box instance assertions should live in dataset-specific named graphs, not committed here." .
+

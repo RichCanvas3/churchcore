@@ -1,0 +1,17 @@
+{
+  "name": "@churchcore/churchcore-congregation",
+  "private": true,
+  "type": "module",
+  "version": "0.0.0",
+  "files": [
+    "ontology/",
+    "src/"
+  ],
+  "dependencies": {
+    "@churchcore/churchcore-ontology": "workspace:*"
+  },
+  "scripts": {
+    "lint": "node ./src/verify.mjs"
+  }
+}
+

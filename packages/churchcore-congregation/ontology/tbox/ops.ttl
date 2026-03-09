@@ -1,0 +1,32 @@
+@prefix cc: <https://ontology.churchcore.ai/cc#> .
+@prefix cccomm: <https://ontology.churchcore.ai/cc/community#> .
+@prefix cccong: <https://ontology.churchcore.ai/cc/congregation#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+<https://ontology.churchcore.ai/cc/congregation/tbox/ops>
+  a owl:Ontology ;
+  rdfs:label "ChurchCore-Congregation T-Box (ops)" ;
+  rdfs:comment "Schema for local church operations: ministries, small groups, facilities." ;
+  owl:imports <https://ontology.churchcore.ai/cc/all> .
+
+cccong:Ministry a owl:Class ;
+  rdfs:label "Ministry" ;
+  rdfs:comment "A congregation-level ministry/program area (kids, students, worship, care, outreach, etc.)." ;
+  rdfs:subClassOf cc:Organization .
+
+cccong:Facility a owl:Class ;
+  rdfs:label "Facility" ;
+  rdfs:comment "A congregation facility/building." ;
+  rdfs:subClassOf cc:Resource .
+
+cccong:Room a owl:Class ;
+  rdfs:label "Room" ;
+  rdfs:comment "A room within a facility (auditorium, classroom, check-in station)." ;
+  rdfs:subClassOf cc:Resource .
+
+cccong:SmallGroup a owl:Class ;
+  rdfs:label "SmallGroup" ;
+  rdfs:comment "A congregation-level small group (relational, long-lived)." ;
+  rdfs:subClassOf cccomm:Group .
+

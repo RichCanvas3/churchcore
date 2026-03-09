@@ -1,0 +1,34 @@
+@prefix cc: <https://ontology.churchcore.ai/cc#> .
+@prefix ccprov: <https://ontology.churchcore.ai/cc/prov#> .
+@prefix prov: <http://www.w3.org/ns/prov#> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<https://ontology.churchcore.ai/cc/prov/tbox>
+  a owl:Ontology ;
+  rdfs:label "ChurchCore T-Box (provenance)" ;
+  rdfs:comment "Minimal provenance hooks for ChurchCore resources, aligned to PROV-O + DCTERMS." ;
+  owl:imports <https://ontology.churchcore.ai/cc> ;
+  owl:imports <http://www.w3.org/ns/prov-o-20130430> ;
+  owl:imports <http://purl.org/dc/terms/> .
+
+ccprov:hasSourceEntity a owl:ObjectProperty ;
+  rdfs:label "hasSourceEntity" ;
+  rdfs:domain cc:Resource ;
+  rdfs:range prov:Entity ;
+  rdfs:subPropertyOf prov:hadPrimarySource .
+
+ccprov:sourceUrl a owl:DatatypeProperty ;
+  rdfs:label "sourceUrl" ;
+  rdfs:domain cc:Resource ;
+  rdfs:range xsd:anyURI ;
+  rdfs:subPropertyOf dcterms:source .
+
+ccprov:extractedAtTime a owl:DatatypeProperty ;
+  rdfs:label "extractedAtTime" ;
+  rdfs:domain cc:Resource ;
+  rdfs:range xsd:dateTime ;
+  rdfs:subPropertyOf prov:generatedAtTime .
+

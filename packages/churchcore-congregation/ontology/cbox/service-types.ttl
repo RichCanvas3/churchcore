@@ -1,0 +1,22 @@
+@prefix cccongclass: <https://ontology.churchcore.ai/cc/congregation/class#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+
+<https://ontology.churchcore.ai/cc/congregation/cbox/service-types>
+  a owl:Ontology ;
+  rdfs:label "ChurchCore-Congregation C-Box (service types)" ;
+  rdfs:comment "Service/event type categories used in congregation calendars and participation records." ;
+  owl:imports <http://www.w3.org/2004/02/skos/core> .
+
+cccongclass:ServiceTypeScheme a skos:ConceptScheme ;
+  skos:prefLabel "Service types" .
+
+cccongclass:service_worship a skos:Concept ; skos:inScheme cccongclass:ServiceTypeScheme ; skos:notation "worship_service" ; skos:prefLabel "Worship service" .
+cccongclass:service_prayer_meeting a skos:Concept ; skos:inScheme cccongclass:ServiceTypeScheme ; skos:notation "prayer_meeting" ; skos:prefLabel "Prayer meeting" .
+cccongclass:service_bible_study a skos:Concept ; skos:inScheme cccongclass:ServiceTypeScheme ; skos:notation "bible_study" ; skos:prefLabel "Bible study" .
+cccongclass:service_class_course a skos:Concept ; skos:inScheme cccongclass:ServiceTypeScheme ; skos:notation "class_course" ; skos:prefLabel "Class / course" .
+cccongclass:service_small_group_meeting a skos:Concept ; skos:inScheme cccongclass:ServiceTypeScheme ; skos:notation "small_group_meeting" ; skos:prefLabel "Small group meeting" .
+cccongclass:service_outreach_event a skos:Concept ; skos:inScheme cccongclass:ServiceTypeScheme ; skos:notation "outreach_event" ; skos:prefLabel "Outreach event" .
+cccongclass:service_volunteer_opportunity a skos:Concept ; skos:inScheme cccongclass:ServiceTypeScheme ; skos:notation "volunteer_opportunity" ; skos:prefLabel "Volunteer opportunity" .
+

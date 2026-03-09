@@ -7,7 +7,9 @@ export const CC_PROV = 'https://ontology.churchcore.ai/cc/prov#';
 export const CC_SITUATION = 'https://ontology.churchcore.ai/cc/situation#';
 export const CC_JOURNEY = 'https://ontology.churchcore.ai/cc/journey#';
 export const CC_COMMUNITY = 'https://ontology.churchcore.ai/cc/community#';
-export const CC_BIBLE = 'https://ontology.churchcore.ai/cc/bible#';
+export const CC_GLOBAL = 'https://ontology.churchcore.ai/cc/global#';
+export const CC_CONGREGATION = 'https://ontology.churchcore.ai/cc/congregation#';
+export const CC_GLOBAL_BIBLE = 'https://ontology.churchcore.ai/cc/global/bible#';
 
 // Provenance + planning foundations (referenced by RichCanvas principles).
 export const PROV = 'http://www.w3.org/ns/prov#';

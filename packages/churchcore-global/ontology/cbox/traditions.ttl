@@ -1,0 +1,37 @@
+@prefix ccgclass: <https://ontology.churchcore.ai/cc/global/class#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+
+<https://ontology.churchcore.ai/cc/global/cbox/traditions>
+  a owl:Ontology ;
+  rdfs:label "ChurchCore-Global C-Box (traditions)" ;
+  rdfs:comment "Starter taxonomy for high-level Christian traditions/families." ;
+  owl:imports <http://www.w3.org/2004/02/skos/core> .
+
+ccgclass:FaithTraditionScheme a skos:ConceptScheme ;
+  skos:prefLabel "Faith traditions" .
+
+ccgclass:tradition_eastern_christianity a skos:Concept ; skos:inScheme ccgclass:FaithTraditionScheme ; skos:notation "eastern_christianity" ; skos:prefLabel "Eastern Christianity" .
+ccgclass:tradition_western_christianity a skos:Concept ; skos:inScheme ccgclass:FaithTraditionScheme ; skos:notation "western_christianity" ; skos:prefLabel "Western Christianity" .
+ccgclass:tradition_protestant a skos:Concept ; skos:inScheme ccgclass:FaithTraditionScheme ; skos:notation "protestant" ; skos:prefLabel "Protestant" ; skos:broader ccgclass:tradition_western_christianity .
+
+ccgclass:tradition_evangelical a skos:Concept ; skos:inScheme ccgclass:FaithTraditionScheme ; skos:notation "evangelical" ; skos:prefLabel "Evangelical" .
+ccgclass:tradition_mainline_protestant a skos:Concept ; skos:inScheme ccgclass:FaithTraditionScheme ; skos:notation "mainline_protestant" ; skos:prefLabel "Mainline Protestant" .
+ccgclass:tradition_reformed a skos:Concept ; skos:inScheme ccgclass:FaithTraditionScheme ; skos:notation "reformed" ; skos:prefLabel "Reformed" .
+ccgclass:tradition_baptist a skos:Concept ; skos:inScheme ccgclass:FaithTraditionScheme ; skos:notation "baptist" ; skos:prefLabel "Baptist" .
+ccgclass:tradition_pentecostal_charismatic a skos:Concept ; skos:inScheme ccgclass:FaithTraditionScheme ; skos:notation "pentecostal_charismatic" ; skos:prefLabel "Pentecostal / Charismatic" .
+ccgclass:tradition_anglican a skos:Concept ; skos:inScheme ccgclass:FaithTraditionScheme ; skos:notation "anglican" ; skos:prefLabel "Anglican" .
+ccgclass:tradition_lutheran a skos:Concept ; skos:inScheme ccgclass:FaithTraditionScheme ; skos:notation "lutheran" ; skos:prefLabel "Lutheran" .
+ccgclass:tradition_methodist a skos:Concept ; skos:inScheme ccgclass:FaithTraditionScheme ; skos:notation "methodist" ; skos:prefLabel "Methodist / Wesleyan" .
+ccgclass:tradition_presbyterian a skos:Concept ; skos:inScheme ccgclass:FaithTraditionScheme ; skos:notation "presbyterian" ; skos:prefLabel "Presbyterian" .
+ccgclass:tradition_anabaptist a skos:Concept ; skos:inScheme ccgclass:FaithTraditionScheme ; skos:notation "anabaptist" ; skos:prefLabel "Anabaptist" .
+ccgclass:tradition_restorationist a skos:Concept ; skos:inScheme ccgclass:FaithTraditionScheme ; skos:notation "restorationist" ; skos:prefLabel "Restorationist" .
+ccgclass:tradition_catholic a skos:Concept ; skos:inScheme ccgclass:FaithTraditionScheme ; skos:notation "catholic" ; skos:prefLabel "Catholic" ; skos:broader ccgclass:tradition_western_christianity .
+ccgclass:tradition_eastern_orthodox a skos:Concept ; skos:inScheme ccgclass:FaithTraditionScheme ; skos:notation "eastern_orthodox" ; skos:prefLabel "Eastern Orthodox" ; skos:broader ccgclass:tradition_eastern_christianity .
+ccgclass:tradition_oriental_orthodox a skos:Concept ; skos:inScheme ccgclass:FaithTraditionScheme ; skos:notation "oriental_orthodox" ; skos:prefLabel "Oriental Orthodox" ; skos:broader ccgclass:tradition_eastern_christianity .
+ccgclass:tradition_assyrian_church_of_east a skos:Concept ; skos:inScheme ccgclass:FaithTraditionScheme ; skos:notation "assyrian_church_of_east" ; skos:prefLabel "Assyrian Church of the East" ; skos:broader ccgclass:tradition_eastern_christianity .
+ccgclass:tradition_non_denom a skos:Concept ; skos:inScheme ccgclass:FaithTraditionScheme ; skos:notation "non_denom" ; skos:prefLabel "Non-denominational" .
+ccgclass:tradition_non_trinitarian a skos:Concept ; skos:inScheme ccgclass:FaithTraditionScheme ; skos:notation "non_trinitarian" ; skos:prefLabel "Non-trinitarian (outside Nicene orthodoxy)" ; skos:broader ccgclass:tradition_other .
+ccgclass:tradition_other a skos:Concept ; skos:inScheme ccgclass:FaithTraditionScheme ; skos:notation "other" ; skos:prefLabel "Other / unspecified" .
+

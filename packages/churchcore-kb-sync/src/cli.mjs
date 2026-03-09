@@ -164,7 +164,7 @@ async function uploadOntologies(client, { contextIri }) {
   const pkgs = [
     { name: 'agentictrust-ontology', dir: '../agentictrust-ontology/ontology' },
     { name: 'churchcore-ontology', dir: '../churchcore-ontology/ontology' },
-    { name: 'churchcore-local-ontology', dir: '../churchcore-local-ontology/ontology' },
+    { name: 'churchcore-congregation', dir: '../churchcore-congregation/ontology' },
   ];
 
   for (const p of pkgs) {

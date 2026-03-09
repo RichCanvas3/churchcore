@@ -1,0 +1,38 @@
+@prefix cc: <https://ontology.churchcore.ai/cc#> .
+@prefix ccsit: <https://ontology.churchcore.ai/cc/situation#> .
+@prefix at: <https://agentictrust.io/ontology/core#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<https://ontology.churchcore.ai/cc/situation/tbox>
+  a owl:Ontology ;
+  rdfs:label "ChurchCore T-Box (situations)" ;
+  rdfs:comment "Faith-neutral situation/membership modeling layer (DnS-style), reusing AgenticTrust Situation primitives." ;
+  owl:imports <https://ontology.churchcore.ai/cc> ;
+  owl:imports <https://agentictrust.io/ontology/core/trust> ;
+  owl:imports <http://www.w3.org/ns/prov-o-20130430> .
+
+ccsit:ChurchSituation a owl:Class ;
+  rdfs:label "ChurchSituation" ;
+  rdfs:comment "Church-domain situation (membership, relationship, participation), modeled as a reified context (Entity) not an event." ;
+  rdfs:subClassOf at:Situation .
+
+ccsit:MembershipSituation a owl:Class ;
+  rdfs:label "MembershipSituation" ;
+  rdfs:subClassOf ccsit:ChurchSituation .
+
+ccsit:RelationshipSituation a owl:Class ;
+  rdfs:label "RelationshipSituation" ;
+  rdfs:subClassOf ccsit:ChurchSituation, at:RelationshipSituation .
+
+ccsit:validFrom a owl:DatatypeProperty ;
+  rdfs:label "validFrom" ;
+  rdfs:domain at:Situation ;
+  rdfs:range xsd:dateTime .
+
+ccsit:validTo a owl:DatatypeProperty ;
+  rdfs:label "validTo" ;
+  rdfs:domain at:Situation ;
+  rdfs:range xsd:dateTime .
+

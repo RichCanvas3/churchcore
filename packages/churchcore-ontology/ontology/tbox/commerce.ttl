@@ -1,0 +1,79 @@
+@prefix cccom: <https://ontology.churchcore.ai/cc/commerce#> .
+@prefix prov: <http://www.w3.org/ns/prov#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<https://ontology.churchcore.ai/cc/commerce/tbox>
+  a owl:Ontology ;
+  rdfs:label "ChurchCore T-Box (commerce)" ;
+  rdfs:comment "Thin cross-domain commerce vocabulary inspired by RichCanvas CommerceCore." ;
+  owl:imports <https://ontology.churchcore.ai/cc> ;
+  owl:imports <http://www.w3.org/ns/prov-o-20130430> .
+
+cccom:Asset a owl:Class ;
+  rdfs:label "Asset" ;
+  rdfs:comment "A transferable thing of value (money, ticket, good, service entitlement). Modeled as a PROV Entity." ;
+  rdfs:subClassOf prov:Entity .
+
+cccom:Offer a owl:Class ;
+  rdfs:label "Offer" ;
+  rdfs:comment "A proposed exchange of assets. Durable record (Entity), distinct from the act of making the offer." ;
+  rdfs:subClassOf prov:Entity .
+
+cccom:Bid a owl:Class ;
+  rdfs:label "Bid" ;
+  rdfs:comment "Demand-side offer (customer intent) as a subtype of Offer." ;
+  rdfs:subClassOf cccom:Offer .
+
+cccom:Order a owl:Class ;
+  rdfs:label "Order" ;
+  rdfs:comment "An agreement/commitment derived from an accepted Offer." ;
+  rdfs:subClassOf prov:Entity .
+
+cccom:FulfillmentActivity a owl:Class ;
+  rdfs:label "FulfillmentActivity" ;
+  rdfs:comment "Operational activity that discharges obligations by delivering assets/services." ;
+  rdfs:subClassOf prov:Activity .
+
+cccom:SettlementActivity a owl:Class ;
+  rdfs:label "SettlementActivity" ;
+  rdfs:comment "Operational activity that closes/discharges remaining obligations (e.g. payment capture, final reconciliation)." ;
+  rdfs:subClassOf prov:Activity .
+
+cccom:madeOffer a owl:ObjectProperty ;
+  rdfs:label "madeOffer" ;
+  rdfs:comment "Links the act (Activity) to the Offer record it generated." ;
+  rdfs:domain prov:Activity ;
+  rdfs:range cccom:Offer ;
+  rdfs:subPropertyOf prov:generated .
+
+cccom:derivedOrder a owl:ObjectProperty ;
+  rdfs:label "derivedOrder" ;
+  rdfs:comment "Links an Order to the Offer it was derived from (accepted/committed)." ;
+  rdfs:domain cccom:Order ;
+  rdfs:range cccom:Offer ;
+  rdfs:subPropertyOf prov:wasDerivedFrom .
+
+cccom:fulfillsOrder a owl:ObjectProperty ;
+  rdfs:label "fulfillsOrder" ;
+  rdfs:domain cccom:FulfillmentActivity ;
+  rdfs:range cccom:Order ;
+  rdfs:subPropertyOf prov:used .
+
+cccom:settlesOrder a owl:ObjectProperty ;
+  rdfs:label "settlesOrder" ;
+  rdfs:domain cccom:SettlementActivity ;
+  rdfs:range cccom:Order ;
+  rdfs:subPropertyOf prov:used .
+
+cccom:involvesAsset a owl:ObjectProperty ;
+  rdfs:label "involvesAsset" ;
+  rdfs:domain prov:Entity ;
+  rdfs:range cccom:Asset .
+
+cccom:assetKind a owl:DatatypeProperty ;
+  rdfs:label "assetKind" ;
+  rdfs:domain cccom:Asset ;
+  rdfs:range xsd:string .
+

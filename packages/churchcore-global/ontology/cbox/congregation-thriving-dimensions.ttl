@@ -1,0 +1,35 @@
+@prefix ccgclass: <https://ontology.churchcore.ai/cc/global/class#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+
+<https://ontology.churchcore.ai/cc/global/cbox/congregation-thriving-dimensions>
+  a owl:Ontology ;
+  rdfs:label "ChurchCore-Global C-Box (congregation thriving dimensions)" ;
+  rdfs:comment "Category scheme for congregation thriving/health dimensions (product-neutral; extend as needed)." ;
+  owl:imports <http://www.w3.org/2004/02/skos/core> .
+
+ccgclass:CongregationThrivingDimensionScheme a skos:ConceptScheme ;
+  skos:prefLabel "Congregation thriving dimensions" .
+
+# Pillars (top-level categories)
+ccgclass:thriving_nurturing a skos:Concept ; skos:inScheme ccgclass:CongregationThrivingDimensionScheme ; skos:notation "nurturing" ; skos:prefLabel "Nurturing" .
+ccgclass:thriving_sending a skos:Concept ; skos:inScheme ccgclass:CongregationThrivingDimensionScheme ; skos:notation "sending" ; skos:prefLabel "Sending" .
+ccgclass:thriving_leading a skos:Concept ; skos:inScheme ccgclass:CongregationThrivingDimensionScheme ; skos:notation "leading" ; skos:prefLabel "Leading" .
+
+# Starter dimensions (extend; keep as categories, not classes)
+ccgclass:thriving_worship a skos:Concept ; skos:inScheme ccgclass:CongregationThrivingDimensionScheme ; skos:notation "worship" ; skos:prefLabel "Worship" ; skos:broader ccgclass:thriving_nurturing .
+ccgclass:thriving_discipleship a skos:Concept ; skos:inScheme ccgclass:CongregationThrivingDimensionScheme ; skos:notation "discipleship" ; skos:prefLabel "Discipleship" ; skos:broader ccgclass:thriving_nurturing .
+ccgclass:thriving_community a skos:Concept ; skos:inScheme ccgclass:CongregationThrivingDimensionScheme ; skos:notation "community" ; skos:prefLabel "Community" ; skos:broader ccgclass:thriving_nurturing .
+ccgclass:thriving_care a skos:Concept ; skos:inScheme ccgclass:CongregationThrivingDimensionScheme ; skos:notation "care" ; skos:prefLabel "Care / pastoral support" ; skos:broader ccgclass:thriving_nurturing .
+
+ccgclass:thriving_evangelism a skos:Concept ; skos:inScheme ccgclass:CongregationThrivingDimensionScheme ; skos:notation "evangelism" ; skos:prefLabel "Evangelism" ; skos:broader ccgclass:thriving_sending .
+ccgclass:thriving_missions a skos:Concept ; skos:inScheme ccgclass:CongregationThrivingDimensionScheme ; skos:notation "missions" ; skos:prefLabel "Missions" ; skos:broader ccgclass:thriving_sending .
+ccgclass:thriving_justice_mercy a skos:Concept ; skos:inScheme ccgclass:CongregationThrivingDimensionScheme ; skos:notation "justice_mercy" ; skos:prefLabel "Mercy / justice engagement" ; skos:broader ccgclass:thriving_sending .
+ccgclass:thriving_partnerships a skos:Concept ; skos:inScheme ccgclass:CongregationThrivingDimensionScheme ; skos:notation "partnerships" ; skos:prefLabel "Partnerships" ; skos:broader ccgclass:thriving_sending .
+
+ccgclass:thriving_leadership_development a skos:Concept ; skos:inScheme ccgclass:CongregationThrivingDimensionScheme ; skos:notation "leadership_development" ; skos:prefLabel "Leadership development" ; skos:broader ccgclass:thriving_leading .
+ccgclass:thriving_governance a skos:Concept ; skos:inScheme ccgclass:CongregationThrivingDimensionScheme ; skos:notation "governance" ; skos:prefLabel "Governance" ; skos:broader ccgclass:thriving_leading .
+ccgclass:thriving_stewardship a skos:Concept ; skos:inScheme ccgclass:CongregationThrivingDimensionScheme ; skos:notation "stewardship" ; skos:prefLabel "Stewardship" ; skos:broader ccgclass:thriving_leading .
+ccgclass:thriving_strategy a skos:Concept ; skos:inScheme ccgclass:CongregationThrivingDimensionScheme ; skos:notation "strategy" ; skos:prefLabel "Strategy / direction" ; skos:broader ccgclass:thriving_leading .
+

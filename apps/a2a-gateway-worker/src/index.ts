@@ -10,30 +10,32 @@ type Env = {
   SENDGRID_MCP_API_KEY?: string;
   OPENAI_API_KEY?: string;
   OPENAI_TRANSCRIBE_MODEL?: string;
-  GLOO_CLIENT_ID?: string;
-  GLOO_CLIENT_SECRET?: string;
-  GLOO_BASE_URL?: string; // default https://platform.ai.gloo.com/ai/v2
-  GLOO_RAG_PUBLISHER?: string;
+  AI_GATEWAY_CLIENT_ID?: string;
+  AI_GATEWAY_CLIENT_SECRET?: string;
+  AI_GATEWAY_TOKEN_URL?: string;
+  AI_GATEWAY_BASE_URL?: string;
+  AI_GATEWAY_RAG_PUBLISHER?: string;
 };
 
 function nowIso() {
   return new Date().toISOString();
 }
 
-type GlooTokenCache = { accessToken: string; expiresAtMs: number };
-let glooTokenCache: GlooTokenCache | null = null;
+type AiGatewayTokenCache = { accessToken: string; expiresAtMs: number };
+let aiGatewayTokenCache: AiGatewayTokenCache | null = null;
 
-async function getGlooAccessToken(env: Env): Promise<string> {
-  const clientId = (env.GLOO_CLIENT_ID ?? "").trim();
-  const clientSecret = (env.GLOO_CLIENT_SECRET ?? "").trim();
-  if (!clientId || !clientSecret) throw new Error("Missing GLOO_CLIENT_ID / GLOO_CLIENT_SECRET");
+async function getAiGatewayAccessToken(env: Env): Promise<string> {
+  const clientId = (env.AI_GATEWAY_CLIENT_ID ?? "").trim();
+  const clientSecret = (env.AI_GATEWAY_CLIENT_SECRET ?? "").trim();
+  const tokenUrl = (env.AI_GATEWAY_TOKEN_URL ?? "").trim();
+  if (!clientId || !clientSecret || !tokenUrl) throw new Error("Missing AI gateway OAuth config");
 
   const now = Date.now();
-  if (glooTokenCache && glooTokenCache.expiresAtMs - now > 60_000) return glooTokenCache.accessToken;
+  if (aiGatewayTokenCache && aiGatewayTokenCache.expiresAtMs - now > 60_000) return aiGatewayTokenCache.accessToken;
 
   const auth = btoa(`${clientId}:${clientSecret}`);
   const body = `grant_type=client_credentials&scope=${encodeURIComponent("api/access")}`;
-  const res = await fetch("https://platform.ai.gloo.com/oauth2/token", {
+  const res = await fetch(tokenUrl, {
     method: "POST",
     headers: {
       authorization: `Basic ${auth}`,
@@ -43,12 +45,12 @@ async function getGlooAccessToken(env: Env): Promise<string> {
     body,
   });
   const raw = await res.text().catch(() => "");
-  if (!res.ok) throw new Error(`Gloo token error (${res.status}): ${raw || "no body"}`);
+  if (!res.ok) throw new Error(`AI gateway token error (${res.status}): ${raw || "no body"}`);
   const j = safeJsonParse(raw) as any;
   const token = typeof j?.access_token === "string" ? j.access_token : "";
   const expiresIn = typeof j?.expires_in === "number" ? j.expires_in : Number(j?.expires_in ?? 3600);
-  if (!token) throw new Error("Gloo token response missing access_token");
-  glooTokenCache = { accessToken: token, expiresAtMs: now + Math.max(300, expiresIn) * 1000 };
+  if (!token) throw new Error("AI gateway token response missing access_token");
+  aiGatewayTokenCache = { accessToken: token, expiresAtMs: now + Math.max(300, expiresIn) * 1000 };
   return token;
 }
 
@@ -1589,7 +1591,7 @@ const ChatSchema = z.object({
   args: z.record(z.string(), z.unknown()).optional().nullable(),
 });
 
-const ChatGlooSchema = ChatSchema.extend({
+const ChatAiGatewaySchema = ChatSchema.extend({
   mode: z.enum(["general", "grounded", "auto"]).optional().nullable(),
   sources_limit: z.number().int().min(1).max(25).optional().nullable(),
   rag_publisher: z.string().min(1).optional().nullable(),
@@ -2296,10 +2298,10 @@ async function runAgentStream(env: Env, args: { threadId: string; inputPayload: 
   return res;
 }
 
-type GlooChatMode = "general" | "grounded" | "auto";
-type GlooMsg = { role: "system" | "user" | "assistant"; content: string };
+type AiGatewayChatMode = "general" | "grounded" | "auto";
+type AiGatewayMsg = { role: "system" | "user" | "assistant"; content: string };
 
-async function loadThreadMessagesForGloo(env: Env, args: { churchId: string; threadId: string; limit?: number }) {
+async function loadThreadMessagesForAiGateway(env: Env, args: { churchId: string; threadId: string; limit?: number }) {
   const limit = Math.max(1, Math.min(400, args.limit ?? 200));
   const rows =
     (
@@ -2315,7 +2317,7 @@ async function loadThreadMessagesForGloo(env: Env, args: { churchId: string; thr
         .all()
     ).results ?? [];
 
-  const msgs: GlooMsg[] = [];
+  const msgs: AiGatewayMsg[] = [];
   for (const r of rows as any[]) {
     const sender = String(r?.senderType ?? "").toLowerCase();
     const content = typeof r?.content === "string" ? String(r.content) : "";
@@ -2376,7 +2378,7 @@ async function getKbExcerptForQuery(env: Env, args: { churchId: string; query: s
   return parts.join("\n\n");
 }
 
-function buildGlooSystemPrompt(args: {
+function buildAiGatewaySystemPrompt(args: {
   role: string;
   identityContact: any;
   journey: any;
@@ -2415,15 +2417,16 @@ function buildGlooSystemPrompt(args: {
     .join("\n");
 }
 
-async function runGlooCompletion(env: Env, args: {
-  mode: GlooChatMode;
-  messages: GlooMsg[];
+async function runAiGatewayCompletion(env: Env, args: {
+  mode: AiGatewayChatMode;
+  messages: AiGatewayMsg[];
   sourcesLimit?: number | null;
   ragPublisher?: string | null;
 }) {
-  const token = await getGlooAccessToken(env);
-  const base = ((env.GLOO_BASE_URL ?? "https://platform.ai.gloo.com/ai/v2").trim() || "https://platform.ai.gloo.com/ai/v2").replace(/\/$/, "");
-  const mode = (args.mode ?? "grounded") as GlooChatMode;
+  const token = await getAiGatewayAccessToken(env);
+  const base = (env.AI_GATEWAY_BASE_URL ?? "").trim().replace(/\/$/, "");
+  if (!base) throw new Error("Missing AI_GATEWAY_BASE_URL");
+  const mode = (args.mode ?? "grounded") as AiGatewayChatMode;
   const url = mode === "general" ? `${base}/chat/completions` : `${base}/chat/completions/grounded`;
 
   const body: any = {
@@ -2433,7 +2436,7 @@ async function runGlooCompletion(env: Env, args: {
   };
   const sourcesLimit = args.sourcesLimit ?? null;
   if (mode !== "general" && typeof sourcesLimit === "number") body.sources_limit = sourcesLimit;
-  const rp = String(args.ragPublisher ?? env.GLOO_RAG_PUBLISHER ?? "").trim();
+  const rp = String(args.ragPublisher ?? env.AI_GATEWAY_RAG_PUBLISHER ?? "").trim();
   if (mode !== "general" && rp) body.rag_publisher = rp;
 
   const res = await fetch(url, {
@@ -2443,22 +2446,23 @@ async function runGlooCompletion(env: Env, args: {
   });
   const raw = await res.text().catch(() => "");
   const j = safeJsonParse(raw) as any;
-  if (!res.ok) throw new Error(`Gloo completion error (${res.status}): ${raw || "no body"}`);
+  if (!res.ok) throw new Error(`AI gateway completion error (${res.status}): ${raw || "no body"}`);
 
   const choice = Array.isArray(j?.choices) && j.choices.length ? j.choices[0] : null;
   const content = typeof choice?.message?.content === "string" ? String(choice.message.content) : "";
   return { raw: j, content };
 }
 
-async function runGlooCompletionStream(env: Env, args: {
-  mode: GlooChatMode;
-  messages: GlooMsg[];
+async function runAiGatewayCompletionStream(env: Env, args: {
+  mode: AiGatewayChatMode;
+  messages: AiGatewayMsg[];
   sourcesLimit?: number | null;
   ragPublisher?: string | null;
 }) {
-  const token = await getGlooAccessToken(env);
-  const base = ((env.GLOO_BASE_URL ?? "https://platform.ai.gloo.com/ai/v2").trim() || "https://platform.ai.gloo.com/ai/v2").replace(/\/$/, "");
-  const mode = (args.mode ?? "grounded") as GlooChatMode;
+  const token = await getAiGatewayAccessToken(env);
+  const base = (env.AI_GATEWAY_BASE_URL ?? "").trim().replace(/\/$/, "");
+  if (!base) throw new Error("Missing AI_GATEWAY_BASE_URL");
+  const mode = (args.mode ?? "grounded") as AiGatewayChatMode;
   const url = mode === "general" ? `${base}/chat/completions` : `${base}/chat/completions/grounded`;
 
   const body: any = {
@@ -2469,7 +2473,7 @@ async function runGlooCompletionStream(env: Env, args: {
   };
   const sourcesLimit = args.sourcesLimit ?? null;
   if (mode !== "general" && typeof sourcesLimit === "number") body.sources_limit = sourcesLimit;
-  const rp = String(args.ragPublisher ?? env.GLOO_RAG_PUBLISHER ?? "").trim();
+  const rp = String(args.ragPublisher ?? env.AI_GATEWAY_RAG_PUBLISHER ?? "").trim();
   if (mode !== "general" && rp) body.rag_publisher = rp;
 
   const res = await fetch(url, {
@@ -2479,7 +2483,7 @@ async function runGlooCompletionStream(env: Env, args: {
   });
   if (!res.ok || !res.body) {
     const raw = await res.text().catch(() => "");
-    throw new Error(`Gloo stream error (${res.status}): ${raw || "no body"}`);
+    throw new Error(`AI gateway stream error (${res.status}): ${raw || "no body"}`);
   }
   return res;
 }
@@ -3026,8 +3030,8 @@ async function handleChatStream(req: Request, env: Env) {
   return new Response(stream, { headers: { "content-type": "text/event-stream; charset=utf-8" } });
 }
 
-async function handleChatGloo(req: Request, env: Env) {
-  const parsed = ChatGlooSchema.safeParse(await parseJson(req));
+async function handleChatAiGateway(req: Request, env: Env) {
+  const parsed = ChatAiGatewaySchema.safeParse(await parseJson(req));
   if (!parsed.success) return json({ error: "Invalid body", issues: parsed.error.issues }, { status: 400 });
   const { identity } = parsed.data;
 
@@ -3036,7 +3040,7 @@ async function handleChatGloo(req: Request, env: Env) {
   const threadId = parsed.data.thread_id;
   const message = parsed.data.message;
   const role = (identity.role ?? "seeker") as string;
-  const mode = ((parsed.data.mode ?? "grounded") as GlooChatMode) || "grounded";
+  const mode = ((parsed.data.mode ?? "grounded") as AiGatewayChatMode) || "grounded";
   const sourcesLimit = parsed.data.sources_limit ?? null;
   const ragPublisher = parsed.data.rag_publisher ?? null;
 
@@ -3075,17 +3079,17 @@ async function handleChatGloo(req: Request, env: Env) {
 
   const weekly = personId ? await getWeeklySermonPlanContext(env, { churchId, campusId: effectiveCampusId, personId }) : null;
   const kbExcerpt = mode === "general" ? "" : await getKbExcerptForQuery(env, { churchId, query: message, limit: 3 });
-  const systemPrompt = buildGlooSystemPrompt({ role, identityContact, journey, weekly, kbExcerpt });
+  const systemPrompt = buildAiGatewaySystemPrompt({ role, identityContact, journey, weekly, kbExcerpt });
 
-  const history = await loadThreadMessagesForGloo(env, { churchId, threadId, limit: 200 });
-  const messages: GlooMsg[] = [{ role: "system", content: systemPrompt }, ...history];
+  const history = await loadThreadMessagesForAiGateway(env, { churchId, threadId, limit: 200 });
+  const messages: AiGatewayMsg[] = [{ role: "system", content: systemPrompt }, ...history];
 
-  const { raw, content } = await runGlooCompletion(env, { mode, messages, sourcesLimit, ragPublisher });
+  const { raw, content } = await runAiGatewayCompletion(env, { mode, messages, sourcesLimit, ragPublisher });
   const assistantText = String(content || "").trim();
 
   const envelope: any = {
     message: assistantText,
-    data: { gloo: { mode, raw } },
+    data: { ai_gateway: { mode, raw } },
     citations: [],
     suggested_next_actions: [],
     cards: [],
@@ -3097,8 +3101,8 @@ async function handleChatGloo(req: Request, env: Env) {
   return json({ thread_id: threadId, output: envelope });
 }
 
-async function handleChatGlooStream(req: Request, env: Env) {
-  const parsed = ChatGlooSchema.safeParse(await parseJson(req));
+async function handleChatAiGatewayStream(req: Request, env: Env) {
+  const parsed = ChatAiGatewaySchema.safeParse(await parseJson(req));
   if (!parsed.success) return json({ error: "Invalid body", issues: parsed.error.issues }, { status: 400 });
 
   const encoder = new TextEncoder();
@@ -3111,7 +3115,7 @@ async function handleChatGlooStream(req: Request, env: Env) {
         const threadId = parsed.data.thread_id;
         const message = parsed.data.message;
         const role = (identity.role ?? "seeker") as string;
-        const mode = ((parsed.data.mode ?? "grounded") as GlooChatMode) || "grounded";
+        const mode = ((parsed.data.mode ?? "grounded") as AiGatewayChatMode) || "grounded";
         const sourcesLimit = parsed.data.sources_limit ?? null;
         const ragPublisher = parsed.data.rag_publisher ?? null;
 
@@ -3149,13 +3153,13 @@ async function handleChatGlooStream(req: Request, env: Env) {
 
         const weekly = personId ? await getWeeklySermonPlanContext(env, { churchId, campusId: effectiveCampusId, personId }) : null;
         const kbExcerpt = mode === "general" ? "" : await getKbExcerptForQuery(env, { churchId, query: message, limit: 3 });
-        const systemPrompt = buildGlooSystemPrompt({ role, identityContact, journey, weekly, kbExcerpt });
+        const systemPrompt = buildAiGatewaySystemPrompt({ role, identityContact, journey, weekly, kbExcerpt });
 
-        const history = await loadThreadMessagesForGloo(env, { churchId, threadId, limit: 200 });
-        const messages: GlooMsg[] = [{ role: "system", content: systemPrompt }, ...history];
+        const history = await loadThreadMessagesForAiGateway(env, { churchId, threadId, limit: 200 });
+        const messages: AiGatewayMsg[] = [{ role: "system", content: systemPrompt }, ...history];
 
-        const glooRes = await runGlooCompletionStream(env, { mode, messages, sourcesLimit, ragPublisher });
-        const reader = glooRes.body!.getReader();
+        const aiRes = await runAiGatewayCompletionStream(env, { mode, messages, sourcesLimit, ragPublisher });
+        const reader = aiRes.body!.getReader();
         const decoder = new TextDecoder();
         let buf = "";
         let assistantText = "";
@@ -3213,7 +3217,7 @@ async function handleChatGlooStream(req: Request, env: Env) {
 
         const envelope: any = {
           message: assistantText,
-          data: { gloo: { mode, lastChunk } },
+          data: { ai_gateway: { mode, lastChunk } },
           citations: [],
           suggested_next_actions: [],
           cards: [],
@@ -5796,10 +5800,10 @@ export default {
         return handleChat(req, env);
       case "/a2a/chat.stream":
         return handleChatStream(req, env);
-      case "/a2a/chat.gloo":
-        return handleChatGloo(req, env);
-      case "/a2a/chat.gloo.stream":
-        return handleChatGlooStream(req, env);
+      case "/a2a/chat.ai_gateway":
+        return handleChatAiGateway(req, env);
+      case "/a2a/chat.ai_gateway.stream":
+        return handleChatAiGatewayStream(req, env);
       case "/a2a/household.identify":
         return handleHouseholdIdentify(req, env);
       case "/a2a/household.create":

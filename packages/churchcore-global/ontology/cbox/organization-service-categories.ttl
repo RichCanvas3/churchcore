@@ -1,0 +1,24 @@
+@prefix ccgclass: <https://ontology.churchcore.ai/cc/global/class#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+
+<https://ontology.churchcore.ai/cc/global/cbox/organization-service-categories>
+  a owl:Ontology ;
+  rdfs:label "ChurchCore-Global C-Box (organization service categories)" ;
+  rdfs:comment "Cross-ecosystem categories for how organizations serve (relief, education, advocacy, evangelism, translation, etc.)." ;
+  owl:imports <http://www.w3.org/2004/02/skos/core> .
+
+ccgclass:OrganizationServiceCategoryScheme a skos:ConceptScheme ;
+  skos:prefLabel "Organization service categories" .
+
+ccgclass:svc_bible_translation a skos:Concept ; skos:inScheme ccgclass:OrganizationServiceCategoryScheme ; skos:notation "bible_translation" ; skos:prefLabel "Bible translation" .
+ccgclass:svc_mission_sending a skos:Concept ; skos:inScheme ccgclass:OrganizationServiceCategoryScheme ; skos:notation "mission_sending" ; skos:prefLabel "Mission sending" .
+ccgclass:svc_relief_development a skos:Concept ; skos:inScheme ccgclass:OrganizationServiceCategoryScheme ; skos:notation "relief_development" ; skos:prefLabel "Relief & development" .
+ccgclass:svc_education_training a skos:Concept ; skos:inScheme ccgclass:OrganizationServiceCategoryScheme ; skos:notation "education_training" ; skos:prefLabel "Education & training" .
+ccgclass:svc_evangelism_outreach a skos:Concept ; skos:inScheme ccgclass:OrganizationServiceCategoryScheme ; skos:notation "evangelism_outreach" ; skos:prefLabel "Evangelism & outreach" .
+ccgclass:svc_research_intel a skos:Concept ; skos:inScheme ccgclass:OrganizationServiceCategoryScheme ; skos:notation "research_intel" ; skos:prefLabel "Research & intelligence" .
+ccgclass:svc_advocacy_policy a skos:Concept ; skos:inScheme ccgclass:OrganizationServiceCategoryScheme ; skos:notation "advocacy_policy" ; skos:prefLabel "Advocacy & policy" .
+ccgclass:svc_media_publishing a skos:Concept ; skos:inScheme ccgclass:OrganizationServiceCategoryScheme ; skos:notation "media_publishing" ; skos:prefLabel "Media & publishing" .
+ccgclass:svc_care_counseling a skos:Concept ; skos:inScheme ccgclass:OrganizationServiceCategoryScheme ; skos:notation "care_counseling" ; skos:prefLabel "Care & counseling" .
+

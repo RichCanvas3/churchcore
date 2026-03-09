@@ -1,0 +1,20 @@
+@prefix cccongclass: <https://ontology.churchcore.ai/cc/congregation/class#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+
+<https://ontology.churchcore.ai/cc/congregation/cbox/attendance-statuses>
+  a owl:Ontology ;
+  rdfs:label "ChurchCore-Congregation C-Box (attendance statuses)" ;
+  rdfs:comment "Categories used for attendance/check-in style participation statuses." ;
+  owl:imports <http://www.w3.org/2004/02/skos/core> .
+
+cccongclass:AttendanceStatusScheme a skos:ConceptScheme ;
+  skos:prefLabel "Attendance statuses" .
+
+cccongclass:attended a skos:Concept ; skos:inScheme cccongclass:AttendanceStatusScheme ; skos:notation "attended" ; skos:prefLabel "Attended" .
+cccongclass:absent a skos:Concept ; skos:inScheme cccongclass:AttendanceStatusScheme ; skos:notation "absent" ; skos:prefLabel "Absent" .
+cccongclass:unknown a skos:Concept ; skos:inScheme cccongclass:AttendanceStatusScheme ; skos:notation "unknown" ; skos:prefLabel "Unknown" .
+cccongclass:checked_in a skos:Concept ; skos:inScheme cccongclass:AttendanceStatusScheme ; skos:notation "checked_in" ; skos:prefLabel "Checked in" .
+cccongclass:checked_out a skos:Concept ; skos:inScheme cccongclass:AttendanceStatusScheme ; skos:notation "checked_out" ; skos:prefLabel "Checked out" .
+

@@ -13,10 +13,18 @@ const required = [
   'ontology/churchcore-upper-classifications.ttl',
   'ontology/churchcore-upper-situations.ttl',
   'ontology/churchcore-upper-community.ttl',
-  'ontology/churchcore-upper-bible.ttl',
   'ontology/churchcore-upper-discipleship.ttl',
   'ontology/churchcore-upper-commerce.ttl',
   'ontology/churchcore-all.ttl',
+  'ontology/tbox/core.ttl',
+  'ontology/tbox/plan.ttl',
+  'ontology/tbox/prov.ttl',
+  'ontology/tbox/situation.ttl',
+  'ontology/tbox/community.ttl',
+  'ontology/tbox/journey.ttl',
+  'ontology/tbox/commerce.ttl',
+  'ontology/cbox/classifications.ttl',
+  'ontology/abox/empty.ttl',
 ];
 
 function main() {

@@ -1,0 +1,34 @@
+@prefix ccgclass: <https://ontology.churchcore.ai/cc/global/class#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+
+<https://ontology.churchcore.ai/cc/global/cbox/people-group-status>
+  a owl:Ontology ;
+  rdfs:label "ChurchCore-Global C-Box (people group status)" ;
+  rdfs:comment "Categories for people-group engagement and reach status used in global mission datasets." ;
+  owl:imports <http://www.w3.org/2004/02/skos/core> .
+
+ccgclass:PeopleGroupStatusScheme a skos:ConceptScheme ;
+  skos:prefLabel "People group status" .
+
+ccgclass:pg_unengaged_unreached a skos:Concept ;
+  skos:inScheme ccgclass:PeopleGroupStatusScheme ;
+  skos:notation "unengaged_unreached" ;
+  skos:prefLabel "Unengaged & unreached" .
+
+ccgclass:pg_engaged_unreached a skos:Concept ;
+  skos:inScheme ccgclass:PeopleGroupStatusScheme ;
+  skos:notation "engaged_unreached" ;
+  skos:prefLabel "Engaged but unreached" .
+
+ccgclass:pg_reached a skos:Concept ;
+  skos:inScheme ccgclass:PeopleGroupStatusScheme ;
+  skos:notation "reached" ;
+  skos:prefLabel "Reached" .
+
+ccgclass:pg_emerging a skos:Concept ;
+  skos:inScheme ccgclass:PeopleGroupStatusScheme ;
+  skos:notation "emerging" ;
+  skos:prefLabel "Emerging church movement" .
+

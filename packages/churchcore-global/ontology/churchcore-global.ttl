@@ -1,0 +1,10 @@
+@prefix ccglobal: <https://ontology.churchcore.ai/cc/global#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+<https://ontology.churchcore.ai/cc/global>
+  a owl:Ontology ;
+  rdfs:label "ChurchCore-Global Ontology (Big-C)" ;
+  rdfs:comment "Big-C Christian ecosystem: denominations, mission agencies, global initiatives, people groups, movements/networks, and shared Christian reference structures." ;
+  owl:imports <https://ontology.churchcore.ai/cc/global/all> .
+

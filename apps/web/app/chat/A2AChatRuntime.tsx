@@ -8,8 +8,8 @@ import { makeA2AChatModelAdapter } from "./a2aChatModelAdapter";
 export function A2AChatRuntime(props: {
   session: Session;
   threadId: string;
-  provider?: "langgraph" | "gloo";
-  glooMode?: "general" | "grounded" | "auto";
+  provider?: "langgraph" | "ai_gateway";
+  aiGatewayMode?: "general" | "grounded" | "auto";
   onFinalEnvelope?: (env: OutputEnvelope | null) => void;
   historyAdapter: any;
   children: React.ReactNode;
@@ -20,10 +20,10 @@ export function A2AChatRuntime(props: {
         session: props.session,
         threadId: props.threadId,
         provider: props.provider,
-        glooMode: props.glooMode,
+        aiGatewayMode: props.aiGatewayMode,
         onFinalEnvelope: props.onFinalEnvelope,
       }),
-    [props.session, props.threadId, props.provider, props.glooMode, props.onFinalEnvelope],
+    [props.session, props.threadId, props.provider, props.aiGatewayMode, props.onFinalEnvelope],
   );
 
   const runtime = useLocalRuntime(model, {

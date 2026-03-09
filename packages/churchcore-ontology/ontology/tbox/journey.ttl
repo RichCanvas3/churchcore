@@ -1,0 +1,70 @@
+@prefix cc: <https://ontology.churchcore.ai/cc#> .
+@prefix ccjourney: <https://ontology.churchcore.ai/cc/journey#> .
+@prefix prov: <http://www.w3.org/ns/prov#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<https://ontology.churchcore.ai/cc/journey/tbox>
+  a owl:Ontology ;
+  rdfs:label "ChurchCore T-Box (journey)" ;
+  rdfs:comment "Faith-agnostic discipleship/journey schema: canonical graphs + per-person state/events. No Bible-specific types here." ;
+  owl:imports <https://ontology.churchcore.ai/cc> ;
+  owl:imports <http://www.w3.org/ns/prov-o-20130430> .
+
+ccjourney:JourneyGraph a owl:Class ;
+  rdfs:label "JourneyGraph" ;
+  rdfs:subClassOf cc:Resource .
+
+ccjourney:JourneyNode a owl:Class ;
+  rdfs:label "JourneyNode" ;
+  rdfs:subClassOf cc:Resource .
+
+ccjourney:JourneyEdge a owl:Class ;
+  rdfs:label "JourneyEdge" ;
+  rdfs:subClassOf cc:Resource .
+
+ccjourney:fromNode a owl:ObjectProperty ;
+  rdfs:label "fromNode" ;
+  rdfs:domain ccjourney:JourneyEdge ;
+  rdfs:range ccjourney:JourneyNode .
+
+ccjourney:toNode a owl:ObjectProperty ;
+  rdfs:label "toNode" ;
+  rdfs:domain ccjourney:JourneyEdge ;
+  rdfs:range ccjourney:JourneyNode .
+
+ccjourney:edgeKind a owl:DatatypeProperty ;
+  rdfs:label "edgeKind" ;
+  rdfs:domain ccjourney:JourneyEdge ;
+  rdfs:range xsd:string .
+
+ccjourney:PersonJourneyState a owl:Class ;
+  rdfs:label "PersonJourneyState" ;
+  rdfs:subClassOf cc:Resource .
+
+ccjourney:forPerson a owl:ObjectProperty ;
+  rdfs:label "forPerson" ;
+  rdfs:domain ccjourney:PersonJourneyState ;
+  rdfs:range cc:Person .
+
+ccjourney:currentNode a owl:ObjectProperty ;
+  rdfs:label "currentNode" ;
+  rdfs:domain ccjourney:PersonJourneyState ;
+  rdfs:range ccjourney:JourneyNode .
+
+ccjourney:updatedAt a owl:DatatypeProperty ;
+  rdfs:label "updatedAt" ;
+  rdfs:domain ccjourney:PersonJourneyState ;
+  rdfs:range xsd:dateTime .
+
+ccjourney:PersonJourneyEvent a owl:Class ;
+  rdfs:label "PersonJourneyEvent" ;
+  rdfs:subClassOf prov:Activity .
+
+ccjourney:hasReferenceSet a owl:ObjectProperty ;
+  rdfs:label "hasReferenceSet" ;
+  rdfs:comment "Links a JourneyNode to a reference set (scripture, article set, curriculum, etc.). Specific reference-set types are defined in derived ontologies." ;
+  rdfs:domain ccjourney:JourneyNode ;
+  rdfs:range cc:Resource .
+

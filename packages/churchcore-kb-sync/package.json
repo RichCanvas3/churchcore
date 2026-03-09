@@ -10,7 +10,8 @@
     "@churchcore/graphdb-client": "workspace:*",
     "@churchcore/agentictrust-ontology": "workspace:*",
     "@churchcore/churchcore-ontology": "workspace:*",
-    "@churchcore/churchcore-local-ontology": "workspace:*",
+    "@churchcore/churchcore-global": "workspace:*",
+    "@churchcore/churchcore-congregation": "workspace:*",
     "better-sqlite3": "^11.10.0"
   }
 }

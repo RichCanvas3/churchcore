@@ -27,8 +27,8 @@ type ThreadMeta = { id: string; title: string; status: string; updatedAt?: strin
 type ActiveThreadMeta = {
   templateId: string | null;
   toolIds: string[];
-  llmProvider: "langgraph" | "gloo";
-  glooMode: "general" | "grounded" | "auto";
+  llmProvider: "langgraph" | "ai_gateway";
+  aiGatewayMode: "general" | "grounded" | "auto";
 };
 
 async function postJson<T>(url: string, body: unknown): Promise<T> {
@@ -223,10 +223,12 @@ export default function ChatPage() {
     }
     const toolIds = Array.isArray(meta?.tool_ids) ? meta.tool_ids.map((x: any) => String(x)).filter(Boolean) : [];
     const llmProviderRaw = typeof meta?.llm_provider === "string" ? String(meta.llm_provider).trim().toLowerCase() : "";
-    const llmProvider: "langgraph" | "gloo" = llmProviderRaw === "gloo" ? "gloo" : "langgraph";
-    const glooModeRaw = typeof meta?.gloo_mode === "string" ? String(meta.gloo_mode).trim().toLowerCase() : "";
-    const glooMode: "general" | "grounded" | "auto" = glooModeRaw === "general" || glooModeRaw === "auto" || glooModeRaw === "grounded" ? glooModeRaw : "grounded";
-    return { templateId: typeof meta?.template_id === "string" ? meta.template_id : null, toolIds, llmProvider, glooMode };
+    const llmProvider: "langgraph" | "ai_gateway" = llmProviderRaw === "ai_gateway" ? "ai_gateway" : "langgraph";
+    const aiGatewayModeRaw =
+      typeof meta?.ai_gateway_mode === "string" ? String(meta.ai_gateway_mode).trim().toLowerCase() : "";
+    const aiGatewayMode: "general" | "grounded" | "auto" =
+      aiGatewayModeRaw === "general" || aiGatewayModeRaw === "auto" || aiGatewayModeRaw === "grounded" ? aiGatewayModeRaw : "grounded";
+    return { templateId: typeof meta?.template_id === "string" ? meta.template_id : null, toolIds, llmProvider, aiGatewayMode };
   }, [effectiveThreadId, threads]);
 
   const session = useMemo<Session>(
@@ -697,11 +699,11 @@ export default function ChatPage() {
 
   async function createThreadFromTemplate(tpl: { slug: string; title: string; toolIds?: string[] }) {
     const title = (customTitle || tpl.title || "New topic").trim() || "New topic";
-    const useGloo = String(tpl.slug || "").trim().toLowerCase() === "ask_our_church";
+    const useAiGateway = String(tpl.slug || "").trim().toLowerCase() === "ask_our_church";
     const metadata: any = { template_id: tpl.slug, tool_ids: Array.isArray(tpl.toolIds) ? tpl.toolIds : [] };
-    if (useGloo) {
-      metadata.llm_provider = "gloo";
-      metadata.gloo_mode = "grounded";
+    if (useAiGateway) {
+      metadata.llm_provider = "ai_gateway";
+      metadata.ai_gateway_mode = "grounded";
     }
     const out = await postJson<{ thread_id?: string }>("/api/a2a/thread/create", {
       identity: {
@@ -1219,7 +1221,7 @@ export default function ChatPage() {
             session={session}
             threadId={effectiveThreadId}
             provider={activeThreadMeta?.llmProvider ?? "langgraph"}
-            glooMode={activeThreadMeta?.glooMode ?? "grounded"}
+            aiGatewayMode={activeThreadMeta?.aiGatewayMode ?? "grounded"}
             historyAdapter={historyAdapter}
             onFinalEnvelope={(env) => {
               setSending(false);

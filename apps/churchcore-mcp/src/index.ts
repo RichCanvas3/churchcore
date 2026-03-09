@@ -4497,6 +4497,9 @@ function ttlPrefixes() {
   return [
     `@prefix cc: <https://ontology.churchcore.ai/cc#> .`,
     `@prefix cccomm: <https://ontology.churchcore.ai/cc/community#> .`,
+    `@prefix cccong: <https://ontology.churchcore.ai/cc/congregation#> .`,
+    `@prefix ccglobal: <https://ontology.churchcore.ai/cc/global#> .`,
+    `@prefix ccbible: <https://ontology.churchcore.ai/cc/global/bible#> .`,
     `@prefix ccprov: <https://ontology.churchcore.ai/cc/prov#> .`,
     `@prefix ccsit: <https://ontology.churchcore.ai/cc/situation#> .`,
     `@prefix prov: <http://www.w3.org/ns/prov#> .`,
@@ -4686,7 +4689,9 @@ async function syncGraphDbFromD1(env: Env, args: { churchId: string; mode: "full
         const lines: string[] = [];
         for (const r of rows as any[]) {
           const s = `${idBase}/group/${encodeURIComponent(String(r.id))}`;
-          const parts: string[] = [`${ttlIri(s)} a cccomm:SmallGroup ; cc:name ${ttlLitString(r.name ?? "")}`];
+          const parts: string[] = [
+            `${ttlIri(s)} a cccomm:Group, cccong:SmallGroup ; cc:name ${ttlLitString(r.name ?? "")}`,
+          ];
           if (r.description) parts.push(`; cc:description ${ttlLitString(r.description)}`);
           parts.push(`; prov:generatedAtTime ${ttlLitDateTime(r.updatedAt ?? r.createdAt ?? nowIso())} .`);
           lines.push(parts.join(" "));

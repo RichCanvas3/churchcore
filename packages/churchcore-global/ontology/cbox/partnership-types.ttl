@@ -1,0 +1,21 @@
+@prefix ccgclass: <https://ontology.churchcore.ai/cc/global/class#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+
+<https://ontology.churchcore.ai/cc/global/cbox/partnership-types>
+  a owl:Ontology ;
+  rdfs:label "ChurchCore-Global C-Box (partnership types)" ;
+  rdfs:comment "Categories for how a congregation relates to supra-congregational organizations and initiatives." ;
+  owl:imports <http://www.w3.org/2004/02/skos/core> .
+
+ccgclass:PartnershipTypeScheme a skos:ConceptScheme ;
+  skos:prefLabel "Partnership types" .
+
+ccgclass:partner_financial_support a skos:Concept ; skos:inScheme ccgclass:PartnershipTypeScheme ; skos:notation "financial_support" ; skos:prefLabel "Financial support" .
+ccgclass:partner_prayer_partner a skos:Concept ; skos:inScheme ccgclass:PartnershipTypeScheme ; skos:notation "prayer_partner" ; skos:prefLabel "Prayer partnership" .
+ccgclass:partner_sending_partner a skos:Concept ; skos:inScheme ccgclass:PartnershipTypeScheme ; skos:notation "sending_partner" ; skos:prefLabel "Sending partner" .
+ccgclass:partner_strategic_partner a skos:Concept ; skos:inScheme ccgclass:PartnershipTypeScheme ; skos:notation "strategic_partner" ; skos:prefLabel "Strategic partnership" .
+ccgclass:partner_hosting_partner a skos:Concept ; skos:inScheme ccgclass:PartnershipTypeScheme ; skos:notation "hosting_partner" ; skos:prefLabel "Hosting / event partner" .
+ccgclass:partner_referral_partner a skos:Concept ; skos:inScheme ccgclass:PartnershipTypeScheme ; skos:notation "referral_partner" ; skos:prefLabel "Referral / services partner" .
+
