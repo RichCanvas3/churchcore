@@ -10,6 +10,7 @@ export type Env = {
   CRAWL_BUDGET?: string;
   CRAWL_DOMAIN_ALLOWLIST?: string;
   ASSEMBLYAI_API_KEY?: string;
+  ASSEMBLYAI_HTTP_TIMEOUT_MS?: string; // default 20000
   OPENAI_API_KEY?: string;
   OPENAI_EMBEDDINGS_MODEL?: string;
   OPENAI_MESSAGE_MODEL?: string; // e.g. gpt-5.2
@@ -3801,17 +3802,28 @@ async function assemblyAiRequest(env: Env, path: string, init: RequestInit) {
   const apiKey = (env.ASSEMBLYAI_API_KEY ?? "").trim();
   if (!apiKey) throw new Error("Missing ASSEMBLYAI_API_KEY (required for AssemblyAI transcription).");
   const url = `https://api.assemblyai.com${path.startsWith("/") ? "" : "/"}${path}`;
-  const res = await fetch(url, {
-    ...init,
-    headers: {
-      authorization: apiKey,
-      "content-type": "application/json",
-      ...(init.headers ?? {}),
-    } as any,
-  });
-  const data = (await res.json().catch(() => ({}))) as any;
-  if (!res.ok) throw new Error(`assemblyai_error:${res.status}:${data?.error ?? data?.message ?? "unknown"}`);
-  return data;
+  const timeoutMs = clampInt(env.ASSEMBLYAI_HTTP_TIMEOUT_MS, 20000, 2000, 60000);
+  const ac = new AbortController();
+  const t = setTimeout(() => ac.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, {
+      ...init,
+      signal: ac.signal,
+      headers: {
+        authorization: apiKey,
+        "content-type": "application/json",
+        ...(init.headers ?? {}),
+      } as any,
+    });
+    const data = (await res.json().catch(() => ({}))) as any;
+    if (!res.ok) throw new Error(`assemblyai_error:${res.status}:${data?.error ?? data?.message ?? "unknown"}`);
+    return data;
+  } catch (e: any) {
+    if (String(e?.name ?? "") === "AbortError") throw new Error("assemblyai_timeout");
+    throw e;
+  } finally {
+    clearTimeout(t);
+  }
 }
 
 async function assemblyAiSubmit(env: Env, args: { audioUrl: string }) {
@@ -4168,13 +4180,17 @@ async function crawlOne(env: Env, args: { churchId: string; url: string; allowDo
 
   const headers: Record<string, string> = { "user-agent": "churchcore-mcp-crawler/0.1" };
   let isMessageDetailUrl = false;
+  let isMessagesIndexUrl = false;
   try {
     const u0 = new URL(url);
     isMessageDetailUrl = Boolean(u0.searchParams.get("enmse_mid")) && u0.pathname.includes("/messages/");
+    // Also treat message index pages as forceable, so we can reliably discover new message detail URLs.
+    isMessagesIndexUrl = !u0.searchParams.get("enmse_mid") && /^\/messages\/(boulder|erie|thornton)?\/$/i.test(u0.pathname);
   } catch {
     isMessageDetailUrl = false;
+    isMessagesIndexUrl = false;
   }
-  const forceMessages = Boolean(args.forceMessages) && isMessageDetailUrl;
+  const forceMessages = Boolean(args.forceMessages) && (isMessageDetailUrl || isMessagesIndexUrl);
   if (!forceMessages) {
     if (typeof prev?.etag === "string" && prev.etag) headers["if-none-match"] = prev.etag;
     if (typeof prev?.lastModified === "string" && prev.lastModified) headers["if-modified-since"] = prev.lastModified;
@@ -4205,7 +4221,9 @@ async function crawlOne(env: Env, args: { churchId: string; url: string; allowDo
 
     const raw = await res.text();
     const title = extractTitle(raw);
-    const links = extractLinksFromHtml(raw, url);
+    // Some pages encode querystring separators as HTML entities in href attributes (e.g., &amp;),
+    // which breaks URLSearchParams parsing unless decoded.
+    const links = extractLinksFromHtml(raw, url).map((l) => String(l).replace(/&amp;/g, "&").replace(/&#0?38;/g, "&"));
     const text = stripHtmlToText(raw);
     const bodyMarkdown = `Source: ${url}\n\n${text}`;
     const contentHash = await sha256Hex(bodyMarkdown);
@@ -4217,7 +4235,8 @@ async function crawlOne(env: Env, args: { churchId: string; url: string; allowDo
     const tid = u.searchParams.get("enmse_tid");
     const sid = u.searchParams.get("enmse_sid");
     const isMessageDetail = Boolean(mid) && u.pathname.includes("/messages/");
-    const isCampusMessagesIndex = !mid && /^\/messages\/(boulder|erie|thornton)\/$/i.test(u.pathname);
+    // Treat both the global messages index and campus-specific indexes as sources of recent message links.
+    const isCampusMessagesIndex = !mid && /^\/messages\/(boulder|erie|thornton)?\/$/i.test(u.pathname);
     const isDiscussionJohn = /^\/discussion\/john\/$/i.test(u.pathname);
 
     // If this is the discussion guide page, upsert weekly guide links (best effort).
@@ -4257,7 +4276,7 @@ async function crawlOne(env: Env, args: { churchId: string; url: string; allowDo
 
     // Discover recent message detail URLs from campus index pages.
     const discoveredUrls = isCampusMessagesIndex
-      ? Array.from(new Set(links.filter((l) => l.includes("enmse_mid=") && l.includes(u.pathname)))).slice(0, 20)
+      ? Array.from(new Set(links.filter((l) => l.includes("enmse_mid=") && l.includes("/messages/")))).slice(0, 30)
       : ([] as string[]);
 
     let doc: { docId: string; sourceId: string } | null = null;
@@ -5332,10 +5351,21 @@ async function runScheduledCrawl(env: Env, cron: string, opts?: { forceMessages?
   const seedUrls = [...new Set([...keyPages, ...daily])].slice(0, seedLimit);
 
   const first = await crawlBatch(env, { churchId, urls: seedUrls, allowDomains, now, forceMessages: opts?.forceMessages });
+  const messageUrlBudget = Math.max(0, budget - seedUrls.length);
   const messageUrls = first.discoveredUrls
     .filter((u) => u.includes("/messages/") && u.includes("enmse_mid="))
     .filter((u) => !u.includes("enmse_o=")) // avoid paging controls
-    .slice(0, Math.max(0, budget - seedUrls.length));
+    // Prefer newest messages (enmse_mid is monotonically increasing).
+    .sort((a, b) => {
+      try {
+        const ma = Number(new URL(a).searchParams.get("enmse_mid") || 0);
+        const mb = Number(new URL(b).searchParams.get("enmse_mid") || 0);
+        return mb - ma;
+      } catch {
+        return 0;
+      }
+    })
+    .slice(0, messageUrlBudget);
 
   const second = messageUrls.length
     ? await crawlBatch(env, { churchId, urls: messageUrls, allowDomains, now, forceMessages: opts?.forceMessages })
