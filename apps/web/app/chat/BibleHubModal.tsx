@@ -157,7 +157,7 @@ export function BibleHubModal(props: { identity: Identity; initialRef?: string |
         onClick={(e) => e.stopPropagation()}
         style={{
           width: "min(1400px, 98vw)",
-          height: "min(94vh, 1100px)",
+            height: "min(94dvh, 1100px)",
           background: "white",
           borderRadius: 16,
           border: "1px solid #e2e8f0",

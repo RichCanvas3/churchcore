@@ -1,0 +1,20 @@
+/* Global mobile UX fixes (iOS Safari zoom, tap targets). */
+
+@media (max-width: 768px) {
+  /*
+    iOS Safari auto-zooms when focusing inputs with font-size < 16px.
+    Many screens use inline styles with 12px inputs/selects.
+  */
+  input,
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+
+  /* Reduce double-tap zoom and improve tap handling. */
+  button,
+  a {
+    touch-action: manipulation;
+  }
+}
+

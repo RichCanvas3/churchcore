@@ -338,6 +338,7 @@ export default function ChatPage() {
     if (toolId === "calendar") return "My Calendar";
     if (toolId === "bible_reader") return "Bible Scripture";
     if (toolId === "groups_manager") return "My Groups";
+    if (toolId === "strategic_intent") return "Congregation Strategic Intent";
     const t = String(title ?? "").trim();
     return t || toolId;
   }
@@ -616,7 +617,7 @@ export default function ChatPage() {
                       : p.toolId === "church_overview"
                         ? "Church"
                         : p.toolId === "strategic_intent"
-                          ? "Strategic intent"
+                          ? "Congregation Strategic Intent"
                               : p.toolId;
           return (
             <span key={i} style={{ display: "inline-flex", margin: "0 6px", verticalAlign: "middle" }}>
@@ -1618,7 +1619,7 @@ export default function ChatPage() {
             onClick={(e) => e.stopPropagation()}
             style={{
               width: "min(1100px, 98vw)",
-              height: "min(94vh, 1100px)",
+              height: "min(94dvh, 1100px)",
               background: "white",
               borderRadius: 16,
               border: "1px solid #e2e8f0",
@@ -1717,7 +1718,7 @@ export default function ChatPage() {
             onClick={(e) => e.stopPropagation()}
             style={{
               width: "min(920px, 98vw)",
-              height: "min(84vh, 820px)",
+              height: "min(84dvh, 820px)",
               background: "white",
               borderRadius: 16,
               border: "1px solid #e2e8f0",

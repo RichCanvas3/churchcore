@@ -68,7 +68,8 @@ export function AppHeader(props: { height?: number }) {
     };
     const onPointerDown = (e: PointerEvent) => {
       const t = e.target as any;
-      const inMenu = t && typeof t.closest === "function" ? Boolean(t.closest("[data-appheader-menu]")) : false;
+      const inMenu =
+        t && typeof t.closest === "function" ? Boolean(t.closest("[data-appheader-menu], [data-appheader-menu-sheet]")) : false;
       if (!inMenu) setMenuOpen(false);
     };
     const onScroll = () => setMenuOpen(false);
@@ -429,6 +430,7 @@ export function AppHeader(props: { height?: number }) {
         <div
           role="dialog"
           aria-modal="true"
+          data-appheader-menu-sheet
           style={{
             position: "fixed",
             inset: 0,
@@ -507,7 +509,7 @@ export function AppHeader(props: { height?: number }) {
           <div
             style={{
               width: "min(760px, 96vw)",
-              height: "min(78vh, 760px)",
+              height: "min(78dvh, 760px)",
               background: "white",
               borderRadius: 16,
               overflow: "hidden",

@@ -133,7 +133,7 @@ export function StrategicIntentPanel(props: { identity: Identity; onClose: () =>
           gap: 10,
         }}
       >
-        <div style={{ fontWeight: 900, fontSize: 14 }}>Strategic intent</div>
+        <div style={{ fontWeight: 900, fontSize: 14 }}>Congregation Strategic Intent</div>
         <button
           onClick={props.onClose}
           style={{ border: "1px solid #e2e8f0", background: "white", borderRadius: 10, padding: "6px 8px", cursor: "pointer", fontSize: 12, fontWeight: 900 }}

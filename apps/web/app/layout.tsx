@@ -1,10 +1,16 @@
 import type { ReactNode } from "react";
 import { AppHeader } from "../components/AppHeader";
 import { DemoIdentityProvider } from "../components/DemoIdentityProvider";
+import "./globals.css";
 
 export const metadata = {
   title: "Church Agent",
   description: "Single agent with seeker + guide roles",
+};
+
+export const viewport = {
+  width: "device-width",
+  initialScale: 1,
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

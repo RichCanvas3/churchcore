@@ -158,12 +158,12 @@ export function ChurchOverviewPanel(props: { identity: Identity; onClose: () => 
 
             <div style={{ border: "1px solid #e2e8f0", borderRadius: 12, overflow: "hidden" }}>
               <div style={{ padding: "10px 12px", background: "#f8fafc", borderBottom: "1px solid #e2e8f0", fontWeight: 900, fontSize: 12, display: "flex", justifyContent: "space-between", gap: 10 }}>
-                <div>Strategic intent (summary)</div>
+                <div>Congregation Strategic Intent (summary)</div>
                 <button
                   onClick={() => props.onOpenTool?.("strategic_intent")}
                   style={{ border: "1px solid #0f172a", background: "#0f172a", color: "white", borderRadius: 10, padding: "6px 10px", cursor: "pointer", fontSize: 12, fontWeight: 900 }}
                 >
-                  Open strategic intent
+                  Open Congregation Strategic Intent
                 </button>
               </div>
               <div style={{ padding: 12, display: "grid", gap: 10 }}>
