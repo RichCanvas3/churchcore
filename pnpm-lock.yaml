@@ -109,6 +109,24 @@ importers:
 
   packages/agentictrust-ontology: {}
 
+  packages/churchcore-congregation:
+    dependencies:
+      '@churchcore/churchcore-ontology':
+        specifier: workspace:*
+        version: link:../churchcore-ontology
+
+  packages/churchcore-faith-journey:
+    dependencies:
+      '@churchcore/churchcore-ontology':
+        specifier: workspace:*
+        version: link:../churchcore-ontology
+
+  packages/churchcore-global:
+    dependencies:
+      '@churchcore/churchcore-ontology':
+        specifier: workspace:*
+        version: link:../churchcore-ontology
+
   packages/churchcore-graphdb-client: {}
 
   packages/churchcore-kb-sync:
@@ -116,9 +134,12 @@ importers:
       '@churchcore/agentictrust-ontology':
         specifier: workspace:*
         version: link:../agentictrust-ontology
-      '@churchcore/churchcore-local-ontology':
+      '@churchcore/churchcore-congregation':
         specifier: workspace:*
-        version: link:../churchcore-local-ontology
+        version: link:../churchcore-congregation
+      '@churchcore/churchcore-global':
+        specifier: workspace:*
+        version: link:../churchcore-global
       '@churchcore/churchcore-ontology':
         specifier: workspace:*
         version: link:../churchcore-ontology
@@ -129,13 +150,13 @@ importers:
         specifier: ^11.10.0
         version: 11.10.0
 
-  packages/churchcore-local-ontology:
+  packages/churchcore-ontology: {}
+
+  packages/churchcore-people-groups:
     dependencies:
       '@churchcore/churchcore-ontology':
         specifier: workspace:*
         version: link:../churchcore-ontology
-
-  packages/churchcore-ontology: {}
 
 packages:
 
