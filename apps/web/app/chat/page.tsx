@@ -547,9 +547,9 @@ export default function ChatPage() {
     const s0 = String(text ?? "");
     const patterns = [
       // Normal JSON
-      /\{\s*"type"\s*:\s*"ui_tool"\s*,\s*"tool_id"\s*:\s*"([^"]+)"\s*\}/g,
+      /\{\s*"type"\s*:\s*"ui_tools?"\s*,\s*"tool_id"\s*:\s*"([^"]+)"\s*\}/g,
       // Escaped JSON inside strings, e.g. {\"type\":\"ui_tool\",\"tool_id\":\"calendar\"}
-      /\{\s*\\"type\\"\s*:\s*\\"ui_tool\\"\s*,\s*\\"tool_id\\"\s*:\s*\\"([^\\"]+)\\"\s*\}/g,
+      /\{\s*\\"type\\"\s*:\s*\\"ui_tools?\\"\s*,\s*\\"tool_id\\"\s*:\s*\\"([^\\"]+)\\"\s*\}/g,
     ];
     // Collect matches from either pattern, then split in one pass.
     const matches: Array<{ start: number; end: number; toolId: string }> = [];

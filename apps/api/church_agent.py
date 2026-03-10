@@ -217,7 +217,7 @@ def _ui_handoff_for_user_text(user_text: str) -> list[dict[str, Any]]:
             "weekly calendar",
             "week calendar",
         ]
-    ) or ("calendar" in u and "event" in u)
+    ) or u.strip() == "calendar" or ("calendar" in u and "event" in u)
     if calendarish:
         return [
             {
@@ -227,6 +227,35 @@ def _ui_handoff_for_user_text(user_text: str) -> list[dict[str, Any]]:
                 "instructions": "Open the events calendar panel.",
             }
         ]
+
+
+def _is_short_ui_open_request(user_text: str) -> bool:
+    u = (user_text or "").strip().lower()
+    if not u:
+        return False
+    if len(u) > 40:
+        return False
+    # Intent: let 1-3 word "open/show" commands skip an LLM call.
+    if u.startswith("open ") or u.startswith("show "):
+        return True
+    return u in {
+        "calendar",
+        "events",
+        "event",
+        "guide",
+        "church",
+        "bible",
+        "bible reader",
+        "kids checkin",
+        "kids check-in",
+        "checkin",
+        "check-in",
+        "groups",
+        "my groups",
+        "faith journey",
+        "strategic intent",
+        "congregation strategic intent",
+    }
 
     intentish = any(
         k in u
@@ -1814,6 +1843,18 @@ async def handle_seeker_skill(
         journey, journey_summary = _journey_context_from_args(args)
         identity_contact_summary = _identity_contact_context_from_args(args)
         weekly, weekly_summary = _weekly_context_from_args(args)
+
+        # Fast path: "open/show X" UI-tool requests shouldn't pay for a full model call.
+        ui_handoff_direct = _ui_handoff_for_user_text(user)
+        if ui_handoff_direct and _is_short_ui_open_request(user):
+            # Keep this terse so the UI can immediately render the right panel.
+            title = str(ui_handoff_direct[0].get("title") or "tool").strip().lower()
+            msg = "Opening that."
+            if title == "calendar":
+                msg = "Opening the calendar."
+            elif title:
+                msg = f"Opening {title}."
+            return OutputEnvelope(message=msg, handoff=ui_handoff_direct)
 
         # If the user is asking an explicit faith-journey / salvation / "next steps" question,
         # ground the answer with GraphDB via SPARQL (canonical journey graphs + edges),
