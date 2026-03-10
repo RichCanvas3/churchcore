@@ -20,7 +20,7 @@ import { ChurchOverviewPanel } from "./ChurchOverviewPanel";
 import { StrategicIntentPanel } from "./StrategicIntentPanel";
 import { CalendarPanel } from "./CalendarPanel";
 import { WeeklySermonsPanel } from "./WeeklySermonsPanel";
-import { BibleHubModal } from "./BibleHubModal";
+import { BibleReaderPanel } from "./BibleReaderPanel";
 import styles from "./ChatLayout.module.css";
 
 type ThreadMeta = { id: string; title: string; status: string; updatedAt?: string; createdAt?: string; metadataJson?: string | null; metadata?: any };
@@ -101,8 +101,8 @@ export default function ChatPage() {
   const [sermonCompareIncluded, setSermonCompareIncluded] = useState<any[]>([]);
   const [sermonCompareAnchorId, setSermonCompareAnchorId] = useState<string>("");
   const [sermonCompareMatch, setSermonCompareMatch] = useState<any | null>(null);
-  const [bibleHubOpen, setBibleHubOpen] = useState(false);
-  const [bibleHubRef, setBibleHubRef] = useState<string | null>(null);
+  const [bibleRef, setBibleRef] = useState<string | null>(null);
+  const [hideBibleTool, setHideBibleTool] = useState(false);
   const [threadReloadNonce, setThreadReloadNonce] = useState(0);
   const [newTopicOpen, setNewTopicOpen] = useState(false);
   const [templateBusy, setTemplateBusy] = useState(false);
@@ -112,9 +112,11 @@ export default function ChatPage() {
   const [customTitle, setCustomTitle] = useState("");
 
   const closeTool = () => {
+    const isBible = String(activeUiToolId || "").trim() === "bible_reader";
     setActiveUiToolId(null);
     setActiveUiToolArgs(null);
     setIsToolsOpenMobile(false);
+    if (isBible) setHideBibleTool(true);
   };
 
   async function openSermonCompare(anchorMessageId?: string) {
@@ -160,13 +162,16 @@ export default function ChatPage() {
     const nextToolId = toolId === "kids_safety" || toolId === "household_memory" ? "household_manager" : toolId;
     if (nextToolId === "bible_reader") {
       const r = args && typeof (args as any)?.ref === "string" ? String((args as any).ref) : null;
-      setBibleHubRef(r);
-      setBibleHubOpen(true);
-      setIsToolsOpenMobile(false);
+      setBibleRef(r);
+      setHideBibleTool(false);
+      setActiveUiToolId("bible_reader");
+      setActiveUiToolArgs(args ?? null);
+      if (isMobile) setIsToolsOpenMobile(true);
       return;
     }
     setActiveUiToolId(nextToolId);
     setActiveUiToolArgs(args ?? null);
+    setHideBibleTool(false);
   }
 
   useEffect(() => {
@@ -296,8 +301,16 @@ export default function ChatPage() {
   useEffect(() => {
     setActiveUiToolId(null);
     setIsToolsOpenMobile(false);
+    setHideBibleTool(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [effectiveThreadId]);
+
+  const effectiveUiToolId = useMemo(() => {
+    // On mobile, don't force-open the Bible panel by default.
+    if (isMobile) return activeUiToolId;
+    if (activeUiToolId) return activeUiToolId;
+    return hideBibleTool ? null : "bible_reader";
+  }, [activeUiToolId, hideBibleTool, isMobile]);
 
   // Welcome card is shown only when the thread is empty.
   useEffect(() => {
@@ -924,7 +937,7 @@ export default function ChatPage() {
       style={
         {
           ["--left-width" as any]: effectiveLeftCollapsed ? "72px" : "234px",
-          ["--right-width" as any]: activeUiToolId ? "minmax(420px, 40%)" : "0px",
+          ["--right-width" as any]: effectiveUiToolId ? "minmax(420px, 40%)" : "0px",
         } as any
       }
     >
@@ -1228,8 +1241,11 @@ export default function ChatPage() {
               const handoff = Array.isArray((env as any)?.handoff) ? ((env as any).handoff as any[]) : [];
               const uiTool = handoff.find((h) => h && typeof h === "object" && String((h as any).type || "").toLowerCase() === "ui_tool");
               const toolId = uiTool && typeof (uiTool as any).tool_id === "string" ? String((uiTool as any).tool_id) : null;
+              const toolArgs =
+                uiTool && (uiTool as any)?.args && typeof (uiTool as any).args === "object" ? ((uiTool as any).args as Record<string, unknown>) : null;
               if (toolId) {
-                setActiveUiToolId(toolId);
+                openTool(toolId, toolArgs);
+                setHideBibleTool(false);
               }
               refreshThreads().catch(() => {});
             }}
@@ -1269,10 +1285,10 @@ export default function ChatPage() {
         )}
       </div>
 
-      {activeUiToolId ? (
+      {effectiveUiToolId ? (
         <div className={`${styles.toolPane} ${isMobile && isToolsOpenMobile ? styles.toolPaneOpen : ""}`}>
           <div style={{ height: "100%", minHeight: 0 }}>
-            {activeUiToolId === "household_manager" ? (
+            {effectiveUiToolId === "household_manager" ? (
               <HouseholdManagerPanel
                 identity={{
                   tenant_id: identity.tenant_id,
@@ -1284,7 +1300,7 @@ export default function ChatPage() {
                 }}
                 onClose={closeTool}
               />
-            ) : activeUiToolId === "weekly_sermons" ? (
+            ) : effectiveUiToolId === "weekly_sermons" ? (
               <WeeklySermonsPanel
                 identity={{
                   tenant_id: identity.tenant_id,
@@ -1304,7 +1320,7 @@ export default function ChatPage() {
                 }
                 onClose={closeTool}
               />
-            ) : activeUiToolId === "weekly_podcasts" ? (
+            ) : effectiveUiToolId === "weekly_podcasts" ? (
               <WeeklySermonsPanel
                 identity={{
                   tenant_id: identity.tenant_id,
@@ -1324,7 +1340,7 @@ export default function ChatPage() {
                 }
                 onClose={closeTool}
               />
-            ) : activeUiToolId === "community_manager" ? (
+            ) : effectiveUiToolId === "community_manager" ? (
               <CommunityManagerPanel
                 identity={{
                   tenant_id: identity.tenant_id,
@@ -1336,7 +1352,7 @@ export default function ChatPage() {
                 }}
                 onClose={closeTool}
               />
-            ) : activeUiToolId === "groups_manager" ? (
+            ) : effectiveUiToolId === "groups_manager" ? (
               <GroupsPanel
                 identity={{
                   tenant_id: identity.tenant_id,
@@ -1348,7 +1364,7 @@ export default function ChatPage() {
                 }}
                 onClose={closeTool}
               />
-            ) : activeUiToolId === "kids_checkin" ? (
+            ) : effectiveUiToolId === "kids_checkin" ? (
               <KidsCheckinPanel
                 identity={{
                   tenant_id: identity.tenant_id,
@@ -1359,7 +1375,7 @@ export default function ChatPage() {
                 }}
                 onClose={closeTool}
               />
-            ) : activeUiToolId === "memory_manager" ? (
+            ) : effectiveUiToolId === "memory_manager" ? (
               <MemoryManagerPanel
                 identity={{
                   tenant_id: identity.tenant_id,
@@ -1372,7 +1388,7 @@ export default function ChatPage() {
                 onClose={closeTool}
                 onOpenTool={(toolId) => openTool(toolId)}
               />
-            ) : activeUiToolId === "faith_journey" ? (
+            ) : effectiveUiToolId === "faith_journey" ? (
               <FaithJourneyPanel
                 identity={{
                   tenant_id: identity.tenant_id,
@@ -1384,7 +1400,7 @@ export default function ChatPage() {
                 }}
                 onClose={closeTool}
               />
-            ) : activeUiToolId === "identity_contact" ? (
+            ) : effectiveUiToolId === "identity_contact" ? (
               <IdentityContactPanel
                 identity={{
                   tenant_id: identity.tenant_id,
@@ -1396,7 +1412,7 @@ export default function ChatPage() {
                 }}
                 onClose={closeTool}
               />
-            ) : activeUiToolId === "comm_prefs" ? (
+            ) : effectiveUiToolId === "comm_prefs" ? (
               <CommPrefsPanel
                 identity={{
                   tenant_id: identity.tenant_id,
@@ -1408,7 +1424,7 @@ export default function ChatPage() {
                 }}
                 onClose={closeTool}
               />
-            ) : activeUiToolId === "care_pastoral" ? (
+            ) : effectiveUiToolId === "care_pastoral" ? (
               <CarePastoralPanel
                 identity={{
                   tenant_id: identity.tenant_id,
@@ -1420,7 +1436,7 @@ export default function ChatPage() {
                 }}
                 onClose={closeTool}
               />
-            ) : activeUiToolId === "teams_skills" ? (
+            ) : effectiveUiToolId === "teams_skills" ? (
               <TeamsSkillsPanel
                 identity={{
                   tenant_id: identity.tenant_id,
@@ -1432,7 +1448,7 @@ export default function ChatPage() {
                 }}
                 onClose={closeTool}
               />
-            ) : activeUiToolId === "guide" ? (
+            ) : effectiveUiToolId === "guide" ? (
               <GuidePanel
                 identity={{
                   tenant_id: identity.tenant_id,
@@ -1445,7 +1461,7 @@ export default function ChatPage() {
                 onClose={closeTool}
                 onOpenTool={(toolId: string, args?: any) => openTool(toolId, args ?? null)}
               />
-            ) : activeUiToolId === "church_overview" ? (
+            ) : effectiveUiToolId === "church_overview" ? (
               <ChurchOverviewPanel
                 identity={{
                   tenant_id: identity.tenant_id,
@@ -1458,7 +1474,7 @@ export default function ChatPage() {
                 onClose={closeTool}
                 onOpenTool={(toolId: string) => openTool(toolId)}
               />
-            ) : activeUiToolId === "strategic_intent" ? (
+            ) : effectiveUiToolId === "strategic_intent" ? (
               <StrategicIntentPanel
                 identity={{
                   tenant_id: identity.tenant_id,
@@ -1470,7 +1486,7 @@ export default function ChatPage() {
                 }}
                 onClose={closeTool}
               />
-            ) : activeUiToolId === "calendar" ? (
+            ) : effectiveUiToolId === "calendar" ? (
               <CalendarPanel
                 identity={{
                   tenant_id: identity.tenant_id,
@@ -1482,12 +1498,27 @@ export default function ChatPage() {
                 }}
                 onClose={closeTool}
               />
-            ) : activeUiToolId === "bible_reader" ? (
-              <div style={{ padding: 14, color: "#64748b", background: "white", height: "100%" }}>
-                Bible opens in a full-screen popup now.
-              </div>
+            ) : effectiveUiToolId === "bible_reader" ? (
+              <BibleReaderPanel
+                identity={{
+                  tenant_id: identity.tenant_id,
+                  user_id: identity.user_id,
+                  role: identity.role as any,
+                  campus_id: identity.campus_id ?? null,
+                  timezone: identity.timezone ?? null,
+                  persona_id: (identity as any).persona_id ?? null,
+                }}
+                initialRef={bibleRef}
+                onClose={() => {
+                  setActiveUiToolId(null);
+                  setActiveUiToolArgs(null);
+                  setIsToolsOpenMobile(false);
+                  setHideBibleTool(true);
+                }}
+                showPlan={true}
+              />
             ) : (
-              <div style={{ padding: 14, color: "#64748b", background: "white", height: "100%" }}>Unknown tool: {activeUiToolId}</div>
+              <div style={{ padding: 14, color: "#64748b", background: "white", height: "100%" }}>Unknown tool: {effectiveUiToolId}</div>
             )}
           </div>
         </div>
@@ -1590,21 +1621,6 @@ export default function ChatPage() {
             </div>
           </div>
         </div>
-      ) : null}
-
-      {bibleHubOpen ? (
-        <BibleHubModal
-          identity={{
-            tenant_id: identity.tenant_id,
-            user_id: identity.user_id,
-            role: identity.role,
-            campus_id: identity.campus_id ?? null,
-            timezone: identity.timezone ?? null,
-            persona_id: (identity as any).persona_id ?? null,
-          }}
-          initialRef={bibleHubRef}
-          onClose={() => setBibleHubOpen(false)}
-        />
       ) : null}
 
       {newTopicOpen ? (

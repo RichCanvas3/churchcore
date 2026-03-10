@@ -14,6 +14,14 @@ import { CarePastoralPanel } from "../app/chat/CarePastoralPanel";
 import { TeamsSkillsPanel } from "../app/chat/TeamsSkillsPanel";
 
 type Person = { first_name?: string | null; last_name?: string | null; id?: string | null } | null;
+type JourneyGetStateResponse = {
+  ok?: boolean;
+  current_stage?: { id?: string | null; title?: string | null; summary?: string | null } | null;
+  next_stage_id?: string | null;
+  stage_path?: Array<{ id?: string | null; title?: string | null; summary?: string | null }> | null;
+  confidence?: number;
+  error?: string;
+};
 
 async function postJson<T>(url: string, body: unknown): Promise<T> {
   const res = await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
@@ -30,12 +38,39 @@ export function AppHeader(props: { height?: number }) {
   const [person, setPerson] = useState<Person>(null);
   const [headerToolId, setHeaderToolId] = useState<string | null>(null);
   const [headerToolBackId, setHeaderToolBackId] = useState<string | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [personPickerOpen, setPersonPickerOpen] = useState(false);
+  const [personQuery, setPersonQuery] = useState("");
+  const [journeyByUserId, setJourneyByUserId] = useState<Record<string, { stageTitle: string; stageSummary: string; nextTitle: string; confidence?: number }>>({});
+  const [journeyLoading, setJourneyLoading] = useState(false);
 
   useEffect(() => {
     postJson<{ person?: any }>("/api/a2a/thread/list", { identity, include_archived: false })
       .then((out) => setPerson((out?.person ?? null) as any))
       .catch(() => {});
   }, [identity]);
+
+  // Close the upper-right menu on outside click / scroll / escape.
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setMenuOpen(false);
+    };
+    const onPointerDown = (e: PointerEvent) => {
+      const t = e.target as any;
+      const inMenu = t && typeof t.closest === "function" ? Boolean(t.closest("[data-appheader-menu]")) : false;
+      if (!inMenu) setMenuOpen(false);
+    };
+    const onScroll = () => setMenuOpen(false);
+    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("pointerdown", onPointerDown);
+    window.addEventListener("scroll", onScroll, true);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("pointerdown", onPointerDown);
+      window.removeEventListener("scroll", onScroll, true);
+    };
+  }, [menuOpen]);
 
   useEffect(() => {
     if (!headerToolId) return;
@@ -64,6 +99,72 @@ export function AppHeader(props: { height?: number }) {
     }),
     [identity],
   );
+
+  async function loadJourneyForIdentity(who: any) {
+    try {
+      const out = await postJson<JourneyGetStateResponse>("/api/a2a/journey/get_state", { identity: who });
+      if ((out as any)?.ok === false) throw new Error(String((out as any)?.error ?? "Failed"));
+      const current = out?.current_stage ?? null;
+      const stageTitle = String(current?.title ?? "").trim();
+      const stageSummary = String(current?.summary ?? "").trim();
+      const nextId = String(out?.next_stage_id ?? "").trim();
+      const stagePath = Array.isArray(out?.stage_path) ? out!.stage_path! : [];
+      const nextTitle = nextId ? String(stagePath.find((s) => String(s?.id ?? "") === nextId)?.title ?? "").trim() : "";
+      return { stageTitle, stageSummary, nextTitle, confidence: typeof out?.confidence === "number" ? out.confidence : undefined };
+    } catch {
+      return { stageTitle: "", stageSummary: "", nextTitle: "" };
+    }
+  }
+
+  // Prefetch journey stage summaries for the person picker (prefer visible results first).
+  useEffect(() => {
+    if (!personPickerOpen) return;
+    let cancelled = false;
+    setJourneyLoading(true);
+    const q = String(personQuery || "").trim().toLowerCase();
+    const ordered = (() => {
+      if (!q) return accounts;
+      const match: typeof accounts = [];
+      const rest: typeof accounts = [];
+      for (const a of accounts) {
+        const hay = `${String(a.label || "").toLowerCase()} ${String((a as any)?.identity?.user_id ?? "").toLowerCase()}`.trim();
+        (hay.includes(q) ? match : rest).push(a);
+      }
+      return [...match, ...rest];
+    })();
+    const todo = ordered.slice(0, 80);
+    const max = 6;
+
+    (async () => {
+      const out: Record<string, { stageTitle: string; stageSummary: string; nextTitle: string; confidence?: number }> = {};
+      const queue = [...todo];
+      const workers = Array.from({ length: Math.min(max, queue.length) }, () => null);
+      await Promise.all(
+        workers.map(async () => {
+          while (queue.length) {
+            const a = queue.shift();
+            if (!a) break;
+            const uid = String((a as any)?.identity?.user_id ?? "");
+            if (!uid) continue;
+            const cur = journeyByUserId[uid];
+            if (cur && (cur.stageTitle || cur.stageSummary || cur.nextTitle)) continue;
+            const j = await loadJourneyForIdentity((a as any).identity);
+            out[uid] = j;
+          }
+        }),
+      );
+      if (cancelled) return;
+      setJourneyByUserId((prev) => ({ ...out, ...prev }));
+      setJourneyLoading(false);
+    })().catch(() => {
+      if (!cancelled) setJourneyLoading(false);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [personPickerOpen, personQuery]);
 
   function openHeaderTool(toolId: string, backId: string | null) {
     setHeaderToolBackId(backId);
@@ -115,6 +216,17 @@ export function AppHeader(props: { height?: number }) {
     lineHeight: 1,
   };
 
+  const filteredAccounts = useMemo(() => {
+    const q = String(personQuery || "").trim().toLowerCase();
+    if (!q) return accounts;
+    return accounts.filter((a) => String(a.label || "").toLowerCase().includes(q) || String((a as any)?.identity?.user_id ?? "").toLowerCase().includes(q));
+  }, [accounts, personQuery]);
+
+  function closeAllMenus() {
+    setMenuOpen(false);
+    setPersonPickerOpen(false);
+  }
+
   return (
     <>
       <div
@@ -164,73 +276,174 @@ export function AppHeader(props: { height?: number }) {
             Me
           </button>
 
-          <details>
-            <summary style={{ cursor: "pointer", listStyle: "none", fontWeight: 800 }}>
-              {label} <span style={{ color: "#64748b", fontWeight: 600, fontSize: 12 }}>({identity.role})</span>
-            </summary>
-            <div
-              style={{
-                position: "absolute",
-                right: 14,
-                marginTop: 10,
-                width: 240,
-                border: "1px solid #e2e8f0",
-                background: "white",
-                borderRadius: 12,
-                padding: 10,
-                display: "grid",
-                gap: 10,
-              }}
+          <div style={{ position: "relative" }} data-appheader-menu>
+            <button
+              type="button"
+              onClick={() => setMenuOpen((v) => !v)}
+              style={{ ...pill, fontWeight: 800, display: "inline-flex", alignItems: "baseline", gap: 8 }}
+              aria-haspopup="menu"
+              aria-expanded={menuOpen}
             >
-              <a href="/chat" style={{ fontSize: 14 }}>
-                Chat
-              </a>
-              <a href="/calendar" style={{ fontSize: 14 }}>
-                Calendar
-              </a>
-              <a href="/checkin" style={{ fontSize: 14 }}>
-                Kids check-in
-              </a>
-              <a href="/guide" style={{ fontSize: 14 }}>
-                Guide
-              </a>
-              <a href="/agent-card" style={{ fontSize: 14 }}>
-                Agent card
-              </a>
-              <div style={{ display: "grid", gap: 6 }}>
-                <div style={{ fontSize: 12, color: "#64748b" }}>Switch account</div>
-                <div style={{ display: "grid", gap: 6 }}>
-                  {accounts.map((a) => (
-                    <button
-                      key={a.identity.user_id}
-                      onClick={() => setIdentity(a.identity)}
-                      style={{
-                        textAlign: "left",
-                        border: "1px solid #e2e8f0",
-                        background: a.identity.user_id === identity.user_id ? "#f1f5f9" : "white",
-                        borderRadius: 10,
-                        padding: "8px 10px",
-                        cursor: "pointer",
-                        fontSize: 12,
-                        fontWeight: 800,
-                      }}
-                    >
-                      {a.label}
-                    </button>
-                  ))}
+              <span>{label}</span>
+              <span style={{ color: "#64748b", fontWeight: 600, fontSize: 12 }}>({identity.role})</span>
+            </button>
+            {menuOpen ? (
+              <div
+                style={{
+                  position: "absolute",
+                  right: 0,
+                  marginTop: 10,
+                  width: 260,
+                  border: "1px solid #e2e8f0",
+                  background: "white",
+                  borderRadius: 12,
+                  padding: 10,
+                  display: "grid",
+                  gap: 10,
+                  zIndex: 60,
+                  boxShadow: "0 18px 50px rgba(15, 23, 42, 0.18)",
+                }}
+                role="menu"
+              >
+                <a href="/chat" style={{ fontSize: 14 }} onClick={() => setMenuOpen(false)}>
+                  Chat
+                </a>
+                <a href="/calendar" style={{ fontSize: 14 }} onClick={() => setMenuOpen(false)}>
+                  Calendar
+                </a>
+                <a href="/checkin" style={{ fontSize: 14 }} onClick={() => setMenuOpen(false)}>
+                  Kids check-in
+                </a>
+                <a href="/guide" style={{ fontSize: 14 }} onClick={() => setMenuOpen(false)}>
+                  Guide
+                </a>
+                <a href="/agent-card" style={{ fontSize: 14 }} onClick={() => setMenuOpen(false)}>
+                  Agent card
+                </a>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    setPersonPickerOpen(true);
+                    setPersonQuery("");
+                  }}
+                  style={{ ...pill, borderRadius: 12, width: "100%", textAlign: "left", padding: "10px 10px" }}
+                >
+                  Switch person…
+                </button>
+
+                <div style={{ fontSize: 12, color: "#64748b" }}>
+                  churchId={identity.tenant_id}
+                  <br />
+                  userId={identity.user_id}
+                  <br />
+                  personId={(person as any)?.id ?? (identity as any)?.persona_id ?? ""}
                 </div>
               </div>
-              <div style={{ fontSize: 12, color: "#64748b" }}>
-                churchId={identity.tenant_id}
-                <br />
-                userId={identity.user_id}
-                <br />
-                personId={(person as any)?.id ?? "p_seeker_2"}
-              </div>
-            </div>
-          </details>
+            ) : null}
+          </div>
         </div>
       </div>
+
+      {personPickerOpen ? (
+        <div
+          role="dialog"
+          aria-modal="true"
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 80,
+            background: "rgba(15, 23, 42, 0.45)",
+            display: "grid",
+            placeItems: "center",
+            padding: 12,
+          }}
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) closeAllMenus();
+          }}
+        >
+          <div
+            style={{
+              width: "min(760px, 96vw)",
+              height: "min(78vh, 760px)",
+              background: "white",
+              borderRadius: 16,
+              overflow: "hidden",
+              border: "1px solid #e2e8f0",
+              boxShadow: "0 24px 80px rgba(15, 23, 42, 0.35)",
+              display: "grid",
+              gridTemplateRows: "auto auto 1fr",
+            }}
+          >
+            <div style={{ padding: 14, borderBottom: "1px solid #e2e8f0", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 14, fontWeight: 900 }}>Switch person</div>
+                <div style={{ fontSize: 12, color: "#64748b" }}>Search by name. Shows current journey stage.</div>
+              </div>
+              <button type="button" onClick={() => closeAllMenus()} style={pill}>
+                Close
+              </button>
+            </div>
+            <div style={{ padding: 14, borderBottom: "1px solid #e2e8f0", display: "flex", gap: 10, alignItems: "center" }}>
+              <input
+                value={personQuery}
+                onChange={(e) => setPersonQuery(e.target.value)}
+                placeholder="Search people…"
+                autoFocus
+                style={{ flex: 1, minWidth: 0, padding: "10px 12px", borderRadius: 12, border: "1px solid #e2e8f0", fontWeight: 800 }}
+              />
+              <div style={{ fontSize: 12, color: "#64748b", whiteSpace: "nowrap" }}>
+                {journeyLoading ? "Loading stages…" : `${filteredAccounts.length} people`}
+              </div>
+            </div>
+            <div style={{ padding: 14, overflow: "auto", background: "#f8fafc", display: "grid", gap: 10, alignContent: "start" }}>
+              {filteredAccounts.slice(0, 80).map((a) => {
+                const uid = String((a as any)?.identity?.user_id ?? "");
+                const isActive = uid && uid === String(identity.user_id);
+                const j = uid ? journeyByUserId[uid] : undefined;
+                const stageTitle = String(j?.stageTitle ?? "").trim();
+                const stageSummary = String(j?.stageSummary ?? "").trim();
+                const nextTitle = String(j?.nextTitle ?? "").trim();
+                const summaryShort = stageSummary.length > 110 ? `${stageSummary.slice(0, 110).trim()}…` : stageSummary;
+                return (
+                  <button
+                    key={uid || a.label}
+                    type="button"
+                    onClick={() => {
+                      setIdentity((a as any).identity);
+                      closeAllMenus();
+                    }}
+                    style={{
+                      textAlign: "left",
+                      border: "1px solid #e2e8f0",
+                      background: isActive ? "#eef2ff" : "white",
+                      borderRadius: 14,
+                      padding: 12,
+                      cursor: "pointer",
+                      display: "grid",
+                      gap: 6,
+                    }}
+                  >
+                    <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "baseline" }}>
+                      <div style={{ fontSize: 13, fontWeight: 900, color: "#0f172a" }}>{a.label}</div>
+                      <div style={{ fontSize: 12, color: "#64748b" }}>{isActive ? "current" : ""}</div>
+                    </div>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "baseline" }}>
+                      <div style={{ fontSize: 12, fontWeight: 900, color: "#0f172a" }}>
+                        {stageTitle ? `Stage: ${stageTitle}` : "Stage: —"}
+                      </div>
+                      {nextTitle ? <div style={{ fontSize: 12, color: "#475569" }}>Next: {nextTitle}</div> : null}
+                      {typeof j?.confidence === "number" ? <div style={{ fontSize: 12, color: "#64748b" }}>conf {j.confidence.toFixed(2)}</div> : null}
+                    </div>
+                    {summaryShort ? <div style={{ fontSize: 12, color: "#475569" }}>{summaryShort}</div> : <div style={{ fontSize: 12, color: "#94a3b8" }}>No stage summary.</div>}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {headerToolId ? (
         <div
