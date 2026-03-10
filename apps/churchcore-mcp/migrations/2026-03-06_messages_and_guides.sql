@@ -23,6 +23,9 @@ CREATE TABLE IF NOT EXISTS campus_messages (
   title TEXT NOT NULL,
   speaker TEXT,
   preached_at TEXT, -- ISO date/time
+  preached_date TEXT, -- YYYY-MM-DD (derived from preached_at)
+  week_start_date TEXT, -- YYYY-MM-DD (Mon after preached_date)
+  week_end_date TEXT, -- YYYY-MM-DD (Sun after week_start_date)
   passage TEXT,
   passage_key TEXT,
   series_title TEXT,
@@ -41,6 +44,7 @@ CREATE TABLE IF NOT EXISTS campus_messages (
 );
 CREATE INDEX IF NOT EXISTS idx_campus_messages ON campus_messages(church_id, campus_id, preached_at);
 CREATE INDEX IF NOT EXISTS idx_campus_messages_series ON campus_messages(church_id, series_title, preached_at);
+CREATE INDEX IF NOT EXISTS idx_campus_messages_week ON campus_messages(church_id, campus_id, week_start_date, preached_date);
 
 CREATE TABLE IF NOT EXISTS campus_message_analysis (
   message_id TEXT PRIMARY KEY,

@@ -4705,35 +4705,78 @@ async function handleGroupMyList(req: Request, env: Env) {
   const { personId } = await resolvePerson(env, identity);
   if (!personId) return json({ ok: true, person_id: null, groups: [], actor: { userId, role } });
 
-  const statusClause = includeInactive ? "" : "AND gm.status IN ('active','pending')";
-  const rows =
-    (
-      await env.churchcore
-        .prepare(
-          `SELECT g.id,
-                  g.campus_id AS campusId,
-                  g.name,
-                  g.description,
-                  g.leader_person_id AS leaderPersonId,
-                  g.meeting_details AS meetingDetails,
-                  g.meeting_frequency AS meetingFrequency,
-                  g.meeting_day_of_week AS meetingDayOfWeek,
-                  g.meeting_time_local AS meetingTimeLocal,
-                  g.meeting_timezone AS meetingTimezone,
-                  g.meeting_location_name AS meetingLocationName,
-                  g.meeting_location_address AS meetingLocationAddress,
-                  g.is_open AS isOpen,
-                  gm.role AS myRole, gm.status AS myStatus, gm.joined_at AS joinedAt
-           FROM group_memberships gm
-           JOIN groups g ON g.id=gm.group_id
-           WHERE gm.church_id=?1 AND gm.person_id=?2 ${statusClause}
-           ORDER BY g.name ASC
-           LIMIT ${limit} OFFSET ${offset}`,
-        )
-        .bind(churchId, personId)
-        .all()
-    ).results ?? [];
-  return json({ ok: true, person_id: personId, groups: rows, actor: { userId, role } });
+  try {
+    const statusClause = includeInactive ? "" : "AND gm.status IN ('active','pending')";
+    const rows =
+      (
+        await env.churchcore
+          .prepare(
+            `SELECT g.id,
+                    g.campus_id AS campusId,
+                    g.name,
+                    g.description,
+                    g.leader_person_id AS leaderPersonId,
+                    g.meeting_details AS meetingDetails,
+                    g.meeting_frequency AS meetingFrequency,
+                    g.meeting_day_of_week AS meetingDayOfWeek,
+                    g.meeting_time_local AS meetingTimeLocal,
+                    g.meeting_timezone AS meetingTimezone,
+                    g.meeting_location_name AS meetingLocationName,
+                    g.meeting_location_address AS meetingLocationAddress,
+                    g.is_open AS isOpen,
+                    gm.role AS myRole, gm.status AS myStatus, gm.joined_at AS joinedAt
+             FROM group_memberships gm
+             JOIN groups g ON g.id=gm.group_id AND g.church_id=gm.church_id
+             WHERE gm.church_id=?1 AND gm.person_id=?2 ${statusClause}
+             ORDER BY g.name ASC
+             LIMIT ${limit} OFFSET ${offset}`,
+          )
+          .bind(churchId, personId)
+          .all()
+      ).results ?? [];
+    return json({ ok: true, person_id: personId, groups: rows, actor: { userId, role } });
+  } catch (e: any) {
+    const msg = String(e?.message ?? e ?? "error");
+    // Schema-tolerant fallback: older DBs may not have newer meeting_* columns yet.
+    if (/no such column/i.test(msg)) {
+      try {
+        const statusClause = includeInactive ? "" : "AND gm.status IN ('active','pending')";
+        const legacyRows =
+          (
+            await env.churchcore
+              .prepare(
+                `SELECT g.id,
+                        g.campus_id AS campusId,
+                        g.name,
+                        g.description,
+                        g.leader_person_id AS leaderPersonId,
+                        g.meeting_details AS meetingDetails,
+                        NULL AS meetingFrequency,
+                        NULL AS meetingDayOfWeek,
+                        NULL AS meetingTimeLocal,
+                        NULL AS meetingTimezone,
+                        NULL AS meetingLocationName,
+                        NULL AS meetingLocationAddress,
+                        g.is_open AS isOpen,
+                        gm.role AS myRole, gm.status AS myStatus, gm.joined_at AS joinedAt
+                 FROM group_memberships gm
+                 JOIN groups g ON g.id=gm.group_id AND g.church_id=gm.church_id
+                 WHERE gm.church_id=?1 AND gm.person_id=?2 ${statusClause}
+                 ORDER BY g.name ASC
+                 LIMIT ${limit} OFFSET ${offset}`,
+              )
+              .bind(churchId, personId)
+              .all()
+          ).results ?? [];
+        return json({ ok: true, person_id: personId, groups: legacyRows, actor: { userId, role }, warning: "groups_schema_legacy_columns" });
+      } catch (e2: any) {
+        const msg2 = String(e2?.message ?? e2 ?? "error");
+        return json({ ok: false, error: "group_my_list_failed", detail: `${msg} | fallback: ${msg2}`, actor: { userId, role, personId } }, { status: 500 });
+      }
+    }
+
+    return json({ ok: false, error: "group_my_list_failed", detail: msg, actor: { userId, role, personId } }, { status: 500 });
+  }
 }
 
 async function handleGroupGet(req: Request, env: Env) {
@@ -5122,32 +5165,44 @@ async function handleGroupInvitesInboxList(req: Request, env: Env) {
   const limit = parsed.data.limit ?? 50;
   const offset = parsed.data.offset ?? 0;
 
-  const rows =
-    (
-      await env.churchcore
-        .prepare(
-          `SELECT i.id,
-                  i.group_id AS groupId,
-                  g.name AS groupName,
-                  g.description AS groupDescription,
-                  i.invited_by_person_id AS invitedByPersonId,
-                  p.first_name AS invitedByFirstName,
-                  p.last_name AS invitedByLastName,
-                  i.status,
-                  i.created_at AS createdAt,
-                  i.updated_at AS updatedAt
-           FROM group_invites i
-           JOIN groups g ON g.id=i.group_id AND g.church_id=i.church_id
-           LEFT JOIN people p ON p.id=i.invited_by_person_id AND p.church_id=i.church_id
-           WHERE i.church_id=?1 AND i.invitee_person_id=?2 AND i.status=?3
-           ORDER BY i.updated_at DESC
-           LIMIT ?4 OFFSET ?5`,
-        )
-        .bind(churchId, personId, status, limit, offset)
-        .all()
-    ).results ?? [];
+  try {
+    const rows =
+      (
+        await env.churchcore
+          .prepare(
+            `SELECT i.id,
+                    i.group_id AS groupId,
+                    g.name AS groupName,
+                    g.description AS groupDescription,
+                    i.invited_by_person_id AS invitedByPersonId,
+                    p.first_name AS invitedByFirstName,
+                    p.last_name AS invitedByLastName,
+                    i.status,
+                    i.created_at AS createdAt,
+                    i.updated_at AS updatedAt
+             FROM group_invites i
+             JOIN groups g ON g.id=i.group_id AND g.church_id=i.church_id
+             LEFT JOIN people p ON p.id=i.invited_by_person_id AND p.church_id=i.church_id
+             WHERE i.church_id=?1 AND i.invitee_person_id=?2 AND i.status=?3
+             ORDER BY i.updated_at DESC
+             LIMIT ?4 OFFSET ?5`,
+          )
+          .bind(churchId, personId, status, limit, offset)
+          .all()
+      ).results ?? [];
 
-  return json({ ok: true, invites: rows, actor: { userId, role, personId } });
+    return json({ ok: true, invites: rows, actor: { userId, role, personId } });
+  } catch (e: any) {
+    return json(
+      {
+        ok: false,
+        error: "group_invites_inbox_list_failed",
+        detail: String(e?.message ?? e ?? "error"),
+        actor: { userId, role, personId },
+      },
+      { status: 500 },
+    );
+  }
 }
 
 async function handlePeopleSearch(req: Request, env: Env) {
@@ -5843,16 +5898,17 @@ async function handleCheckinCommit(req: Request, env: Env) {
 export default {
   async fetch(req: Request, env: Env) {
     const url = new URL(req.url);
-    // Public discovery endpoints (no auth)
-    if (req.method === "GET" && url.pathname === "/.well-known/agent-card.json") return agentCard(req, env);
-    if (req.method === "GET" && url.pathname === "/healthz") return json({ ok: true });
+    try {
+      // Public discovery endpoints (no auth)
+      if (req.method === "GET" && url.pathname === "/.well-known/agent-card.json") return agentCard(req, env);
+      if (req.method === "GET" && url.pathname === "/healthz") return json({ ok: true });
 
-    const auth = requireApiKey(req, env);
-    if (auth) return auth;
+      const auth = requireApiKey(req, env);
+      if (auth) return auth;
 
-    if (req.method !== "POST") return json({ error: "Method not allowed" }, { status: 405 });
+      if (req.method !== "POST") return json({ error: "Method not allowed" }, { status: 405 });
 
-    switch (url.pathname) {
+      switch (url.pathname) {
       case "/a2a/thread.create":
         return handleThreadCreate(req, env);
       case "/a2a/thread.list":
@@ -6001,6 +6057,18 @@ export default {
         return handleChurchStrategicIntentsList(req, env);
       default:
         return json({ error: "Not found" }, { status: 404 });
+      }
+    } catch (e: any) {
+      // Ensure we always return JSON (Cloudflare would otherwise return HTML 500 pages).
+      return json(
+        {
+          ok: false,
+          error: "a2a_internal_error",
+          path: url.pathname,
+          detail: String(e?.message ?? e ?? "error"),
+        },
+        { status: 500 },
+      );
     }
   },
 };

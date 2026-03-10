@@ -1,18 +1,8 @@
 -- Sermon-anchored Bible reading plan (week + daily items) + guide check-ins.
--- NOTE: This migration is NOT fully idempotent because SQLite/D1 does not support
--- `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`. If you rerun this file after it has
--- already been applied, you may see "duplicate column name" errors on the 3
--- `ALTER TABLE campus_messages ADD COLUMN ...` statements below.
---
--- If you need to re-run only the table/index creation portion, comment out
--- the 3 ALTER TABLE lines and re-execute.
-
--- Anchor sermons to week after Sunday.
-ALTER TABLE campus_messages ADD COLUMN preached_date TEXT; -- YYYY-MM-DD (derived from preached_at)
-ALTER TABLE campus_messages ADD COLUMN week_start_date TEXT; -- YYYY-MM-DD (Mon after preached_date)
-ALTER TABLE campus_messages ADD COLUMN week_end_date TEXT; -- YYYY-MM-DD (Sun after week_start_date)
-
-CREATE INDEX IF NOT EXISTS idx_campus_messages_week ON campus_messages(church_id, campus_id, week_start_date, preached_date);
+-- NOTE: `campus_messages.preached_date/week_start_date/week_end_date` are defined
+-- in the base `campus_messages` table schema (see `2026-03-06_messages_and_guides.sql`).
+-- We avoid `ALTER TABLE ... ADD COLUMN` here because D1 does not support
+-- `ADD COLUMN IF NOT EXISTS` and production DBs may already have the columns.
 
 -- Bible reading plan weeks (per campus).
 CREATE TABLE IF NOT EXISTS bible_reading_weeks (

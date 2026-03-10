@@ -1,8 +1,19 @@
 -- Topic templates for the "New topic" chooser + thread metadata.
 -- NOTE: SQLite/D1 does not support `ADD COLUMN IF NOT EXISTS`.
--- If re-running after applied, comment out the ALTER TABLE line.
+-- Some environments already have `chat_threads.metadata_json`, so we avoid ALTER TABLE
+-- here and only ensure the table exists for fresh databases.
 
-ALTER TABLE chat_threads ADD COLUMN metadata_json TEXT;
+CREATE TABLE IF NOT EXISTS chat_threads (
+  id TEXT PRIMARY KEY,
+  church_id TEXT NOT NULL,
+  user_id TEXT NOT NULL,
+  title TEXT NOT NULL,
+  metadata_json TEXT, -- template_id, tool_ids, etc.
+  status TEXT NOT NULL DEFAULT 'active', -- active|archived
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_chat_threads ON chat_threads(church_id, user_id, status, updated_at);
 
 CREATE TABLE IF NOT EXISTS topic_templates (
   id TEXT PRIMARY KEY,
