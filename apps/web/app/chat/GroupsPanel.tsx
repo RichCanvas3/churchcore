@@ -116,8 +116,30 @@ type PersonHit = {
 
 async function postJson<T = unknown>(url: string, body: unknown): Promise<T> {
   const res = await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
-  const data = (await res.json().catch(() => ({}))) as T & { error?: string };
-  if (!res.ok) throw new Error((data as any)?.error ?? `HTTP ${res.status}`);
+  const raw = await res.text();
+  const parsed = ((): any => {
+    try {
+      return raw ? JSON.parse(raw) : {};
+    } catch {
+      return null;
+    }
+  })();
+  const data = (parsed ?? {}) as T & { error?: string; detail?: string; issues?: any[] };
+  if (!res.ok) {
+    const issues = Array.isArray((data as any)?.issues) ? (data as any).issues : [];
+    const issueBrief = issues.length
+      ? ` (${issues
+          .slice(0, 3)
+          .map((i: any) => `${Array.isArray(i?.path) ? i.path.join(".") : ""}${i?.message ? `: ${i.message}` : ""}`.trim())
+          .filter(Boolean)
+          .join("; ")})`
+      : "";
+    const msg =
+      String((data as any)?.error ?? "").trim() ||
+      String((data as any)?.detail ?? "").trim() ||
+      (parsed === null ? `HTTP ${res.status}: ${(raw || "").slice(0, 180)}` : `HTTP ${res.status}`);
+    throw new Error(`${msg}${issueBrief}`);
+  }
   return data;
 }
 
@@ -390,12 +412,28 @@ export function GroupsPanel(props: { identity: Identity; onClose: () => void }) 
     setSavingGroup(true);
     setGroupSaveErr(null);
     try {
+      const timeRaw = editTime.trim();
+      let timeNorm: string | null = null;
+      if (!timeRaw) {
+        timeNorm = null;
+      } else if (/^\d{2}:\d{2}$/.test(timeRaw)) {
+        timeNorm = timeRaw;
+      } else if (/^\d{1}:\d{2}$/.test(timeRaw)) {
+        timeNorm = `0${timeRaw}`;
+      } else {
+        setGroupSaveErr("Time must be HH:MM (e.g., 07:00 or 19:00).");
+        return;
+      }
+
+      const dow = editDow === "" ? null : Number(editDow);
+      const dowNorm = dow == null || Number.isNaN(dow) ? null : dow;
+
       await postJson("/api/a2a/group/update", {
         identity,
         group_id: activeGroupId,
         meeting_frequency: editFreq || null,
-        meeting_day_of_week: editDow === "" ? null : Number(editDow),
-        meeting_time_local: editTime.trim() || null,
+        meeting_day_of_week: dowNorm,
+        meeting_time_local: timeNorm,
         meeting_timezone: editTz.trim() || null,
         meeting_location_name: editLocName.trim() || null,
         meeting_location_address: editLocAddr.trim() || null,
@@ -662,7 +700,15 @@ export function GroupsPanel(props: { identity: Identity; onClose: () => void }) 
               <div style={{ display: "grid", gap: 8, gridTemplateColumns: "1fr 1fr" }}>
                 <div style={{ display: "grid", gap: 6 }}>
                   <div style={{ fontSize: 12, fontWeight: 900, color: "#0f172a" }}>Time (local)</div>
-                  <input value={editTime} onChange={(e) => setEditTime(e.target.value)} disabled={!canManageMembers} placeholder="HH:MM (e.g., 19:00)" style={{ border: "1px solid #cbd5e1", borderRadius: 10, padding: "8px 10px" }} />
+                  <input
+                    type="time"
+                    step={60}
+                    value={editTime}
+                    onChange={(e) => setEditTime(e.target.value)}
+                    disabled={!canManageMembers}
+                    placeholder="HH:MM (e.g., 19:00)"
+                    style={{ border: "1px solid #cbd5e1", borderRadius: 10, padding: "8px 10px" }}
+                  />
                 </div>
                 <div style={{ display: "grid", gap: 6 }}>
                   <div style={{ fontSize: 12, fontWeight: 900, color: "#0f172a" }}>Timezone</div>
