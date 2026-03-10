@@ -1114,86 +1114,70 @@ async def _predict_journey_flows_with_sparql(
     journey, _journey_summary = _journey_context_from_args(args)
     weekly, _weekly_summary = _weekly_context_from_args(args)
 
-    # Step 1: ask for SPARQL queries
-    sys1 = (
-        "You are a faith-journey reasoning agent.\n"
-        "You will propose SPARQL SELECT queries to retrieve canonical journey graphs and next-step options from GraphDB.\n"
-        "Return STRICT JSON ONLY with shape:\n"
-        '{\"sparql_queries\":[{\"name\":\"...\",\"purpose\":\"...\",\"query\":\"...\"}]}\n'
-        "Rules:\n"
-        "- Use only SELECT queries.\n"
-        "- Prefer small result sets (use LIMIT).\n"
-        "- Use the ChurchCore journey/faith-journey vocabularies where possible.\n"
-        "Example (must be valid JSON):\n"
-        '{\"sparql_queries\":[{\"name\":\"graphs\",\"purpose\":\"list graphs\",\"query\":\"SELECT ?g ?name WHERE { GRAPH <https://churchcore.ai/graph/ontology> { ?g a <https://ontology.churchcore.ai/cc/journey#JourneyGraph> ; <https://ontology.churchcore.ai/cc#name> ?name . } } LIMIT 50\"}]}'
-    )
-    user1 = json.dumps(
+    # Step 1 (deterministic): canonical GraphDB query pack.
+    # Long-term: avoids LLM-invented IRIs by using the ontology's actual namespaces.
+    ontology_graph = "https://churchcore.ai/graph/ontology"
+    ccfj_prefix = "https://ontology.churchcore.ai/cc/faith-journey#"
+    qclean: list[dict[str, str]] = [
         {
-            "churchId": session.churchId,
-            "personId": session.personId,
-            "userId": session.userId,
-            "timezone": session.timezone,
-            "memory": mem or {},
-            "journey_context": journey or {},
-            "weekly_context": weekly or {},
-            "task": "Fetch the canonical journey graphs (MacroStages + Openness/Formation/Belonging/Multiplication), current-node to next-step edges, and any linked state categories, so you can predict next state/manifestation changes.",
+            "name": "ontology_triple_count",
+            "purpose": "Verify the ontology named graph is populated.",
+            "query": f"SELECT (COUNT(*) AS ?triples) WHERE {{ GRAPH <{ontology_graph}> {{ ?s ?p ?o }} }}",
         },
-        ensure_ascii=False,
-    )[:8000]
-
-    r1 = await model.ainvoke([("system", sys1), ("user", user1)])
-    raw1 = str(getattr(r1, "content", "") or "").strip()
-    j1 = _safe_json_extract(raw1)
-    queries = j1.get("sparql_queries") if isinstance(j1, dict) else None
-    qlist = queries if isinstance(queries, list) else []
-    qclean: list[dict[str, str]] = []
-    for q in qlist[:12]:
-        if not isinstance(q, dict):
-            continue
-        name = str(q.get("name") or "").strip()
-        purpose = str(q.get("purpose") or "").strip()
-        query = str(q.get("query") or "").strip()
-        if not query.lower().startswith("select"):
-            continue
-        if not name:
-            name = f"q{len(qclean)+1}"
-        qclean.append({"name": name, "purpose": purpose, "query": query})
-
-    # Retry once with a stricter prompt if we didn't get queries.
-    if not qclean:
-        sys1b = (
-            "Return ONLY valid JSON. No prose.\n"
-            "Required key: sparql_queries (array).\n"
-            "Each item must contain: name, purpose, query.\n"
-            "All queries MUST start with SELECT.\n"
-            "If uncertain, still produce 3-6 small SELECT queries for graphs/nodes/edges using GRAPH <https://churchcore.ai/graph/ontology>.\n"
-        )
-        r1b = await model.ainvoke([("system", sys1b), ("user", user1)])
-        raw1b = str(getattr(r1b, "content", "") or "").strip()
-        j1b = _safe_json_extract(raw1b)
-        queries_b = j1b.get("sparql_queries") if isinstance(j1b, dict) else None
-        qlist_b = queries_b if isinstance(queries_b, list) else []
-        for q in qlist_b[:12]:
-            if not isinstance(q, dict):
-                continue
-            name = str(q.get("name") or "").strip()
-            purpose = str(q.get("purpose") or "").strip()
-            query = str(q.get("query") or "").strip()
-            if not query.lower().startswith("select"):
-                continue
-            if not name:
-                name = f"q{len(qclean)+1}"
-            qclean.append({"name": name, "purpose": purpose, "query": query})
-
-    if not qclean:
-        return OutputEnvelope(
-            message="Could not generate SPARQL queries.",
-            data={
-                "ok": False,
-                "reason": "sparql_generation_failed",
-                "raw_model_output": raw1[:4000],
-            },
-        )
+        {
+            "name": "journey_graphs",
+            "purpose": "List JourneyGraph resources + names.",
+            "query": f"""
+PREFIX cc: <https://ontology.churchcore.ai/cc#>
+PREFIX ccjourney: <https://ontology.churchcore.ai/cc/journey#>
+SELECT ?graph ?name WHERE {{
+  GRAPH <{ontology_graph}> {{
+    ?graph a ccjourney:JourneyGraph .
+    OPTIONAL {{ ?graph cc:name ?name }}
+  }}
+}} LIMIT 200
+""".strip(),
+        },
+        {
+            "name": "ccfj_nodes",
+            "purpose": "Fetch ChurchCore faith-journey nodes + linked state categories (labels/definitions).",
+            "query": f"""
+PREFIX cc: <https://ontology.churchcore.ai/cc#>
+PREFIX ccjourney: <https://ontology.churchcore.ai/cc/journey#>
+PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
+SELECT ?node ?nodeName ?state ?stateLabel ?stateNotation ?stateDefinition ?stateScopeNote WHERE {{
+  GRAPH <{ontology_graph}> {{
+    ?node a ccjourney:JourneyNode .
+    FILTER(STRSTARTS(STR(?node), "{ccfj_prefix}"))
+    OPTIONAL {{ ?node cc:name ?nodeName }}
+    OPTIONAL {{
+      ?node ccjourney:representsState ?state .
+      OPTIONAL {{ ?state skos:prefLabel ?stateLabel }}
+      OPTIONAL {{ ?state skos:notation ?stateNotation }}
+      OPTIONAL {{ ?state skos:definition ?stateDefinition }}
+      OPTIONAL {{ ?state skos:scopeNote ?stateScopeNote }}
+    }}
+  }}
+}} LIMIT 5000
+""".strip(),
+        },
+        {
+            "name": "ccfj_edges",
+            "purpose": "Fetch ChurchCore faith-journey edges (from/to/kind).",
+            "query": f"""
+PREFIX ccjourney: <https://ontology.churchcore.ai/cc/journey#>
+SELECT ?edge ?from ?to ?edgeKind WHERE {{
+  GRAPH <{ontology_graph}> {{
+    ?edge a ccjourney:JourneyEdge ;
+          ccjourney:fromNode ?from ;
+          ccjourney:toNode ?to .
+    FILTER(STRSTARTS(STR(?edge), "{ccfj_prefix}"))
+    OPTIONAL {{ ?edge ccjourney:edgeKind ?edgeKind }}
+  }}
+}} LIMIT 10000
+""".strip(),
+        },
+    ]
 
     # Step 2: execute SPARQL via MCP (parallel).
     async def _run_sparql_one(q: dict[str, str]) -> tuple[str, dict[str, Any]]:
@@ -1220,6 +1204,28 @@ async def _predict_journey_flows_with_sparql(
     sparql_t1 = time.perf_counter()
     results: dict[str, Any] = {k: v for (k, v) in pairs}
     sparql_total_ms = int(round((sparql_t1 - sparql_t0) * 1000.0))
+
+    # Parse helpers for SPARQL JSON results.
+    def _bindings_for(name: str) -> list[dict[str, Any]]:
+        r = results.get(name) if isinstance(results.get(name), dict) else None
+        tool_res = r.get("result") if isinstance(r, dict) else None
+        if not isinstance(tool_res, dict) or tool_res.get("ok") is not True:
+            return []
+        payload = tool_res.get("result")
+        if not isinstance(payload, dict):
+            return []
+        res2 = payload.get("results")
+        if not isinstance(res2, dict):
+            return []
+        b = res2.get("bindings")
+        return [x for x in b if isinstance(x, dict)] if isinstance(b, list) else []
+
+    def _bval(row: dict[str, Any], key: str) -> str | None:
+        v = row.get(key)
+        if isinstance(v, dict):
+            vv = v.get("value")
+            return str(vv) if isinstance(vv, str) else None
+        return None
 
     failed = [name for name, r in results.items() if not (isinstance(r, dict) and r.get("ok") is True)]
     if failed:
@@ -1256,10 +1262,91 @@ async def _predict_journey_flows_with_sparql(
             },
         )
 
+    # Validate ontology graph has triples and journey graphs exist.
+    triple_rows = _bindings_for("ontology_triple_count")
+    triples = None
+    if triple_rows:
+        t = _bval(triple_rows[0], "triples")
+        try:
+            triples = int(float(t)) if isinstance(t, str) and t.strip() else None
+        except Exception:
+            triples = None
+    if not triples or triples <= 0:
+        return OutputEnvelope(
+            message="Ontology graph is empty (no triples). Load ontology TTL into GraphDB context https://churchcore.ai/graph/ontology.",
+            data={"ok": False, "reason": "ontology_graph_empty", "triples": triples, "ontologyGraph": ontology_graph},
+        )
+
+    graph_rows = _bindings_for("journey_graphs")
+    graphs: list[dict[str, str]] = []
+    for r in graph_rows:
+        g = _bval(r, "graph")
+        nm = _bval(r, "name") or ""
+        if g:
+            graphs.append({"graph": g, "name": nm})
+
+    # Pull nodes/edges (faith-journey namespace) into structured form for the reasoning step.
+    node_rows = _bindings_for("ccfj_nodes")
+    nodes_by_iri: dict[str, dict[str, Any]] = {}
+    for r in node_rows:
+        iri = _bval(r, "node")
+        if not iri:
+            continue
+        node = nodes_by_iri.get(iri) or {"nodeIri": iri}
+        nm = _bval(r, "nodeName")
+        if nm and not node.get("name"):
+            node["name"] = nm
+        st = _bval(r, "state")
+        if st and not node.get("stateIri"):
+            node["stateIri"] = st
+        for k_src, k_dst in [
+            ("stateLabel", "stateLabel"),
+            ("stateNotation", "stateNotation"),
+            ("stateDefinition", "stateDefinition"),
+            ("stateScopeNote", "stateScopeNote"),
+        ]:
+            vv = _bval(r, k_src)
+            if vv and not node.get(k_dst):
+                node[k_dst] = vv
+        nodes_by_iri[iri] = node
+
+    edge_rows = _bindings_for("ccfj_edges")
+    edges: list[dict[str, Any]] = []
+    for r in edge_rows:
+        e = _bval(r, "edge")
+        f = _bval(r, "from")
+        t = _bval(r, "to")
+        if not e or not f or not t:
+            continue
+        edges.append({"edgeIri": e, "from": f, "to": t, "edgeKind": _bval(r, "edgeKind") or ""})
+
+    # Determine current stage from journey_context (gateway uses ids like stage_new_believer).
+    # Map to ontology node IRI using stable naming conventions + SKOS notation on the represented state.
+    current_stage_id = ""
+    try:
+        cur = (journey or {}).get("current_stage") if isinstance(journey, dict) else None
+        current_stage_id = str((cur or {}).get("id") or "").strip() if isinstance(cur, dict) else ""
+    except Exception:
+        current_stage_id = ""
+    stage_key = current_stage_id.replace("stage_", "", 1).strip().lower() if current_stage_id else ""
+    current_node_iri = ""
+    if stage_key:
+        guess = f"{ccfj_prefix}journey_stage_{stage_key}"
+        if guess in nodes_by_iri:
+            current_node_iri = guess
+        else:
+            for iri, n in nodes_by_iri.items():
+                if str(n.get("stateNotation") or "").strip().lower() == stage_key:
+                    current_node_iri = iri
+                    break
+
+    # If we still can't map, continue but be explicit (synthesis can fall back to graph-level guidance).
+    current_node = nodes_by_iri.get(current_node_iri) if current_node_iri else None
+
     # Step 3: synthesize predictions
     sys2 = (
         "You are a faith-journey guide.\n"
-        "Use the user's memory + GraphDB SPARQL results to:\n"
+        "Use the user's memory + the provided canonical journey graph data from GraphDB to:\n"
         "- predict plausible TimeVaryingConcept/Manifestation/State changes (synthetic forecast)\n"
         "- recommend next actions (journey steps) per graph\n"
         "Return STRICT JSON ONLY with shape:\n"
@@ -1279,7 +1366,18 @@ async def _predict_journey_flows_with_sparql(
             "memory": mem or {},
             "journey_context": journey or {},
             "weekly_context": weekly or {},
-            "sparql_results": results,
+            "graphdb": {
+                "ontologyGraph": ontology_graph,
+                "triples": triples,
+                "journeyGraphs": graphs,
+                "faithJourney": {
+                    "namespace": ccfj_prefix,
+                    "currentStageId": current_stage_id,
+                    "currentNode": current_node,
+                    "nodes": list(nodes_by_iri.values())[:6000],
+                    "edges": edges[:12000],
+                },
+            },
         },
         ensure_ascii=False,
     )[:12000]
@@ -1324,7 +1422,16 @@ async def _predict_journey_flows_with_sparql(
                 "timingMs": (r or {}).get("timingMs") if isinstance(r, dict) else None,
             }
         )
-    j2["sparqlDebug"] = {"totalTimingMs": sparql_total_ms, "queriesUsed": queries_used[:20]}
+    j2["sparqlDebug"] = {
+        "totalTimingMs": sparql_total_ms,
+        "ontologyGraph": ontology_graph,
+        "queriesUsed": queries_used[:20],
+        "triples": triples,
+        "notes": [
+            "If rows=0 with ok=true, the query executed but matched nothing (often wrong IRIs or empty ontology graph).",
+            "This run uses a canonical query pack anchored to https://ontology.churchcore.ai/* vocabularies to avoid invented IRIs.",
+        ],
+    }
 
     # Normalize/ensure graph grounding fields exist on recommended actions.
     preds = j2.get("predictions")
