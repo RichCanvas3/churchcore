@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ComposerPrimitive, MessagePrimitive, ThreadPrimitive } from "@assistant-ui/react";
 import type { Session } from "../../lib/types";
 import { A2AChatRuntime } from "./A2AChatRuntime";
@@ -110,6 +110,7 @@ export default function ChatPage() {
   const [templates, setTemplates] = useState<Array<{ slug: string; title: string; description?: string | null; toolIds?: string[] }>>([]);
   const [templateSearch, setTemplateSearch] = useState("");
   const [customTitle, setCustomTitle] = useState("");
+  const refreshThreadsSeq = useRef(0);
 
   const closeTool = () => {
     const isBible = String(activeUiToolId || "").trim() === "bible_reader";
@@ -261,10 +262,12 @@ export default function ChatPage() {
   }, [identity.user_id, mePerson]);
 
   async function refreshThreads() {
+    const seq = ++refreshThreadsSeq.current;
+    const reqUserId = identity.user_id;
     const out = await postJson<{ threads?: ThreadMeta[]; person?: any }>("/api/a2a/thread/list", {
       identity: {
         tenant_id: identity.tenant_id,
-        user_id: identity.user_id,
+        user_id: reqUserId,
         role: identity.role,
         campus_id: identity.campus_id ?? undefined,
         timezone: identity.timezone ?? undefined,
@@ -273,10 +276,13 @@ export default function ChatPage() {
       include_archived: false,
     });
 
+    // Guard against out-of-order responses (e.g., identity changes during load).
+    if (seq !== refreshThreadsSeq.current) return;
+
     if (out?.person && typeof out.person === "object") setMePerson(out.person);
     const next = Array.isArray(out?.threads) ? out.threads : [];
     setThreads(next);
-    setThreadsOwnerUserId(identity.user_id);
+    setThreadsOwnerUserId(reqUserId);
     setActiveThreadId((prev) => {
       if (prev && next.some((t) => t && t.id === prev)) return prev;
       return next.length ? String(next[0].id) : null;
@@ -284,6 +290,8 @@ export default function ChatPage() {
   }
 
   useEffect(() => {
+    // Invalidate any in-flight thread refresh for prior identity.
+    refreshThreadsSeq.current += 1;
     setThreads([]);
     setThreadsOwnerUserId(identity.user_id);
     setActiveThreadId(null);

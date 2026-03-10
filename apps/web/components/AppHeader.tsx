@@ -42,6 +42,7 @@ export function AppHeader(props: { height?: number }) {
   const [personPickerOpen, setPersonPickerOpen] = useState(false);
   const [personQuery, setPersonQuery] = useState("");
   const [journeyByUserId, setJourneyByUserId] = useState<Record<string, { stageTitle: string; stageSummary: string; nextTitle: string; confidence?: number }>>({});
+  const [journeyPendingByUserId, setJourneyPendingByUserId] = useState<Record<string, true>>({});
   const [journeyLoading, setJourneyLoading] = useState(false);
 
   useEffect(() => {
@@ -137,28 +138,55 @@ export function AppHeader(props: { height?: number }) {
 
     (async () => {
       const out: Record<string, { stageTitle: string; stageSummary: string; nextTitle: string; confidence?: number }> = {};
-      const queue = [...todo];
-      const workers = Array.from({ length: Math.min(max, queue.length) }, () => null);
-      await Promise.all(
-        workers.map(async () => {
-          while (queue.length) {
-            const a = queue.shift();
-            if (!a) break;
-            const uid = String((a as any)?.identity?.user_id ?? "");
-            if (!uid) continue;
-            const cur = journeyByUserId[uid];
-            if (cur && (cur.stageTitle || cur.stageSummary || cur.nextTitle)) continue;
-            const j = await loadJourneyForIdentity((a as any).identity);
-            out[uid] = j;
-          }
-        }),
-      );
-      if (cancelled) return;
-      setJourneyByUserId((prev) => ({ ...out, ...prev }));
-      setJourneyLoading(false);
-    })().catch(() => {
-      if (!cancelled) setJourneyLoading(false);
-    });
+      let batchUids: string[] = [];
+      try {
+        const toFetch: Array<{ uid: string; identity: any }> = [];
+        for (const a of todo) {
+          const uid = String((a as any)?.identity?.user_id ?? "");
+          if (!uid) continue;
+          const cur = journeyByUserId[uid];
+          if (cur && (cur.stageTitle || cur.stageSummary || cur.nextTitle)) continue;
+          if (journeyPendingByUserId[uid]) continue;
+          toFetch.push({ uid, identity: (a as any).identity });
+        }
+
+        batchUids = toFetch.map((x) => x.uid);
+        if (batchUids.length) {
+          setJourneyPendingByUserId((prev) => {
+            const next = { ...prev };
+            for (const uid of batchUids) next[uid] = true;
+            return next;
+          });
+        }
+
+        const queue = [...toFetch];
+        const workers = Array.from({ length: Math.min(max, queue.length) }, () => null);
+        await Promise.all(
+          workers.map(async () => {
+            while (queue.length) {
+              const a = queue.shift();
+              if (!a) break;
+              const uid = String((a as any)?.uid ?? "");
+              if (!uid) continue;
+              const j = await loadJourneyForIdentity((a as any).identity);
+              out[uid] = j;
+            }
+          }),
+        );
+        if (cancelled) return;
+        if (Object.keys(out).length) setJourneyByUserId((prev) => ({ ...out, ...prev }));
+      } finally {
+        if (cancelled) return;
+        if (batchUids.length) {
+          setJourneyPendingByUserId((prev) => {
+            const next = { ...prev };
+            for (const uid of batchUids) delete (next as any)[uid];
+            return next;
+          });
+        }
+        setJourneyLoading(false);
+      }
+    })().catch(() => {});
 
     return () => {
       cancelled = true;
@@ -401,7 +429,9 @@ export function AppHeader(props: { height?: number }) {
               {filteredAccounts.slice(0, 80).map((a) => {
                 const uid = String((a as any)?.identity?.user_id ?? "");
                 const isActive = uid && uid === String(identity.user_id);
+                const pending = uid ? Boolean(journeyPendingByUserId[uid]) : false;
                 const j = uid ? journeyByUserId[uid] : undefined;
+                const loadingRow = pending || (journeyLoading && !j);
                 const stageTitle = String(j?.stageTitle ?? "").trim();
                 const stageSummary = String(j?.stageSummary ?? "").trim();
                 const nextTitle = String(j?.nextTitle ?? "").trim();
@@ -431,12 +461,18 @@ export function AppHeader(props: { height?: number }) {
                     </div>
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "baseline" }}>
                       <div style={{ fontSize: 12, fontWeight: 900, color: "#0f172a" }}>
-                        {stageTitle ? `Stage: ${stageTitle}` : "Stage: —"}
+                        {loadingRow ? "Stage: Loading…" : stageTitle ? `Stage: ${stageTitle}` : "Stage: —"}
                       </div>
-                      {nextTitle ? <div style={{ fontSize: 12, color: "#475569" }}>Next: {nextTitle}</div> : null}
+                      {!loadingRow && nextTitle ? <div style={{ fontSize: 12, color: "#475569" }}>Next: {nextTitle}</div> : null}
                       {typeof j?.confidence === "number" ? <div style={{ fontSize: 12, color: "#64748b" }}>conf {j.confidence.toFixed(2)}</div> : null}
                     </div>
-                    {summaryShort ? <div style={{ fontSize: 12, color: "#475569" }}>{summaryShort}</div> : <div style={{ fontSize: 12, color: "#94a3b8" }}>No stage summary.</div>}
+                    {loadingRow ? (
+                      <div style={{ fontSize: 12, color: "#94a3b8" }}>Loading journey summary…</div>
+                    ) : summaryShort ? (
+                      <div style={{ fontSize: 12, color: "#475569" }}>{summaryShort}</div>
+                    ) : (
+                      <div style={{ fontSize: 12, color: "#94a3b8" }}>No stage summary.</div>
+                    )}
                   </button>
                 );
               })}
