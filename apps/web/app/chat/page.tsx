@@ -52,25 +52,30 @@ function parseD1Date(value: unknown): Date {
 
 // NOTE: TextPart is defined inside ChatPage so it can render tool buttons.
 
-function Composer() {
+function Composer(props: { disabled?: boolean; onSend?: () => void }) {
+  const disabled = Boolean(props.disabled);
   return (
     <ComposerPrimitive.Root style={{ display: "flex", gap: 10, alignItems: "flex-end" }}>
       <ComposerPrimitive.Input
         placeholder="Message Church Agent…"
+        disabled={disabled}
         style={{ flex: 1, minWidth: 0, border: "1px solid #cbd5e1", borderRadius: 12, padding: "10px 12px", fontSize: 16 }}
       />
       <ComposerPrimitive.Send
+        disabled={disabled}
+        onClick={() => props.onSend?.()}
         style={{
           border: "1px solid #0f172a",
           background: "#0f172a",
           color: "white",
           padding: "10px 12px",
           borderRadius: 12,
-          cursor: "pointer",
+          cursor: disabled ? "not-allowed" : "pointer",
           touchAction: "manipulation",
+          opacity: disabled ? 0.7 : 1,
         }}
       >
-        Send
+        {disabled ? "Thinking…" : "Send"}
       </ComposerPrimitive.Send>
     </ComposerPrimitive.Root>
   );
@@ -952,6 +957,10 @@ export default function ChatPage() {
         } as any
       }
     >
+      <style>{`
+        @keyframes ccspin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        @keyframes ccpulse { 0% { opacity: .55; } 50% { opacity: 1; } 100% { opacity: .55; } }
+      `}</style>
       {/* Mobile: threads drawer backdrop */}
       <div
         className={`${styles.backdrop} ${isMobile && isThreadsOpenMobile ? styles.backdropOpen : ""}`}
@@ -1210,7 +1219,7 @@ export default function ChatPage() {
           <div style={{ fontSize: 16, fontWeight: 600, minWidth: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
             {threads.find((t) => t.id === effectiveThreadId)?.title ?? "Select a topic"}
           </div>
-          {effectiveThreadId ? (
+          {effectiveThreadId && !isMobile ? (
             <div className={styles.desktopOnly} style={{ display: "inline-flex", gap: 8, alignItems: "center" }}>
               {(activeThreadMeta?.toolIds ?? []).slice(0, 5).map((toolId: string) => (
                 <ToolButton key={toolId} toolId={toolId} title={toolDisplayTitle(toolId)} variant="inline" />
@@ -1224,18 +1233,7 @@ export default function ChatPage() {
               </button>
             </div>
           ) : null}
-          {activeUiToolId ? (
-            <>
-              <button
-                className={styles.mobileOnly}
-                onClick={() => setIsToolsOpenMobile(true)}
-                title="Open tools"
-                style={{ border: "1px solid #e2e8f0", background: "white", borderRadius: 10, padding: "6px 8px", cursor: "pointer", fontSize: 12, fontWeight: 900 }}
-              >
-                Tools
-              </button>
-            </>
-          ) : null}
+          {/* Mobile: don't show right-side header actions */}
 
         </div>
 
@@ -1278,15 +1276,81 @@ export default function ChatPage() {
               </ThreadPrimitive.Root>
 
               <div className={styles.composerWrap} style={{ padding: 14, display: "grid", gap: 10 }}>
-                {sending ? <div style={{ fontSize: 12, color: "#64748b" }}>Generating…</div> : null}
+                {sending ? (
+                  <div
+                    role="status"
+                    aria-live="polite"
+                    style={{
+                      border: "1px solid #e2e8f0",
+                      background: "#f8fafc",
+                      borderRadius: 12,
+                      padding: "10px 12px",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      gap: 12,
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+                      <div
+                        style={{
+                          width: 18,
+                          height: 18,
+                          borderRadius: 999,
+                          border: "2px solid #cbd5e1",
+                          borderTopColor: "#0f172a",
+                          animation: "ccspin 900ms linear infinite",
+                          flex: "0 0 auto",
+                        }}
+                      />
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontSize: 13, fontWeight: 900, color: "#0f172a" }}>Thinking…</div>
+                        <div style={{ fontSize: 12, color: "#64748b", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", animation: "ccpulse 1400ms ease-in-out infinite" }}>
+                          Working on your response
+                        </div>
+                      </div>
+                    </div>
+                    <div style={{ fontSize: 12, color: "#64748b", fontWeight: 800, flex: "0 0 auto" }}>Please wait</div>
+                  </div>
+                ) : null}
+
+                {isMobile && activeUiToolId && !isToolsOpenMobile ? (
+                  <button
+                    type="button"
+                    onClick={() => setIsToolsOpenMobile(true)}
+                    style={{
+                      border: "1px solid #e2e8f0",
+                      background: "white",
+                      borderRadius: 12,
+                      padding: "10px 12px",
+                      cursor: "pointer",
+                      fontSize: 13,
+                      fontWeight: 900,
+                      color: "#0f172a",
+                      textAlign: "left",
+                    }}
+                  >
+                    Open tool
+                  </button>
+                ) : null}
 
                 <div
-                  onKeyDownCapture={() => {
-                    setSending(true);
-                    setThreadEmpty(false);
+                  onKeyDownCapture={(e) => {
+                    // Avoid flipping to "thinking" while typing; only when sending.
+                    // Enter sends (without Shift) for the assistant-ui composer.
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      setSending(true);
+                      setThreadEmpty(false);
+                    }
                   }}
                 >
-                  <Composer />
+                  <Composer
+                    disabled={sending}
+                    onSend={() => {
+                      setSending(true);
+                      setThreadEmpty(false);
+                    }}
+                  />
                 </div>
               </div>
             </div>

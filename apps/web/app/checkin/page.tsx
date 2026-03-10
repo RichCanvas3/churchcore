@@ -62,6 +62,15 @@ export default function CheckinPage() {
   const [checkinId, setCheckinId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 768px)");
+    const onChange = () => setIsMobile(Boolean(mq.matches));
+    onChange();
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
 
   useEffect(() => {
     setPhone(identity.user_id === "demo_user_ava" ? "+15550000001" : "+15550000002");
@@ -221,14 +230,14 @@ export default function CheckinPage() {
             <div style={{ fontWeight: 900 }}>Create family profile</div>
             <div style={{ display: "grid", gap: 6 }}>
               <div style={{ fontSize: 12, color: "#64748b" }}>Parent name</div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+              <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 10 }}>
                 <input value={parentFirst} onChange={(e) => setParentFirst(e.target.value)} style={{ border: "1px solid #cbd5e1", borderRadius: 12, padding: "10px 12px" }} />
                 <input value={parentLast} onChange={(e) => setParentLast(e.target.value)} style={{ border: "1px solid #cbd5e1", borderRadius: 12, padding: "10px 12px" }} />
               </div>
             </div>
             <div style={{ display: "grid", gap: 6 }}>
               <div style={{ fontSize: 12, color: "#64748b" }}>Child</div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+              <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 10 }}>
                 <input value={childFirst} onChange={(e) => setChildFirst(e.target.value)} style={{ border: "1px solid #cbd5e1", borderRadius: 12, padding: "10px 12px" }} />
                 <input value={childBirthdate} onChange={(e) => setChildBirthdate(e.target.value)} placeholder="YYYY-MM-DD" style={{ border: "1px solid #cbd5e1", borderRadius: 12, padding: "10px 12px" }} />
               </div>

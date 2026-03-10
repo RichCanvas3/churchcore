@@ -38,12 +38,21 @@ export function AppHeader(props: { height?: number }) {
   const [person, setPerson] = useState<Person>(null);
   const [headerToolId, setHeaderToolId] = useState<string | null>(null);
   const [headerToolBackId, setHeaderToolBackId] = useState<string | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [personPickerOpen, setPersonPickerOpen] = useState(false);
   const [personQuery, setPersonQuery] = useState("");
   const [journeyByUserId, setJourneyByUserId] = useState<Record<string, { stageTitle: string; stageSummary: string; nextTitle: string; confidence?: number }>>({});
   const [journeyPendingByUserId, setJourneyPendingByUserId] = useState<Record<string, true>>({});
   const [journeyLoading, setJourneyLoading] = useState(false);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 768px)");
+    const onChange = () => setIsMobile(Boolean(mq.matches));
+    onChange();
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
 
   useEffect(() => {
     postJson<{ person?: any }>("/api/a2a/thread/list", { identity, include_archived: false })
@@ -273,36 +282,40 @@ export function AppHeader(props: { height?: number }) {
         </div>
 
         <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-          <button
-            type="button"
-            style={pill}
-            onClick={() => {
-              setHeaderToolBackId(null);
-              setHeaderToolId("groups_manager");
-            }}
-          >
-            My Groups
-          </button>
-          <button
-            type="button"
-            style={pill}
-            onClick={() => {
-              setHeaderToolBackId(null);
-              setHeaderToolId("calendar");
-            }}
-          >
-            My Calendar
-          </button>
-          <button
-            type="button"
-            style={pill}
-            onClick={() => {
-              setHeaderToolBackId(null);
-              setHeaderToolId("memory_manager");
-            }}
-          >
-            Me
-          </button>
+          {!isMobile ? (
+            <>
+              <button
+                type="button"
+                style={pill}
+                onClick={() => {
+                  setHeaderToolBackId(null);
+                  setHeaderToolId("groups_manager");
+                }}
+              >
+                My Groups
+              </button>
+              <button
+                type="button"
+                style={pill}
+                onClick={() => {
+                  setHeaderToolBackId(null);
+                  setHeaderToolId("calendar");
+                }}
+              >
+                My Calendar
+              </button>
+              <button
+                type="button"
+                style={pill}
+                onClick={() => {
+                  setHeaderToolBackId(null);
+                  setHeaderToolId("memory_manager");
+                }}
+              >
+                Me
+              </button>
+            </>
+          ) : null}
 
           <div style={{ position: "relative" }} data-appheader-menu>
             <button
@@ -315,7 +328,7 @@ export function AppHeader(props: { height?: number }) {
               <span>{label}</span>
               <span style={{ color: "#64748b", fontWeight: 600, fontSize: 12 }}>({identity.role})</span>
             </button>
-            {menuOpen ? (
+            {menuOpen && !isMobile ? (
               <div
                 style={{
                   position: "absolute",
@@ -349,6 +362,44 @@ export function AppHeader(props: { height?: number }) {
                   Agent card
                 </a>
 
+                {isMobile ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMenuOpen(false);
+                        setHeaderToolBackId(null);
+                        setHeaderToolId("groups_manager");
+                      }}
+                      style={{ ...pill, borderRadius: 12, width: "100%", textAlign: "left", padding: "10px 10px" }}
+                    >
+                      My Groups
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMenuOpen(false);
+                        setHeaderToolBackId(null);
+                        setHeaderToolId("calendar");
+                      }}
+                      style={{ ...pill, borderRadius: 12, width: "100%", textAlign: "left", padding: "10px 10px" }}
+                    >
+                      My Calendar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMenuOpen(false);
+                        setHeaderToolBackId(null);
+                        setHeaderToolId("memory_manager");
+                      }}
+                      style={{ ...pill, borderRadius: 12, width: "100%", textAlign: "left", padding: "10px 10px" }}
+                    >
+                      Me
+                    </button>
+                  </>
+                ) : null}
+
                 <button
                   type="button"
                   onClick={() => {
@@ -374,6 +425,67 @@ export function AppHeader(props: { height?: number }) {
         </div>
       </div>
 
+      {menuOpen && isMobile ? (
+        <div
+          role="dialog"
+          aria-modal="true"
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 90,
+            background: "rgba(15, 23, 42, 0.45)",
+            display: "grid",
+            alignItems: "end",
+          }}
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) setMenuOpen(false);
+          }}
+        >
+          <div
+            style={{
+              background: "white",
+              borderTopLeftRadius: 18,
+              borderTopRightRadius: 18,
+              borderTop: "1px solid #e2e8f0",
+              padding: 14,
+              paddingBottom: 18,
+              boxShadow: "0 -18px 60px rgba(15, 23, 42, 0.25)",
+              maxHeight: "88dvh",
+              overflow: "auto",
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "baseline" }}>
+              <div style={{ fontWeight: 900, fontSize: 14, color: "#0f172a" }}>{label}</div>
+              <button type="button" onClick={() => setMenuOpen(false)} style={pill}>
+                Close
+              </button>
+            </div>
+            <div style={{ marginTop: 10, display: "grid", gap: 8 }}>
+              <a href="/chat" style={{ ...pill, borderRadius: 12, textDecoration: "none", padding: "12px 12px" }} onClick={() => setMenuOpen(false)}>
+                Chat
+              </a>
+              <a href="/checkin" style={{ ...pill, borderRadius: 12, textDecoration: "none", padding: "12px 12px" }} onClick={() => setMenuOpen(false)}>
+                Kids check-in
+              </a>
+
+              <div style={{ height: 1, background: "#e2e8f0", margin: "6px 0" }} />
+
+              <button
+                type="button"
+                onClick={() => {
+                  setMenuOpen(false);
+                  setPersonPickerOpen(true);
+                  setPersonQuery("");
+                }}
+                style={{ ...pill, borderRadius: 12, width: "100%", textAlign: "left", padding: "12px 12px" }}
+              >
+                Switch person…
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       {personPickerOpen ? (
         <div
           role="dialog"
@@ -381,13 +493,14 @@ export function AppHeader(props: { height?: number }) {
           style={{
             position: "fixed",
             inset: 0,
-            zIndex: 80,
+            // Keep above the mobile bottom-sheet menu.
+            zIndex: 120,
             background: "rgba(15, 23, 42, 0.45)",
             display: "grid",
             placeItems: "center",
             padding: 12,
           }}
-          onMouseDown={(e) => {
+          onClick={(e) => {
             if (e.target === e.currentTarget) closeAllMenus();
           }}
         >
@@ -403,6 +516,7 @@ export function AppHeader(props: { height?: number }) {
               display: "grid",
               gridTemplateRows: "auto auto 1fr",
             }}
+            onClick={(e) => e.stopPropagation()}
           >
             <div style={{ padding: 14, borderBottom: "1px solid #e2e8f0", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
               <div style={{ minWidth: 0 }}>

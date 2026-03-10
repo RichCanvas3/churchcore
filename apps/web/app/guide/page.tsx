@@ -23,6 +23,15 @@ export default function GuidePage() {
   const [threadId, setThreadId] = useState<string | null>(null);
   const [runAsGuide, setRunAsGuide] = useState(true);
   const [uiError, setUiError] = useState<string | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 768px)");
+    const onChange = () => setIsMobile(Boolean(mq.matches));
+    onChange();
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
 
   const effectiveRole = useMemo(() => (runAsGuide ? "guide" : identity.role), [identity.role, runAsGuide]);
 
@@ -80,15 +89,17 @@ export default function GuidePage() {
   return (
     <div style={{ height: "100%", minHeight: 0, overflow: "auto", background: "#f8fafc" }}>
       <div style={{ maxWidth: 980, margin: "0 auto", padding: 16, display: "grid", gap: 14 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: isMobile ? "flex-start" : "baseline", gap: 12, flexWrap: "wrap" }}>
           <div>
             <div style={{ fontSize: 20, fontWeight: 800 }}>Guide Console</div>
             <div style={{ color: "#475569" }}>All requests go through the A2A gateway.</div>
           </div>
-          <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-            <a href="/chat" style={{ fontSize: 12 }}>
-              Back to Seeker Chat
-            </a>
+          <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+            {!isMobile ? (
+              <a href="/chat" style={{ fontSize: 12 }}>
+                Back to Seeker Chat
+              </a>
+            ) : null}
             <label style={{ display: "flex", gap: 6, alignItems: "center" }}>
               <span style={{ fontSize: 12, color: "#475569" }}>Run as guide</span>
               <input
@@ -110,7 +121,7 @@ export default function GuidePage() {
             gap: 10,
           }}
         >
-          <div style={{ display: "flex", gap: 10 }}>
+          <div style={{ display: "flex", gap: 10, flexDirection: isMobile ? "column" : "row" }}>
             <input
               value={message}
               onChange={(e) => setMessage(e.target.value)}
@@ -133,6 +144,7 @@ export default function GuidePage() {
                 borderRadius: 10,
                 cursor: "pointer",
                 opacity: loading ? 0.7 : 1,
+                width: isMobile ? "100%" : undefined,
               }}
             >
               Send

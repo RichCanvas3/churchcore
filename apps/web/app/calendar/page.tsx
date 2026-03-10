@@ -165,6 +165,7 @@ function CalendarInner() {
   const [campuses, setCampuses] = useState<Campus[]>([]);
   const [err, setErr] = useState<string>("");
   const [busy, setBusy] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
 
   const weekDates = useMemo(() => {
     const dates: string[] = [];
@@ -194,6 +195,19 @@ function CalendarInner() {
     if (start && isISODate(start)) setWeekStartISO(startOfWeekISO(start, 0));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 768px)");
+    const onChange = () => setIsMobile(Boolean(mq.matches));
+    onChange();
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
+
+  useEffect(() => {
+    // Default to cards view on mobile.
+    if (isMobile) setView("cards");
+  }, [isMobile]);
 
   useEffect(() => {
     // Pull campuses for the filter (fallback to a small hardcoded set).
@@ -444,21 +458,25 @@ function CalendarInner() {
           </div>
 
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-            <button onClick={() => setView("cards")} style={viewBtn(view === "cards")}>
-              Cards
-            </button>
-            <button onClick={() => setView("week")} style={viewBtn(view === "week")}>
-              Week
-            </button>
-            <button
-              onClick={() => {
-                setMonthStartISO(startOfMonthISO(weekStartISO));
-                setView("month");
-              }}
-              style={viewBtn(view === "month")}
-            >
-              Month
-            </button>
+            {!isMobile ? (
+              <>
+                <button onClick={() => setView("cards")} style={viewBtn(view === "cards")}>
+                  Cards
+                </button>
+                <button onClick={() => setView("week")} style={viewBtn(view === "week")}>
+                  Week
+                </button>
+                <button
+                  onClick={() => {
+                    setMonthStartISO(startOfMonthISO(weekStartISO));
+                    setView("month");
+                  }}
+                  style={viewBtn(view === "month")}
+                >
+                  Month
+                </button>
+              </>
+            ) : null}
 
             <button
               onClick={() => {
@@ -466,9 +484,10 @@ function CalendarInner() {
                 else setWeekStartISO(addDaysISO(weekStartISO, -7));
               }}
               style={button}
+              aria-label="Previous"
             >
               <ChevronLeft size={16} />
-              Prev
+              {!isMobile ? "Prev" : null}
             </button>
             <button
               onClick={() => {
@@ -486,22 +505,115 @@ function CalendarInner() {
                 else setWeekStartISO(addDaysISO(weekStartISO, 7));
               }}
               style={button}
+              aria-label="Next"
             >
-              Next
+              {!isMobile ? "Next" : null}
               <ChevronRight size={16} />
             </button>
-            <Link href="/chat" style={{ ...button, textDecoration: "none" }}>
-              Chat
-            </Link>
+            {!isMobile ? (
+              <Link href="/chat" style={{ ...button, textDecoration: "none" }}>
+                Chat
+              </Link>
+            ) : null}
           </div>
         </header>
 
         <section style={{ ...card, padding: 12, display: "grid", gap: 10 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, fontWeight: 900, color: "#0f172a" }}>
-            <Filter size={16} color="#475569" />
-            Filters
-          </div>
-          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+          {isMobile ? (
+            <details>
+              <summary style={{ cursor: "pointer", listStyle: "none", fontSize: 12, fontWeight: 900, color: "#0f172a", display: "flex", alignItems: "center", gap: 8 }}>
+                <Filter size={16} color="#475569" />
+                Filters
+              </summary>
+              <div style={{ marginTop: 10, display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+                <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 12, fontWeight: 800, color: "#0f172a" }}>
+                  Campus
+                  <select
+                    value={filters.campus}
+                    onChange={(e) => setFilters((f) => ({ ...f, campus: e.target.value as any }))}
+                    style={{ border: "1px solid #cbd5e1", borderRadius: 10, padding: "6px 10px", fontSize: 12, fontWeight: 800 }}
+                  >
+                    <option value="all">All</option>
+                    {(campuses.length
+                      ? campuses
+                      : [
+                          { id: "campus_boulder", name: "Boulder" },
+                          { id: "campus_erie", name: "Erie" },
+                          { id: "campus_thornton", name: "Thornton" },
+                        ]
+                    ).map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name ?? c.id}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <button
+                  onClick={() => setFilters((f) => ({ ...f, showChurchEvents: !f.showChurchEvents }))}
+                  style={{
+                    borderRadius: 999,
+                    border: `1px solid ${filters.showChurchEvents ? "#93c5fd" : "#e2e8f0"}`,
+                    background: filters.showChurchEvents ? "#eff6ff" : "white",
+                    padding: "8px 10px",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 8,
+                    fontSize: 12,
+                    fontWeight: 900,
+                    color: "#0f172a",
+                  }}
+                  title="Toggle church events"
+                >
+                  Church events
+                </button>
+
+                <button
+                  onClick={() => setFilters((f) => ({ ...f, showMyActivities: !f.showMyActivities }))}
+                  style={{
+                    borderRadius: 999,
+                    border: `1px solid ${filters.showMyActivities ? "#86efac" : "#e2e8f0"}`,
+                    background: filters.showMyActivities ? "#f0fdf4" : "white",
+                    padding: "8px 10px",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 8,
+                    fontSize: 12,
+                    fontWeight: 900,
+                    color: "#0f172a",
+                  }}
+                  title="Toggle my activities"
+                >
+                  My activities
+                </button>
+
+                <button
+                  onClick={() => setFilters((f) => ({ ...f, outdoorOnly: !f.outdoorOnly }))}
+                  style={{
+                    borderRadius: 999,
+                    border: `1px solid ${filters.outdoorOnly ? "#fdba74" : "#e2e8f0"}`,
+                    background: filters.outdoorOnly ? "#fff7ed" : "white",
+                    padding: "8px 10px",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 8,
+                    fontSize: 12,
+                    fontWeight: 900,
+                    color: "#0f172a",
+                  }}
+                >
+                  <Sun size={16} color={filters.outdoorOnly ? "#b45309" : "#475569"} />
+                  Outdoor
+                </button>
+              </div>
+            </details>
+          ) : (
+            <>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, fontWeight: 900, color: "#0f172a" }}>
+                <Filter size={16} color="#475569" />
+                Filters
+              </div>
+              <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
             <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 12, fontWeight: 800, color: "#0f172a" }}>
               Campus
               <select
@@ -581,7 +693,9 @@ function CalendarInner() {
               <Sun size={16} color={filters.outdoorOnly ? "#b45309" : "#475569"} />
               Outdoor
             </button>
-          </div>
+              </div>
+            </>
+          )}
         </section>
 
         <section style={{ ...card, padding: 12 }}>
