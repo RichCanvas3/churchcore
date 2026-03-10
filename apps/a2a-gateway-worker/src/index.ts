@@ -1918,7 +1918,8 @@ const GroupUpdateSchema = z.object({
   meeting_details: z.string().optional().nullable(),
   meeting_frequency: z.enum(["weekly", "biweekly"]).optional().nullable(),
   meeting_day_of_week: z.number().int().min(0).max(6).optional().nullable(),
-  meeting_time_local: z.string().regex(/^\d{2}:\d{2}$/).optional().nullable(),
+  // Accept both "7:00" and "07:00" (normalize later).
+  meeting_time_local: z.string().trim().regex(/^\d{1,2}:\d{2}$/).optional().nullable(),
   meeting_timezone: z.string().optional().nullable(),
   meeting_location_name: z.string().optional().nullable(),
   meeting_location_address: z.string().optional().nullable(),
@@ -4840,6 +4841,17 @@ async function handleGroupUpdate(req: Request, env: Env) {
   const ok = await canManageGroupMembers(env, { churchId, userId, identityRole: role, groupId, personId });
   if (!ok) return json({ ok: false, error: "Forbidden" }, { status: 403 });
 
+  const meetingTimeLocal = (() => {
+    const raw = String(parsed.data.meeting_time_local ?? "").trim();
+    if (!raw) return null;
+    // normalized to HH:MM
+    const m = /^(\d{1,2}):(\d{2})$/.exec(raw);
+    if (!m) return null;
+    const hh = String(Math.max(0, Math.min(23, Number(m[1])))).padStart(2, "0");
+    const mm = String(Math.max(0, Math.min(59, Number(m[2])))).padStart(2, "0");
+    return `${hh}:${mm}`;
+  })();
+
   const now = nowIso();
   await env.churchcore
     .prepare(
@@ -4867,7 +4879,7 @@ async function handleGroupUpdate(req: Request, env: Env) {
       parsed.data.meeting_details ?? null,
       parsed.data.meeting_frequency ?? null,
       parsed.data.meeting_day_of_week ?? null,
-      parsed.data.meeting_time_local ?? null,
+      meetingTimeLocal,
       parsed.data.meeting_timezone ?? null,
       parsed.data.meeting_location_name ?? null,
       parsed.data.meeting_location_address ?? null,

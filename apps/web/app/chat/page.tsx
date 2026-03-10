@@ -300,6 +300,8 @@ export default function ChatPage() {
     setEditingTitle("");
     setUiError(null);
     setActiveUiToolId(null);
+    setActiveUiToolArgs(null);
+    setHideBibleTool(true);
     setLeftCollapsed(false);
     refreshThreads().catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -308,8 +310,9 @@ export default function ChatPage() {
   // Close the right-side tool when switching topics.
   useEffect(() => {
     setActiveUiToolId(null);
+    setActiveUiToolArgs(null);
     setIsToolsOpenMobile(false);
-    setHideBibleTool(false);
+    setHideBibleTool(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [effectiveThreadId]);
 
