@@ -5,6 +5,7 @@ import os
 import base64
 import asyncio
 import time
+import traceback
 import urllib.parse
 import urllib.request
 from datetime import datetime, timedelta, timezone
@@ -2551,12 +2552,27 @@ async def handle_guide_skill(
 
 
 async def run_church_agent(inp: Input) -> OutputEnvelope:
-    tools = await load_mcp_tools_from_env()
-    session = inp.session
-    role = session.role
+    try:
+        tools = await load_mcp_tools_from_env()
+        tools = tools if isinstance(tools, list) else []
+        session = inp.session
+        role = session.role
 
-    if role == "guide":
-        return await handle_guide_skill(skill=inp.skill, message=inp.message, args=inp.args, session=session, tools=tools)
+        if role == "guide":
+            return await handle_guide_skill(skill=inp.skill, message=inp.message, args=inp.args, session=session, tools=tools)
 
-    return await handle_seeker_skill(skill=inp.skill, message=inp.message, args=inp.args, session=session, tools=tools)
+        return await handle_seeker_skill(skill=inp.skill, message=inp.message, args=inp.args, session=session, tools=tools)
+    except Exception as e:
+        tr = traceback.format_exc()
+        # Keep trace bounded so it fits in LangSmith outputs.
+        tr_tail = tr[-8000:] if isinstance(tr, str) else str(tr or "")[-8000:]
+        return OutputEnvelope(
+            message="Internal error in church_agent. See data.trace.",
+            data={
+                "ok": False,
+                "error": "church_agent_exception",
+                "detail": str(getattr(e, "message", "") or str(e) or "error"),
+                "trace": tr_tail,
+            },
+        )
 
