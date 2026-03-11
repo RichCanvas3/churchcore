@@ -164,9 +164,9 @@ def _pick_relevant_docs(exported_docs: list[dict[str, Any]], query: str, k: int 
     return out[:k]
 
 
-def _citations_from_docs(docs: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def _citations_from_docs(docs: list[dict[str, Any]] | None) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
-    for d in docs:
+    for d in (docs or []):
         sid = d.get("sourceId")
         txt = d.get("text")
         if isinstance(sid, str) and isinstance(txt, str) and sid.strip():
@@ -650,9 +650,9 @@ def _should_propose_memory_ops(user_text: str) -> bool:
     )
 
 
-def _cards_from_export_docs(docs: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def _cards_from_export_docs(docs: list[dict[str, Any]] | None) -> list[dict[str, Any]]:
     cards: list[dict[str, Any]] = []
-    for d in docs:
+    for d in (docs or []):
         sid = str(d.get("sourceId") or "")
         txt = d.get("text")
         if not isinstance(txt, str) or not txt.strip():
@@ -806,7 +806,8 @@ async def _require_guide_permission(session: Session, tools: list[Any]) -> bool:
     auth = session.auth
     if not auth or not auth.isAuthenticated:
         return False
-    if not any(r in {"guide", "staff"} for r in auth.roles):
+    roles = getattr(auth, "roles", None) or []
+    if not any(r in {"guide", "staff"} for r in roles):
         return False
 
     # Canonical check via ChurchCore MCP when available.
@@ -2141,6 +2142,7 @@ async def handle_seeker_skill(
             has_scripture = bool(__import__("re").search(scripture_re, out_text or ""))
         except Exception:
             has_scripture = False
+        ui_handoff = ui_handoff or []
         if has_scripture and not any(isinstance(h, dict) and h.get("type") == "ui_tool" and h.get("tool_id") == "bible_reader" for h in ui_handoff):
             ui_handoff = [
                 *ui_handoff,
@@ -2361,7 +2363,7 @@ async def handle_seeker_skill(
                         "items": [
                             {"role": session.role},
                             {"isAuthenticated": bool(session.auth and session.auth.isAuthenticated)},
-                            {"roles": (session.auth.roles if session.auth else [])},
+                            {"roles": (getattr(session.auth, "roles", None) or []) if session.auth else []},
                         ],
                     }
                 ],

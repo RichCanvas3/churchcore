@@ -222,7 +222,9 @@ async def ensure_index_with_mcp(*, church_id: str, ttl_seconds: int = 300) -> li
     return out
 
 
-def search_kb(index: list[IndexedChunk], query: str, k: int = 4) -> tuple[str, list[KnowledgeHit]]:
+def search_kb(index: list[IndexedChunk] | None, query: str, k: int = 4) -> tuple[str, list[KnowledgeHit]]:
+    if not index:
+        return "No relevant knowledge base content found.", []
     embeddings = OpenAIEmbeddings(
         api_key=os.environ.get("OPENAI_API_KEY"),
         model=os.environ.get("OPENAI_EMBEDDINGS_MODEL", "text-embedding-3-large"),
