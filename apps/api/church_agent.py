@@ -30,6 +30,9 @@ _JOURNEY_SPARQL_CACHE_TTL = 300
 _church_export_cache: dict[str, tuple[list[Any], float]] = {}
 _CHURCH_EXPORT_CACHE_TTL = 11000
 
+# Max seconds for chat LLM call; prevents hanging on slow/unresponsive API. Env: CHAT_LLM_TIMEOUT_SECONDS (default 60).
+_CHAT_LLM_TIMEOUT = 60
+
 
 def _ai_gateway_access_token() -> str:
     """
@@ -566,19 +569,22 @@ async def _quick_need_church_export(model: Any, user_text: str) -> bool:
         return False
     try:
         bound = model.bind(max_tokens=8) if hasattr(model, "bind") else model
-        r = await bound.ainvoke(
-            [
-                (
-                    "system",
-                    "Answer only YES or NO. Does this user question require loading full church data (services, events, groups, locations, strategy) to answer accurately?",
-                ),
-                ("user", u[:400]),
-            ]
+        r = await asyncio.wait_for(
+            bound.ainvoke(
+                [
+                    (
+                        "system",
+                        "Answer only YES or NO. Does this user question require loading full church data (services, events, groups, locations, strategy) to answer accurately?",
+                    ),
+                    ("user", u[:400]),
+                ]
+            ),
+            timeout=15,
         )
         txt = (getattr(r, "content", "") or "").strip().upper()
         return "YES" in txt and "NO" not in txt[:10]
-    except Exception:
-        return True  # On failure, do export to be safe
+    except (Exception, asyncio.TimeoutError):
+        return True  # On failure or timeout, do export to be safe
 
 
 def _should_fetch_church_export(user_text: str) -> bool:
@@ -2188,37 +2194,45 @@ async def handle_seeker_skill(
             kb_text, kb_hits = "", []
         _t_fetch_ms = int(round((time.perf_counter() - _t_pre_fetch) * 1000))
 
-        sys = (
-            "You are Church Agent in seeker role. Help the person explore faith and take next steps.\n"
-            "Do not invent service times, events, groups, or volunteer opportunities. Use ONLY the provided church data excerpt.\n"
-            "Always be warm, concise, and propose 1-3 next actions.\n\n"
-            "If week-scoped sermon/plan context is provided, prefer it for: verse-of-the-day, Bible study prompts, and discussion questions.\n"
-            "When the user says 'this week', interpret it as the provided weekly context.\n\n"
-            "Client UI tools available (use handoff items when helpful):\n"
-            "- church_overview: show church overview (logo, campuses, service times).\n"
-            "- strategic_intent: show purpose/vision/mission/strategy (church strategic intent).\n"
-            "- calendar: show events calendar (week view, with outdoor weather).\n"
-            "- bible_reader: read Bible passages (WEB text in-panel, NIV link).\n"
-            "- household_manager: manage household (kids, custody notes, allergies; authorized pickup + extended family).\n"
-            "- weekly_sermons: browse sermons by campus; view cached summary/topics/verses/transcript.\n"
-            "- kids_checkin: run kids check-in flow (find family, preview rooms, commit check-in).\n"
-            "- guide: show journey position + next steps + resources.\n"
-            "- memory_manager: manage person memory areas (hub).\n"
-            "- groups_manager: manage my long-lived groups (roster, invites, schedule, group Bible study).\n"
-            "- identity_contact: view/edit preferred name + email/phone.\n"
-            "- faith_journey: view/edit faith journey phase and milestones (Seeker, New Believer, Growing, etc.).\n"
-            "- comm_prefs: view/edit communication preferences (SMS/email opt-in, preferred channel).\n"
-            "- care_pastoral: manage prayer requests (and staff-only care notes).\n"
-            "- teams_skills: staff-only serving teams/skills.\n"
-            'If a UI tool should open, include a handoff item like: {"type":"ui_tool","tool_id":"identity_contact"}.\n\n'
-            + (("Identity/contact context (authoritative):\n" + identity_contact_summary + "\n\n") if identity_contact_summary else "")
-            + (("Faith journey context:\n" + journey_summary + "\n\n") if journey_summary else "")
-            + (("This week context:\n" + weekly_summary + "\n\n") if weekly_summary else "")
-            + (("Known person memory (shared across topics):\n" + mem_summary + "\n\n") if mem_summary else "")
-            + (("Household context:\n" + hh_summary + "\n\n") if hh_summary else "")
-            + (("Authoritative church data excerpt:\n" + church_context + "\n\n") if church_context else "")
-            + (kb_text + "\n\n" if kb_text else "")
-        )
+        # Minimal prompt for simple questions (no church/KB): much fewer tokens → faster response (often sub-second).
+        simple_query = not church_context and not kb_text
+        if simple_query:
+            sys = (
+                "You are Church Agent. Be warm and concise. Answer in 1-3 short sentences. Do not invent church details.\n"
+                + (("User context: " + identity_contact_summary + "\n") if identity_contact_summary else "")
+            )
+        else:
+            sys = (
+                "You are Church Agent in seeker role. Help the person explore faith and take next steps.\n"
+                "Do not invent service times, events, groups, or volunteer opportunities. Use ONLY the provided church data excerpt.\n"
+                "Always be warm, concise, and propose 1-3 next actions.\n\n"
+                "If week-scoped sermon/plan context is provided, prefer it for: verse-of-the-day, Bible study prompts, and discussion questions.\n"
+                "When the user says 'this week', interpret it as the provided weekly context.\n\n"
+                "Client UI tools available (use handoff items when helpful):\n"
+                "- church_overview: show church overview (logo, campuses, service times).\n"
+                "- strategic_intent: show purpose/vision/mission/strategy (church strategic intent).\n"
+                "- calendar: show events calendar (week view, with outdoor weather).\n"
+                "- bible_reader: read Bible passages (WEB text in-panel, NIV link).\n"
+                "- household_manager: manage household (kids, custody notes, allergies; authorized pickup + extended family).\n"
+                "- weekly_sermons: browse sermons by campus; view cached summary/topics/verses/transcript.\n"
+                "- kids_checkin: run kids check-in flow (find family, preview rooms, commit check-in).\n"
+                "- guide: show journey position + next steps + resources.\n"
+                "- memory_manager: manage person memory areas (hub).\n"
+                "- groups_manager: manage my long-lived groups (roster, invites, schedule, group Bible study).\n"
+                "- identity_contact: view/edit preferred name + email/phone.\n"
+                "- faith_journey: view/edit faith journey phase and milestones (Seeker, New Believer, Growing, etc.).\n"
+                "- comm_prefs: view/edit communication preferences (SMS/email opt-in, preferred channel).\n"
+                "- care_pastoral: manage prayer requests (and staff-only care notes).\n"
+                "- teams_skills: staff-only serving teams/skills.\n"
+                'If a UI tool should open, include a handoff item like: {"type":"ui_tool","tool_id":"identity_contact"}.\n\n'
+                + (("Identity/contact context (authoritative):\n" + identity_contact_summary + "\n\n") if identity_contact_summary else "")
+                + (("Faith journey context:\n" + journey_summary + "\n\n") if journey_summary else "")
+                + (("This week context:\n" + weekly_summary + "\n\n") if weekly_summary else "")
+                + (("Known person memory (shared across topics):\n" + mem_summary + "\n\n") if mem_summary else "")
+                + (("Household context:\n" + hh_summary + "\n\n") if hh_summary else "")
+                + (("Authoritative church data excerpt:\n" + church_context + "\n\n") if church_context else "")
+                + (kb_text + "\n\n" if kb_text else "")
+            )
         if not user:
             return OutputEnvelope(
                 message="What’s on your mind today?",
@@ -2229,7 +2243,23 @@ async def handle_seeker_skill(
                 ],
             )
         _t_pre_llm = time.perf_counter()
-        r = await model.ainvoke([("system", sys), ("user", user)])
+        timeout_sec = int(float(os.environ.get("CHAT_LLM_TIMEOUT_SECONDS", str(_CHAT_LLM_TIMEOUT)) or str(_CHAT_LLM_TIMEOUT)))
+        timeout_sec = max(10, min(300, timeout_sec))
+        try:
+            r = await asyncio.wait_for(
+                model.ainvoke([("system", sys), ("user", user)]),
+                timeout=timeout_sec,
+            )
+        except asyncio.TimeoutError:
+            _t_llm_ms = int(round((time.perf_counter() - _t_pre_llm) * 1000))
+            return OutputEnvelope(
+                message="That took too long—please try again. If it keeps happening, try a shorter question or try again in a few minutes.",
+                suggested_next_actions=[
+                    NextAction(title="Service times", skill="discover.service_times"),
+                    NextAction(title="Upcoming events", skill="discover.events"),
+                ],
+                data={"debug_timing_ms": {"context": _t_context, "llm_timeout": _t_llm_ms, "total_agent": int(round((time.perf_counter() - _t0) * 1000))}},
+            )
         _t_llm_ms = int(round((time.perf_counter() - _t_pre_llm) * 1000))
         txt = getattr(r, "content", "") if r else ""
         out_text = str(txt or "").strip() or "How can I help?"
