@@ -25,6 +25,11 @@ _ai_gateway_token_cache: dict[str, Any] = {"token": None, "expires_at": 0.0}
 _journey_sparql_cache: dict[str, tuple[dict[str, Any], int, float]] = {}
 _JOURNEY_SPARQL_CACHE_TTL = 300
 
+# In-memory cache for church KB export (churchId:limit -> (exported_docs_list, expiry_ts)). Same church+limit = same docs until D1 changes.
+# TTL via CHURCH_EXPORT_CACHE_TTL_SECONDS (default 300).
+_church_export_cache: dict[str, tuple[list[Any], float]] = {}
+_CHURCH_EXPORT_CACHE_TTL = 11000
+
 
 def _ai_gateway_access_token() -> str:
     """
@@ -552,6 +557,28 @@ def _wants_sparql_journey(user_text: str) -> bool:
             "my stage",
         ]
     )
+
+
+async def _quick_need_church_export(model: Any, user_text: str) -> bool:
+    """Quick LLM gate: should we call churchcore_kb_export_docs? Reduces unnecessary heavy exports."""
+    u = (user_text or "").strip()
+    if not u or len(u) > 500:
+        return False
+    try:
+        bound = model.bind(max_tokens=8) if hasattr(model, "bind") else model
+        r = await bound.ainvoke(
+            [
+                (
+                    "system",
+                    "Answer only YES or NO. Does this user question require loading full church data (services, events, groups, locations, strategy) to answer accurately?",
+                ),
+                ("user", u[:400]),
+            ]
+        )
+        txt = (getattr(r, "content", "") or "").strip().upper()
+        return "YES" in txt and "NO" not in txt[:10]
+    except Exception:
+        return True  # On failure, do export to be safe
 
 
 def _should_fetch_church_export(user_text: str) -> bool:
@@ -2045,6 +2072,43 @@ async def handle_seeker_skill(
                 data={"weather": hourly or {}, "campus": session.campusId},
             )
 
+        # Deterministic: "what events this week" / "events going on" — one MCP call, no church export (avoids getting stuck).
+        if user and ("event" in u or "events" in u) and any(k in u for k in ["this week", "this wekk", "going on", "upcoming", "happening", "what's on"]):
+            week_start = None
+            if isinstance(weekly, dict) and isinstance(weekly.get("plan"), dict) and isinstance(weekly["plan"].get("week"), dict):
+                week_start = str(weekly["plan"]["week"].get("weekStartDate") or "").strip()
+            if not week_start:
+                week_start = datetime.now(timezone.utc).date().isoformat()
+            from_iso = f"{week_start}T00:00:00.000Z"
+            week_end = (datetime.fromisoformat(week_start).date() + timedelta(days=6)).isoformat()
+            to_iso = f"{week_end}T23:59:59.999Z"
+            res = await _call_tool_json(
+                tools,
+                "churchcore_list_events",
+                {
+                    "churchId": session.churchId,
+                    "campusId": session.campusId,
+                    "timezone": session.timezone,
+                    "fromIso": from_iso,
+                    "toIso": to_iso,
+                },
+            )
+            if not res:
+                return _missing_mcp("churchcore_list_events")
+            events = res.get("events") if isinstance(res, dict) else None
+            items = [e for e in events if isinstance(e, dict)] if isinstance(events, list) else []
+            n = len(items)
+            msg = f"Here are this week's events ({n}):" if n else "No church events this week."
+            if n:
+                msg += " Open the calendar for details and weather."
+            return OutputEnvelope(
+                message=msg,
+                cards=[{"type": "events", "title": "This week's events", "items": items[:30]}],
+                suggested_next_actions=[NextAction(title="Open calendar", skill="chat", args=None)],
+                handoff=[{"type": "ui_tool", "tool_id": "calendar", "title": "Calendar", "instructions": "Open the events calendar."}],
+                data={"events": items, "weekStartISO": week_start, "weekEndISO": week_end},
+            )
+
         # Deterministic: if the user asks to email/remind, send to their own email (if on file).
         if user and any(k in u for k in ["email me", "send me an email", "remind me"]) and "@" not in u:
             person_id = str(session.personId or "").strip()
@@ -2069,9 +2133,21 @@ async def handle_seeker_skill(
         async def _fetch_church_export() -> tuple[list[dict[str, Any]], str]:
             if not user or not _should_fetch_church_export(user):
                 return [], ""
-            exported = await _call_tool_json(tools, "churchcore_kb_export_docs", {"churchId": session.churchId, "limitPerTable": 200})
+            limit = 200
+            cache_key = f"{session.churchId}:{limit}"
+            ttl_sec = int(float(os.environ.get("CHURCH_EXPORT_CACHE_TTL_SECONDS", str(_CHURCH_EXPORT_CACHE_TTL)) or str(_CHURCH_EXPORT_CACHE_TTL)))
+            now = time.time()
+            cached = _church_export_cache.get(cache_key)
+            if cached and len(cached) == 2:
+                exported_docs_list, expiry = cached
+                if now < expiry and isinstance(exported_docs_list, list):
+                    relevant_docs = _pick_relevant_docs([d for d in exported_docs_list if isinstance(d, dict)], user, k=3)
+                    church_context = "\n\n".join([f"SOURCE {d.get('sourceId')}:\n{_as_text(d.get('text'), 6000)}" for d in relevant_docs])
+                    return relevant_docs, church_context
+            exported = await _call_tool_json(tools, "churchcore_kb_export_docs", {"churchId": session.churchId, "limitPerTable": limit})
             exported_docs = exported.get("docs") if isinstance(exported, dict) else None
             exported_docs_list = exported_docs if isinstance(exported_docs, list) else []
+            _church_export_cache[cache_key] = (exported_docs_list, now + max(60, ttl_sec))
             relevant_docs = _pick_relevant_docs([d for d in exported_docs_list if isinstance(d, dict)], user, k=3)
             church_context = "\n\n".join([f"SOURCE {d.get('sourceId')}:\n{_as_text(d.get('text'), 6000)}" for d in relevant_docs])
             return relevant_docs, church_context
@@ -2095,6 +2171,8 @@ async def handle_seeker_skill(
                 return "", []
 
         do_export = user and _should_fetch_church_export(user)
+        if do_export:
+            do_export = await _quick_need_church_export(model, user)
         do_kb = user and _should_search_kb(user)
         _t_pre_fetch = time.perf_counter()
         if do_export and do_kb:
@@ -2155,13 +2233,15 @@ async def handle_seeker_skill(
         _t_llm_ms = int(round((time.perf_counter() - _t_pre_llm) * 1000))
         txt = getattr(r, "content", "") if r else ""
         out_text = str(txt or "").strip() or "How can I help?"
-        # If the model output raw handoff JSON (e.g. {"type":"ui_tool","tool_id":"calendar"}), show a friendly message instead.
+        # If the model output raw handoff JSON (e.g. {"type":"ui_tool","tool_id":"calendar"}), use it as handoff so the UI opens the tool.
+        llm_handoff: list[dict[str, Any]] = []
         if out_text.lstrip().startswith('{"type":"ui_tool"') and "tool_id" in out_text:
             try:
                 parsed = json.loads(out_text)
                 if isinstance(parsed, dict) and parsed.get("type") == "ui_tool":
                     tool_id = str(parsed.get("tool_id") or "").strip()
                     out_text = f"Opening {tool_id.replace('_', ' ')}." if tool_id else "Opening that."
+                    llm_handoff = [{"type": "ui_tool", "tool_id": tool_id, "title": tool_id.replace("_", " ").title()}]
             except Exception:
                 pass
         ui_handoff = _ui_handoff_for_user_text(user)
@@ -2174,6 +2254,8 @@ async def handle_seeker_skill(
         except Exception:
             has_scripture = False
         ui_handoff = ui_handoff or []
+        if llm_handoff:
+            ui_handoff = llm_handoff
         if has_scripture and not any(isinstance(h, dict) and h.get("type") == "ui_tool" and h.get("tool_id") == "bible_reader" for h in ui_handoff):
             ui_handoff = [
                 *ui_handoff,
@@ -2184,6 +2266,9 @@ async def handle_seeker_skill(
                     "instructions": "Open the Bible reader for recommended passages.",
                 },
             ]
+        # Ensure handoff is always a list (frontend expects array).
+        if not isinstance(ui_handoff, list):
+            ui_handoff = [ui_handoff] if isinstance(ui_handoff, dict) else []
         memory_ops: list[dict[str, Any]] = []
         if _should_propose_memory_ops(user):
             try:

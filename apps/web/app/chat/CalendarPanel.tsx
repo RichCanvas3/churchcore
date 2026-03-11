@@ -92,7 +92,7 @@ export function CalendarPanel(props: { identity: Identity; onClose: () => void }
   const [myBusy, setMyBusy] = useState(false);
   const [myErr, setMyErr] = useState<string>("");
   const [myActivities, setMyActivities] = useState<MyActivity[]>([]);
-  const [showChurch, setShowChurch] = useState(false);
+  const [showChurch, setShowChurch] = useState(true);
   const [showMine, setShowMine] = useState(true);
 
   const weekDates = useMemo(() => {

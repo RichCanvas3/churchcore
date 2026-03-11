@@ -2263,35 +2263,73 @@ function createServer(env: Env) {
     async (args) => {
       const parsed = z.object({ churchId: z.string().min(1), limitPerTable: z.number().int().min(1).max(500).optional() }).parse(args);
       const limit = parsed.limitPerTable ?? 200;
+      const cid = parsed.churchId;
 
-      const church = (await env.churchcore.prepare(`SELECT * FROM churches WHERE id=?1`).bind(parsed.churchId).first()) as any;
-      const branding = (await env.churchcore.prepare(`SELECT * FROM church_branding WHERE church_id=?1`).bind(parsed.churchId).first()) as any;
-      const campuses = (await env.churchcore.prepare(`SELECT * FROM campuses WHERE church_id=?1 LIMIT ${limit}`).bind(parsed.churchId).all()).results ?? [];
-      const locations = (await env.churchcore.prepare(`SELECT * FROM locations WHERE church_id=?1 LIMIT ${limit}`).bind(parsed.churchId).all()).results ?? [];
-      const services = (await env.churchcore.prepare(`SELECT * FROM services WHERE church_id=?1 LIMIT ${limit}`).bind(parsed.churchId).all()).results ?? [];
-      const servicePlans = (await env.churchcore.prepare(`SELECT * FROM service_plans WHERE church_id=?1 LIMIT ${limit}`).bind(parsed.churchId).all()).results ?? [];
-      const servicePlanItems = (await env.churchcore.prepare(`SELECT * FROM service_plan_items WHERE church_id=?1 LIMIT ${limit}`).bind(parsed.churchId).all()).results ?? [];
-      const events = (await env.churchcore.prepare(`SELECT * FROM events WHERE church_id=?1 LIMIT ${limit}`).bind(parsed.churchId).all()).results ?? [];
-      const outreaches = (await env.churchcore.prepare(`SELECT * FROM outreach_campaigns WHERE church_id=?1 LIMIT ${limit}`).bind(parsed.churchId).all()).results ?? [];
-      const communityCatalog = (await env.churchcore.prepare(`SELECT * FROM community_catalog WHERE church_id=?1 LIMIT ${limit}`).bind(parsed.churchId).all()).results ?? [];
-      const groups = (await env.churchcore.prepare(`SELECT * FROM groups WHERE church_id=?1 LIMIT ${limit}`).bind(parsed.churchId).all()).results ?? [];
-      const opportunities = (await env.churchcore.prepare(`SELECT * FROM opportunities WHERE church_id=?1 LIMIT ${limit}`).bind(parsed.churchId).all()).results ?? [];
-      const resources = (await env.churchcore.prepare(`SELECT * FROM resources WHERE church_id=?1 LIMIT ${limit}`).bind(parsed.churchId).all()).results ?? [];
-      const strategicIntents = (await env.churchcore.prepare(`SELECT * FROM strategic_intents WHERE church_id=?1 LIMIT ${limit}`).bind(parsed.churchId).all()).results ?? [];
-      const strategicLinks = (await env.churchcore.prepare(`SELECT * FROM strategic_intent_links WHERE church_id=?1 LIMIT ${limit}`).bind(parsed.churchId).all()).results ?? [];
-      const journeyNodes = (await env.churchcore.prepare(`SELECT * FROM journey_node WHERE church_id=?1 LIMIT ${limit}`).bind(parsed.churchId).all()).results ?? [];
-      const journeyEdges = (await env.churchcore.prepare(`SELECT * FROM journey_edge WHERE church_id=?1 LIMIT ${limit}`).bind(parsed.churchId).all()).results ?? [];
-      const journeyLinks = (await env.churchcore.prepare(`SELECT * FROM journey_resource_link WHERE church_id=?1 LIMIT ${limit}`).bind(parsed.churchId).all()).results ?? [];
-
-      const contentDocs = (
-        await env.churchcore
+      const [
+        church,
+        branding,
+        campusesRes,
+        locationsRes,
+        servicesRes,
+        servicePlansRes,
+        servicePlanItemsRes,
+        eventsRes,
+        outreachesRes,
+        communityCatalogRes,
+        groupsRes,
+        opportunitiesRes,
+        resourcesRes,
+        strategicIntentsRes,
+        strategicLinksRes,
+        journeyNodesRes,
+        journeyEdgesRes,
+        journeyLinksRes,
+        contentDocsRes,
+      ] = await Promise.all([
+        env.churchcore.prepare(`SELECT * FROM churches WHERE id=?1`).bind(cid).first(),
+        env.churchcore.prepare(`SELECT * FROM church_branding WHERE church_id=?1`).bind(cid).first(),
+        env.churchcore.prepare(`SELECT * FROM campuses WHERE church_id=?1 LIMIT ${limit}`).bind(cid).all(),
+        env.churchcore.prepare(`SELECT * FROM locations WHERE church_id=?1 LIMIT ${limit}`).bind(cid).all(),
+        env.churchcore.prepare(`SELECT * FROM services WHERE church_id=?1 LIMIT ${limit}`).bind(cid).all(),
+        env.churchcore.prepare(`SELECT * FROM service_plans WHERE church_id=?1 LIMIT ${limit}`).bind(cid).all(),
+        env.churchcore.prepare(`SELECT * FROM service_plan_items WHERE church_id=?1 LIMIT ${limit}`).bind(cid).all(),
+        env.churchcore.prepare(`SELECT * FROM events WHERE church_id=?1 LIMIT ${limit}`).bind(cid).all(),
+        env.churchcore.prepare(`SELECT * FROM outreach_campaigns WHERE church_id=?1 LIMIT ${limit}`).bind(cid).all(),
+        env.churchcore.prepare(`SELECT * FROM community_catalog WHERE church_id=?1 LIMIT ${limit}`).bind(cid).all(),
+        env.churchcore.prepare(`SELECT * FROM groups WHERE church_id=?1 LIMIT ${limit}`).bind(cid).all(),
+        env.churchcore.prepare(`SELECT * FROM opportunities WHERE church_id=?1 LIMIT ${limit}`).bind(cid).all(),
+        env.churchcore.prepare(`SELECT * FROM resources WHERE church_id=?1 LIMIT ${limit}`).bind(cid).all(),
+        env.churchcore.prepare(`SELECT * FROM strategic_intents WHERE church_id=?1 LIMIT ${limit}`).bind(cid).all(),
+        env.churchcore.prepare(`SELECT * FROM strategic_intent_links WHERE church_id=?1 LIMIT ${limit}`).bind(cid).all(),
+        env.churchcore.prepare(`SELECT * FROM journey_node WHERE church_id=?1 LIMIT ${limit}`).bind(cid).all(),
+        env.churchcore.prepare(`SELECT * FROM journey_edge WHERE church_id=?1 LIMIT ${limit}`).bind(cid).all(),
+        env.churchcore.prepare(`SELECT * FROM journey_resource_link WHERE church_id=?1 LIMIT ${limit}`).bind(cid).all(),
+        env.churchcore
           .prepare(
             `SELECT id AS docId, entity_type AS entityType, entity_id AS entityId, locale, title, body_markdown AS bodyMarkdown, updated_at AS updatedAt
              FROM content_docs WHERE church_id=?1 ORDER BY updated_at DESC LIMIT ${limit}`,
           )
-          .bind(parsed.churchId)
-          .all()
-      ).results ?? [];
+          .bind(cid)
+          .all(),
+      ]);
+
+      const campuses = (campusesRes as any)?.results ?? [];
+      const locations = (locationsRes as any)?.results ?? [];
+      const services = (servicesRes as any)?.results ?? [];
+      const servicePlans = (servicePlansRes as any)?.results ?? [];
+      const servicePlanItems = (servicePlanItemsRes as any)?.results ?? [];
+      const events = (eventsRes as any)?.results ?? [];
+      const outreaches = (outreachesRes as any)?.results ?? [];
+      const communityCatalog = (communityCatalogRes as any)?.results ?? [];
+      const groups = (groupsRes as any)?.results ?? [];
+      const opportunities = (opportunitiesRes as any)?.results ?? [];
+      const resources = (resourcesRes as any)?.results ?? [];
+      const strategicIntents = (strategicIntentsRes as any)?.results ?? [];
+      const strategicLinks = (strategicLinksRes as any)?.results ?? [];
+      const journeyNodes = (journeyNodesRes as any)?.results ?? [];
+      const journeyEdges = (journeyEdgesRes as any)?.results ?? [];
+      const journeyLinks = (journeyLinksRes as any)?.results ?? [];
+      const contentDocs = (contentDocsRes as any)?.results ?? [];
 
       const docs = [
         { sourceId: "church/church.json", text: JSON.stringify({ church, branding, campuses, locations }, null, 2) },
