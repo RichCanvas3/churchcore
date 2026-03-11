@@ -79,7 +79,7 @@ _CACHED_BY_CHURCH: dict[str, list[IndexedChunk]] = {}
 _CACHED_BUILT_AT: dict[str, float] = {}
 
 
-async def ensure_index_with_mcp(*, church_id: str, ttl_seconds: int = 300) -> list[IndexedChunk]:
+async def ensure_index_with_mcp(*, church_id: str, ttl_seconds: int = 600) -> list[IndexedChunk]:
     """
     Builds a KB index from:
     - local markdown in packages/knowledge/content
@@ -100,11 +100,12 @@ async def ensure_index_with_mcp(*, church_id: str, ttl_seconds: int = 300) -> li
 
     persist_enabled = _truthy_env("KB_PERSIST_TO_CHURCHCORE", default=True)
 
-    # 1) Preferred: load persisted chunks (paged) for full coverage.
+    # 1) Preferred: load persisted chunks (paged) for full coverage. Smaller page = faster first response.
     if persist_enabled:
         out: list[IndexedChunk] = []
         offset = 0
-        page = 5000
+        page = int(os.environ.get("KB_LIST_CHUNKS_PAGE_SIZE", "2000"))
+        page = max(500, min(5000, page))
         while True:
             persisted = await _mcp_call_json("churchcore_kb_list_chunks", {"churchId": church_id, "limit": page, "offset": offset})
             rows = persisted.get("chunks") if isinstance(persisted, dict) else None

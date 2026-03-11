@@ -2061,23 +2061,23 @@ async def handle_seeker_skill(
                 return _missing_mcp("sendgrid_sendEmail")
             return OutputEnvelope(message=f"{tool_txt or 'Email sent.'} (to {email})")
 
-        # Only ground with authoritative church data when the user is asking church questions.
-        relevant_docs: list[dict[str, Any]] = []
-        church_context = ""
-        if user and _should_fetch_church_export(user):
+        # Fetch church export and KB in parallel when both are needed (saves ~3–4s wall time).
+        async def _fetch_church_export() -> tuple[list[dict[str, Any]], str]:
+            if not user or not _should_fetch_church_export(user):
+                return [], ""
             exported = await _call_tool_json(tools, "churchcore_kb_export_docs", {"churchId": session.churchId, "limitPerTable": 200})
             exported_docs = exported.get("docs") if isinstance(exported, dict) else None
             exported_docs_list = exported_docs if isinstance(exported_docs, list) else []
             relevant_docs = _pick_relevant_docs([d for d in exported_docs_list if isinstance(d, dict)], user, k=3)
             church_context = "\n\n".join([f"SOURCE {d.get('sourceId')}:\n{_as_text(d.get('text'), 6000)}" for d in relevant_docs])
+            return relevant_docs, church_context
 
-        # If embeddings are configured, also do semantic KB search (for better grounding).
-        kb_text = ""
-        kb_hits: list[Any] = []
-        if user and _should_search_kb(user):
+        async def _fetch_kb() -> tuple[str, list[Any]]:
+            if not user or not _should_search_kb(user):
+                return "", []
             try:
-                kb_ttl = int(float(os.environ.get("KB_INDEX_TTL_SECONDS", "300") or "300"))
-                kb_index = await ensure_index_with_mcp(church_id=session.churchId, ttl_seconds=max(30, kb_ttl))
+                kb_ttl = int(float(os.environ.get("KB_INDEX_TTL_SECONDS", "600") or "600"))
+                kb_index = await ensure_index_with_mcp(church_id=session.churchId, ttl_seconds=max(60, kb_ttl))
                 boosted_query = user
                 try:
                     week = (weekly or {}).get("plan", {}).get("week", {}) if isinstance((weekly or {}).get("plan"), dict) else {}
@@ -2086,9 +2086,23 @@ async def handle_seeker_skill(
                         boosted_query = f"{session.campusId} {week_start} {user}".strip()
                 except Exception:
                     boosted_query = user
-                kb_text, kb_hits = search_kb(kb_index, boosted_query, k=4) if user and kb_index else ("", [])
+                return search_kb(kb_index, boosted_query, k=4) if kb_index else ("", [])
             except Exception:
-                kb_text, kb_hits = ("", [])
+                return "", []
+
+        do_export = user and _should_fetch_church_export(user)
+        do_kb = user and _should_search_kb(user)
+        if do_export and do_kb:
+            (relevant_docs, church_context), (kb_text, kb_hits) = await asyncio.gather(_fetch_church_export(), _fetch_kb())
+        elif do_export:
+            relevant_docs, church_context = await _fetch_church_export()
+            kb_text, kb_hits = "", []
+        elif do_kb:
+            kb_text, kb_hits = await _fetch_kb()
+            relevant_docs, church_context = [], ""
+        else:
+            relevant_docs, church_context = [], ""
+            kb_text, kb_hits = "", []
 
         sys = (
             "You are Church Agent in seeker role. Help the person explore faith and take next steps.\n"
@@ -2456,8 +2470,8 @@ async def handle_guide_skill(
 
     if skill in {"chat", "chat.stream"}:
         model = get_chat_model()
-        kb_ttl = int(float(os.environ.get("KB_INDEX_TTL_SECONDS", "300") or "300"))
-        kb_index = await ensure_index_with_mcp(church_id=session.churchId, ttl_seconds=max(30, kb_ttl))
+        kb_ttl = int(float(os.environ.get("KB_INDEX_TTL_SECONDS", "600") or "600"))
+        kb_index = await ensure_index_with_mcp(church_id=session.churchId, ttl_seconds=max(60, kb_ttl))
         kb_text, kb_hits = search_kb(kb_index, (message or "").strip(), k=4) if (message or "").strip() and kb_index else ("", [])
         sys = (
             "You are Church Agent in guide role. Be concise and operational.\n"

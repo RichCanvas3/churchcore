@@ -1,0 +1,17 @@
+---
+description: All user-facing answers must go through the LLM; no logic-only shortcuts
+alwaysApply: true
+---
+
+# Always use LLM for responses
+
+## Rule
+
+- **Every user message must get an LLM-generated response.** Do not add “fast paths” or shortcuts that reply using only logic, keyword matching, or MCP data without calling the chat model.
+- In `apps/api/church_agent.py` (and any other agent code): avoid returning `OutputEnvelope(message=...)` from deterministic branches that skip `model.ainvoke` / `model.invoke`. User-facing text should come from the model.
+- **Allowed:** Using the LLM with minimal context (e.g. short system prompt + weekly context) for speed. Using tools/MCP to fetch data that is then passed into the LLM as context is fine.
+- **Not allowed:** Returning a preformatted or rule-based message (e.g. “Today’s reading is X” from weekly context only, or a fixed weather template without model) so that the user never sees model output for that turn.
+
+## Rationale
+
+Consistent experience and tone; no mixed “sometimes logic, sometimes LLM” behavior.
