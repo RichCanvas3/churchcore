@@ -20,6 +20,11 @@ from .models import Input, NextAction, OutputEnvelope, Session
 
 _ai_gateway_token_cache: dict[str, Any] = {"token": None, "expires_at": 0.0}
 
+# In-memory cache for journey predict_flows SPARQL results (churchId -> (results, sparql_total_ms, expiry_ts)).
+# TTL via JOURNEY_SPARQL_CACHE_TTL_SECONDS (default 300). Per-process; use Redis if multi-replica.
+_journey_sparql_cache: dict[str, tuple[dict[str, Any], int, float]] = {}
+_JOURNEY_SPARQL_CACHE_TTL = 300
+
 
 def _ai_gateway_access_token() -> str:
     """
@@ -1144,11 +1149,42 @@ async def _predict_journey_flows_with_sparql(
     journey, _journey_summary = _journey_context_from_args(args)
     weekly, _weekly_summary = _weekly_context_from_args(args)
 
-    # Step 1 (deterministic): canonical GraphDB query pack.
-    # Long-term: avoids LLM-invented IRIs by using the ontology's actual namespaces.
     ontology_graph = "https://churchcore.ai/graph/ontology"
     ccfj_prefix = "https://ontology.churchcore.ai/cc/faith-journey#"
-    qclean: list[dict[str, str]] = [
+
+    # Optional: use pre-fetched graph from gateway to skip SPARQL (saves ~1–5s when gateway caches).
+    ctx = args.get("__context") or {}
+    gdb = ctx.get("graphdb") if isinstance(ctx, dict) else None
+    if isinstance(gdb, dict) and isinstance(gdb.get("faithJourney"), dict):
+        fj = gdb.get("faithJourney") or {}
+        if isinstance(fj.get("nodes"), list) and isinstance(fj.get("edges"), list):
+            ontology_graph = str(gdb.get("ontologyGraph") or ontology_graph).strip()
+            triples = gdb.get("triples")
+            if isinstance(triples, (int, float)):
+                triples = int(triples)
+            else:
+                triples = None
+            graphs = [x for x in (gdb.get("journeyGraphs") or []) if isinstance(x, dict) and x.get("graph")]
+            nodes_by_iri = {
+                n["nodeIri"]: n
+                for n in fj.get("nodes") or []
+                if isinstance(n, dict) and n.get("nodeIri")
+            }
+            edges = [
+                e for e in fj.get("edges") or []
+                if isinstance(e, dict) and e.get("from") and e.get("to")
+            ]
+            sparql_total_ms = 0
+            qclean = []
+            results = {}
+        else:
+            gdb = None
+    else:
+        gdb = None
+
+    if gdb is None:
+        # Step 1 (deterministic): canonical GraphDB query pack.
+        qclean = [
         {
             "name": "ontology_triple_count",
             "purpose": "Verify the ontology named graph is populated.",
@@ -1209,146 +1245,166 @@ SELECT ?edge ?from ?to ?edgeKind WHERE {{
         },
     ]
 
-    # Step 2: execute SPARQL via MCP (parallel).
-    async def _run_sparql_one(q: dict[str, str]) -> tuple[str, dict[str, Any]]:
-        name = str(q.get("name") or "").strip() or "q"
-        t0 = time.perf_counter()
-        res = await _call_tool_json(
-            tools,
-            "churchcore_graphdb_sparql_query",
-            {"churchId": session.churchId, "query": q.get("query") or "", "accept": "application/sparql-results+json"},
-        )
-        t1 = time.perf_counter()
-        return (
-            name,
-            {
-                "purpose": str(q.get("purpose") or "").strip(),
-                "ok": bool(res and res.get("ok")),
-                "result": res,
-                "timingMs": int(round((t1 - t0) * 1000.0)),
-            },
-        )
-
-    sparql_t0 = time.perf_counter()
-    pairs = await asyncio.gather(*[_run_sparql_one(q) for q in qclean])
-    sparql_t1 = time.perf_counter()
-    results: dict[str, Any] = {k: v for (k, v) in pairs}
-    sparql_total_ms = int(round((sparql_t1 - sparql_t0) * 1000.0))
-
-    # Parse helpers for SPARQL JSON results.
-    def _bindings_for(name: str) -> list[dict[str, Any]]:
-        r = results.get(name) if isinstance(results.get(name), dict) else None
-        tool_res = r.get("result") if isinstance(r, dict) else None
-        if not isinstance(tool_res, dict) or tool_res.get("ok") is not True:
-            return []
-        payload = tool_res.get("result")
-        if not isinstance(payload, dict):
-            return []
-        res2 = payload.get("results")
-        if not isinstance(res2, dict):
-            return []
-        b = res2.get("bindings")
-        return [x for x in b if isinstance(x, dict)] if isinstance(b, list) else []
-
-    def _bval(row: dict[str, Any], key: str) -> str | None:
-        v = row.get(key)
-        if isinstance(v, dict):
-            vv = v.get("value")
-            return str(vv) if isinstance(vv, str) else None
-        return None
-
-    failed = [name for name, r in results.items() if not (isinstance(r, dict) and r.get("ok") is True)]
-    if failed:
-        # Hard fail if SPARQL isn't working so it's visible in tracing/UI.
-        qmap = {q["name"]: q.get("query") for q in qclean if isinstance(q, dict) and isinstance(q.get("name"), str)}
-        brief: dict[str, Any] = {}
-        for name in failed[:6]:
-            r = results.get(name) if isinstance(results.get(name), dict) else {}
-            rr = (r or {}).get("result") if isinstance(r, dict) else None
-            if isinstance(rr, dict):
-                brief[name] = {
-                    "reason": rr.get("reason") or rr.get("error") or rr.get("message"),
-                    "query_snippet": str(qmap.get(name) or "").strip().replace("\n", " ")[:260],
-                }
+        cache_key = (session.churchId or "").strip() or "__default"
+        ttl_sec = max(60, int(float(os.environ.get("JOURNEY_SPARQL_CACHE_TTL_SECONDS", str(_JOURNEY_SPARQL_CACHE_TTL)))))
+        now_ts = time.time()
+        cached = _journey_sparql_cache.get(cache_key)
+        if cached and len(cached) == 3:
+            _results, _total_ms, expiry = cached
+            if now_ts < expiry and isinstance(_results, dict):
+                results = _results
+                sparql_total_ms = int(_total_ms) if isinstance(_total_ms, (int, float)) else 0
+                cached = True
             else:
-                brief[name] = {"reason": "no_result", "query_snippet": str(qmap.get(name) or "").strip().replace("\n", " ")[:260]}
-        msg_lines = [f"SPARQL query failed for: {', '.join(failed[:6])}"]
-        for name in failed[:3]:
-            reason = ""
-            b = brief.get(name)
-            if isinstance(b, dict):
-                reason = str(b.get("reason") or "").strip()
-            if reason:
-                msg_lines.append(f"- {name}: {reason[:500]}")
-        msg_lines.append("See `data.failed_brief` for full details.")
-        return OutputEnvelope(
-            message="\n".join(msg_lines).strip(),
-            data={
-                "ok": False,
-                "reason": "sparql_execution_failed",
-                "failed": failed,
-                "failed_brief": brief,
-                "note": "Check failed_brief[*].reason for GraphDB/config/auth/SPARQL errors.",
-            },
-        )
+                cached = False
+        else:
+            cached = False
 
-    # Validate ontology graph has triples and journey graphs exist.
-    triple_rows = _bindings_for("ontology_triple_count")
-    triples = None
-    if triple_rows:
-        t = _bval(triple_rows[0], "triples")
-        try:
-            triples = int(float(t)) if isinstance(t, str) and t.strip() else None
-        except Exception:
-            triples = None
-    if not triples or triples <= 0:
-        return OutputEnvelope(
-            message="Ontology graph is empty (no triples). Load ontology TTL into GraphDB context https://churchcore.ai/graph/ontology.",
-            data={"ok": False, "reason": "ontology_graph_empty", "triples": triples, "ontologyGraph": ontology_graph},
-        )
+        if not cached:
+            # Step 2: execute SPARQL via MCP (parallel).
+            async def _run_sparql_one(q: dict[str, str]) -> tuple[str, dict[str, Any]]:
+                name = str(q.get("name") or "").strip() or "q"
+                t0 = time.perf_counter()
+                res = await _call_tool_json(
+                    tools,
+                    "churchcore_graphdb_sparql_query",
+                    {"churchId": session.churchId, "query": q.get("query") or "", "accept": "application/sparql-results+json"},
+                )
+                t1 = time.perf_counter()
+                return (
+                    name,
+                    {
+                        "purpose": str(q.get("purpose") or "").strip(),
+                        "ok": bool(res and res.get("ok")),
+                        "result": res,
+                        "timingMs": int(round((t1 - t0) * 1000.0)),
+                    },
+                )
 
-    graph_rows = _bindings_for("journey_graphs")
-    graphs: list[dict[str, str]] = []
-    for r in graph_rows:
-        g = _bval(r, "graph")
-        nm = _bval(r, "name") or ""
-        if g:
-            graphs.append({"graph": g, "name": nm})
+            sparql_t0 = time.perf_counter()
+            pairs = await asyncio.gather(*[_run_sparql_one(q) for q in qclean])
+            sparql_t1 = time.perf_counter()
+            results = {k: v for (k, v) in pairs}
+            sparql_total_ms = int(round((sparql_t1 - sparql_t0) * 1000.0))
+            _journey_sparql_cache[cache_key] = (results, sparql_total_ms, time.time() + ttl_sec)
 
-    # Pull nodes/edges (faith-journey namespace) into structured form for the reasoning step.
-    node_rows = _bindings_for("ccfj_nodes")
-    nodes_by_iri: dict[str, dict[str, Any]] = {}
-    for r in node_rows:
-        iri = _bval(r, "node")
-        if not iri:
-            continue
-        node = nodes_by_iri.get(iri) or {"nodeIri": iri}
-        nm = _bval(r, "nodeName")
-        if nm and not node.get("name"):
-            node["name"] = nm
-        st = _bval(r, "state")
-        if st and not node.get("stateIri"):
-            node["stateIri"] = st
-        for k_src, k_dst in [
-            ("stateLabel", "stateLabel"),
-            ("stateNotation", "stateNotation"),
-            ("stateDefinition", "stateDefinition"),
-            ("stateScopeNote", "stateScopeNote"),
-        ]:
-            vv = _bval(r, k_src)
-            if vv and not node.get(k_dst):
-                node[k_dst] = vv
-        nodes_by_iri[iri] = node
+        # Parse helpers for SPARQL JSON results.
+        def _bindings_for(name: str) -> list[dict[str, Any]]:
+            r = results.get(name) if isinstance(results.get(name), dict) else None
+            tool_res = r.get("result") if isinstance(r, dict) else None
+            if not isinstance(tool_res, dict) or tool_res.get("ok") is not True:
+                return []
+            payload = tool_res.get("result")
+            if not isinstance(payload, dict):
+                return []
+            res2 = payload.get("results")
+            if not isinstance(res2, dict):
+                return []
+            b = res2.get("bindings")
+            return [x for x in b if isinstance(x, dict)] if isinstance(b, list) else []
 
-    edge_rows = _bindings_for("ccfj_edges")
-    edges: list[dict[str, Any]] = []
-    for r in edge_rows:
-        e = _bval(r, "edge")
-        f = _bval(r, "from")
-        t = _bval(r, "to")
-        if not e or not f or not t:
-            continue
-        edges.append({"edgeIri": e, "from": f, "to": t, "edgeKind": _bval(r, "edgeKind") or ""})
+        def _bval(row: dict[str, Any], key: str) -> str | None:
+            v = row.get(key)
+            if isinstance(v, dict):
+                vv = v.get("value")
+                return str(vv) if isinstance(vv, str) else None
+            return None
+
+        failed = [name for name, r in results.items() if not (isinstance(r, dict) and r.get("ok") is True)]
+        if failed:
+            qmap = {q["name"]: q.get("query") for q in qclean if isinstance(q, dict) and isinstance(q.get("name"), str)}
+            brief: dict[str, Any] = {}
+            for name in failed[:6]:
+                r = results.get(name) if isinstance(results.get(name), dict) else {}
+                rr = (r or {}).get("result") if isinstance(r, dict) else None
+                if isinstance(rr, dict):
+                    brief[name] = {
+                        "reason": rr.get("reason") or rr.get("error") or rr.get("message"),
+                        "query_snippet": str(qmap.get(name) or "").strip().replace("\n", " ")[:260],
+                    }
+                else:
+                    brief[name] = {"reason": "no_result", "query_snippet": str(qmap.get(name) or "").strip().replace("\n", " ")[:260]}
+            msg_lines = [f"SPARQL query failed for: {', '.join(failed[:6])}"]
+            for name in failed[:3]:
+                reason = ""
+                b = brief.get(name)
+                if isinstance(b, dict):
+                    reason = str(b.get("reason") or "").strip()
+                if reason:
+                    msg_lines.append(f"- {name}: {reason[:500]}")
+            msg_lines.append("See `data.failed_brief` for full details.")
+            return OutputEnvelope(
+                message="\n".join(msg_lines).strip(),
+                data={
+                    "ok": False,
+                    "reason": "sparql_execution_failed",
+                    "failed": failed,
+                    "failed_brief": brief,
+                    "note": "Check failed_brief[*].reason for GraphDB/config/auth/SPARQL errors.",
+                },
+            )
+
+        triple_rows = _bindings_for("ontology_triple_count")
+        triples = None
+        if triple_rows:
+            t = _bval(triple_rows[0], "triples")
+            try:
+                triples = int(float(t)) if isinstance(t, str) and t.strip() else None
+            except Exception:
+                triples = None
+        if not triples or triples <= 0:
+            return OutputEnvelope(
+                message="Ontology graph is empty (no triples). Load ontology TTL into GraphDB context https://churchcore.ai/graph/ontology.",
+                data={"ok": False, "reason": "ontology_graph_empty", "triples": triples, "ontologyGraph": ontology_graph},
+            )
+
+        graph_rows = _bindings_for("journey_graphs")
+        graphs = []
+        for r in graph_rows:
+            g = _bval(r, "graph")
+            nm = _bval(r, "name") or ""
+            if g:
+                graphs.append({"graph": g, "name": nm})
+
+        node_rows = _bindings_for("ccfj_nodes")
+        nodes_by_iri = {}
+        for r in node_rows:
+            iri = _bval(r, "node")
+            if not iri:
+                continue
+            node = nodes_by_iri.get(iri) or {"nodeIri": iri}
+            nm = _bval(r, "nodeName")
+            if nm and not node.get("name"):
+                node["name"] = nm
+            st = _bval(r, "state")
+            if st and not node.get("stateIri"):
+                node["stateIri"] = st
+            for k_src, k_dst in [
+                ("stateLabel", "stateLabel"),
+                ("stateNotation", "stateNotation"),
+                ("stateDefinition", "stateDefinition"),
+                ("stateScopeNote", "stateScopeNote"),
+            ]:
+                vv = _bval(r, k_src)
+                if vv and not node.get(k_dst):
+                    node[k_dst] = vv
+            nodes_by_iri[iri] = node
+
+        edge_rows = _bindings_for("ccfj_edges")
+        edges = []
+        for r in edge_rows:
+            e = _bval(r, "edge")
+            f = _bval(r, "from")
+            t = _bval(r, "to")
+            if not e or not f or not t:
+                continue
+            edges.append({"edgeIri": e, "from": f, "to": t, "edgeKind": _bval(r, "edgeKind") or ""})
+    else:
+        if not triples or triples <= 0:
+            return OutputEnvelope(
+                message="Ontology graph is empty (no triples).",
+                data={"ok": False, "reason": "ontology_graph_empty", "triples": triples, "ontologyGraph": ontology_graph},
+            )
 
     # Determine current stage from journey_context (gateway uses ids like stage_new_believer).
     # Map to ontology node IRI using stable naming conventions + SKOS notation on the represented state.
@@ -1372,6 +1428,35 @@ SELECT ?edge ?from ?to ?edgeKind WHERE {{
 
     # If we still can't map, continue but be explicit (synthesis can fall back to graph-level guidance).
     current_node = nodes_by_iri.get(current_node_iri) if current_node_iri else None
+
+    # Build a reachable subgraph so we send fewer nodes/edges to the LLM (faster, smaller prompt).
+    _max_subgraph_nodes = 400
+    _max_subgraph_edges = 1200
+    relevant_iris: set[str] = set()
+    if current_node_iri:
+        relevant_iris.add(current_node_iri)
+    from_to: dict[str, set[str]] = {}  # from_iri -> set of to_iris
+    to_from: dict[str, set[str]] = {}  # to_iri -> set of from_iris
+    for e in edges:
+        f, t = e.get("from"), e.get("to")
+        if f and t:
+            from_to.setdefault(f, set()).add(t)
+            to_from.setdefault(t, set()).add(f)
+    # 1-hop out and in from current
+    for iri in list(relevant_iris):
+        relevant_iris |= from_to.get(iri, set()) | to_from.get(iri, set())
+    # 2-hop out (next possible steps)
+    for iri in list(relevant_iris):
+        relevant_iris |= from_to.get(iri, set())
+    subgraph_edges = [e for e in edges if e.get("from") in relevant_iris and e.get("to") in relevant_iris][:_max_subgraph_edges]
+    subgraph_node_iris = {e.get("from") for e in subgraph_edges} | {e.get("to") for e in subgraph_edges}
+    if current_node_iri:
+        subgraph_node_iris.add(current_node_iri)
+    subgraph_nodes = [nodes_by_iri[iri] for iri in subgraph_node_iris if iri in nodes_by_iri][:_max_subgraph_nodes]
+    # If subgraph is tiny (e.g. no edges), send a bounded full set so the model still has structure.
+    if len(subgraph_nodes) < 10 and len(nodes_by_iri) > 10:
+        subgraph_nodes = list(nodes_by_iri.values())[:_max_subgraph_nodes]
+        subgraph_edges = edges[:_max_subgraph_edges]
 
     # Step 3: synthesize predictions
     sys2 = (
@@ -1404,13 +1489,13 @@ SELECT ?edge ?from ?to ?edgeKind WHERE {{
                     "namespace": ccfj_prefix,
                     "currentStageId": current_stage_id,
                     "currentNode": current_node,
-                    "nodes": list(nodes_by_iri.values())[:6000],
-                    "edges": edges[:12000],
+                    "nodes": subgraph_nodes,
+                    "edges": subgraph_edges,
                 },
             },
         },
         ensure_ascii=False,
-    )[:12000]
+    )[:24000]
 
     r2 = await model.ainvoke([("system", sys2), ("user", user2)])
     raw2 = str(getattr(r2, "content", "") or "").strip()
