@@ -936,52 +936,55 @@ def _weekly_context_from_args(args: dict[str, Any]) -> tuple[dict[str, Any] | No
     A2A gateway may inject week-scoped sermon + plan data into args.__context.weekly.
     Treat as a read-only snapshot to ground Bible-study style answers.
     """
-    ctx = args.get("__context")
-    if not isinstance(ctx, dict):
+    try:
+        ctx = args.get("__context")
+        if not isinstance(ctx, dict):
+            return None, ""
+        weekly = ctx.get("weekly")
+        if not isinstance(weekly, dict):
+            return None, ""
+
+        plan = weekly.get("plan") if isinstance(weekly.get("plan"), dict) else {}
+        week = plan.get("week") if isinstance(plan.get("week"), dict) else {}
+        sermon = weekly.get("sermon") if isinstance(weekly.get("sermon"), dict) else {}
+        today = str(weekly.get("today") or "").strip()
+
+        title = str(sermon.get("title") or week.get("title") or "").strip()
+        passage = str(sermon.get("passage") or week.get("passage") or "").strip()
+        week_start = str(week.get("weekStartDate") or "").strip()
+        week_end = str(week.get("weekEndDate") or "").strip()
+
+        today_items = plan.get("today_items") if isinstance(plan.get("today_items"), list) else []
+        today_lines: list[str] = []
+        for it in today_items[:4]:
+            if not isinstance(it, dict):
+                continue
+            lab = str(it.get("label") or "").strip()
+            ref = str(it.get("ref") or "").strip()
+            done = bool(it.get("completed"))
+            if lab or ref:
+                today_lines.append(f"- {'[done] ' if done else ''}{lab or 'Reading'}{(' — ' + ref) if ref else ''}".strip())
+
+        guide_discussion_url = str(sermon.get("guideDiscussionUrl") or "").strip()
+        guide_leader_url = str(sermon.get("guideLeaderUrl") or "").strip()
+
+        bits: list[str] = []
+        if week_start or week_end:
+            bits.append(f"Week: {week_start or '?'} → {week_end or '?'}")
+        if title or passage:
+            bits.append(f"Sermon: {title or 'This week'}{(' (' + passage + ')') if passage else ''}")
+        if today:
+            bits.append(f"Today: {today}")
+        if today_lines:
+            bits.append("Today's plan items:\n" + "\n".join(today_lines))
+        if guide_discussion_url or guide_leader_url:
+            bits.append(
+                "Guides:\n"
+                + ("\n".join([f"- Discussion: {guide_discussion_url}" if guide_discussion_url else "", f"- Leader: {guide_leader_url}" if guide_leader_url else ""]).strip())
+            )
+        return weekly, ("\n".join([b for b in bits if b.strip()])).strip()
+    except Exception:
         return None, ""
-    weekly = ctx.get("weekly")
-    if not isinstance(weekly, dict):
-        return None, ""
-
-    plan = weekly.get("plan") if isinstance(weekly.get("plan"), dict) else {}
-    week = plan.get("week") if isinstance(plan.get("week"), dict) else {}
-    sermon = weekly.get("sermon") if isinstance(weekly.get("sermon"), dict) else {}
-    today = str(weekly.get("today") or "").strip()
-
-    title = str(sermon.get("title") or week.get("title") or "").strip()
-    passage = str(sermon.get("passage") or week.get("passage") or "").strip()
-    week_start = str(week.get("weekStartDate") or "").strip()
-    week_end = str(week.get("weekEndDate") or "").strip()
-
-    today_items = plan.get("today_items") if isinstance(plan.get("today_items"), list) else []
-    today_lines: list[str] = []
-    for it in today_items[:4]:
-        if not isinstance(it, dict):
-            continue
-        lab = str(it.get("label") or "").strip()
-        ref = str(it.get("ref") or "").strip()
-        done = bool(it.get("completed"))
-        if lab or ref:
-            today_lines.append(f"- {'[done] ' if done else ''}{lab or 'Reading'}{(' — ' + ref) if ref else ''}".strip())
-
-    guide_discussion_url = str(sermon.get("guideDiscussionUrl") or "").strip()
-    guide_leader_url = str(sermon.get("guideLeaderUrl") or "").strip()
-
-    bits: list[str] = []
-    if week_start or week_end:
-        bits.append(f"Week: {week_start or '?'} → {week_end or '?'}")
-    if title or passage:
-        bits.append(f"Sermon: {title or 'This week'}{(' (' + passage + ')') if passage else ''}")
-    if today:
-        bits.append(f"Today: {today}")
-    if today_lines:
-        bits.append("Today's plan items:\n" + "\n".join(today_lines))
-    if guide_discussion_url or guide_leader_url:
-        bits.append(
-            "Guides:\n"
-            + ("\n".join([f"- Discussion: {guide_discussion_url}" if guide_discussion_url else "", f"- Leader: {guide_leader_url}" if guide_leader_url else ""]).strip())
-        )
-    return weekly, ("\n".join([b for b in bits if b.strip()])).strip()
 
 
 def _now_iso() -> str:
@@ -1430,8 +1433,8 @@ SELECT ?edge ?from ?to ?edgeKind WHERE {{
     current_node = nodes_by_iri.get(current_node_iri) if current_node_iri else None
 
     # Build a reachable subgraph so we send fewer nodes/edges to the LLM (faster, smaller prompt).
-    _max_subgraph_nodes = 400
-    _max_subgraph_edges = 1200
+    _max_subgraph_nodes = 120
+    _max_subgraph_edges = 350
     relevant_iris: set[str] = set()
     if current_node_iri:
         relevant_iris.add(current_node_iri)
@@ -1458,33 +1461,67 @@ SELECT ?edge ?from ?to ?edgeKind WHERE {{
         subgraph_nodes = list(nodes_by_iri.values())[:_max_subgraph_nodes]
         subgraph_edges = edges[:_max_subgraph_edges]
 
-    # Step 3: synthesize predictions
+    # Step 3: synthesize predictions. Trim payload to reduce LLM input tokens and latency.
+    def _trim_memory_for_predict(m: dict[str, Any] | None) -> dict[str, Any]:
+        if not m or not isinstance(m, dict):
+            return {}
+        out: dict[str, Any] = {}
+        if m.get("summary"):
+            out["summary"] = str(m["summary"])[:500]
+        if isinstance(m.get("spiritualJourney"), dict):
+            sj = m["spiritualJourney"]
+            out["spiritualJourney"] = {"stage": sj.get("stage"), "milestones": (sj.get("milestones") or [])[:5]}
+        if isinstance(m.get("identity"), dict):
+            out["identity"] = {"preferredName": m["identity"].get("preferredName"), "campusId": m["identity"].get("campusId")}
+        if isinstance(m.get("intentProfile"), dict):
+            out["intentProfile"] = m["intentProfile"]
+        for k in ("community", "groups"):
+            v = m.get(k)
+            if isinstance(v, dict) and v.get("my"):
+                out[k] = {"my": (v["my"] or [])[:3]}
+        return out
+
+    def _trim_journey_for_predict(j: dict[str, Any] | None) -> dict[str, Any]:
+        if not j or not isinstance(j, dict):
+            return {}
+        out: dict[str, Any] = {}
+        if isinstance(j.get("current_stage"), dict):
+            cur = j["current_stage"]
+            out["current_stage"] = {"id": cur.get("id"), "title": cur.get("title")}
+        steps = j.get("next_steps")
+        if isinstance(steps, list):
+            out["next_steps"] = [{"why": s.get("why"), "node": {"id": (s.get("node") or {}).get("id"), "title": (s.get("node") or {}).get("title")}} for s in steps[:6] if isinstance(s, dict)]
+        return out
+
+    def _trim_weekly_for_predict(w: dict[str, Any] | None) -> dict[str, Any]:
+        if not w or not isinstance(w, dict):
+            return {}
+        out: dict[str, Any] = {"today": w.get("today")}
+        plan = w.get("plan") if isinstance(w.get("plan"), dict) else {}
+        if isinstance(plan.get("week"), dict):
+            out["week"] = {"title": plan["week"].get("title"), "passage": plan["week"].get("passage")}
+        if isinstance(w.get("sermon"), dict):
+            s = w["sermon"]
+            out["sermon"] = {"title": s.get("title"), "passage": s.get("passage")}
+        return out
+
     sys2 = (
-        "You are a faith-journey guide.\n"
-        "Use the user's memory + the provided canonical journey graph data from GraphDB to:\n"
-        "- predict plausible TimeVaryingConcept/Manifestation/State changes (synthetic forecast)\n"
-        "- recommend next actions (journey steps) per graph\n"
-        "Return STRICT JSON ONLY with shape:\n"
-        '{\"ok\":true,\"asOf\":\"<iso>\",\"predictions\":[{\"graphId\":\"\",\"graphName\":\"\",\"current\":{\"nodeId\":\"\",\"title\":\"\"},\"predictedChanges\":[{\"timeHorizonDays\":7,\"stateIri\":null,\"stateLabel\":\"\",\"manifestationLabel\":\"\",\"confidence\":0.0,\"evidence\":[\"...\"],\"notes\":\"\"}],\"recommendedNextActions\":[{\"fromNodeId\":\"\",\"fromTitle\":\"\",\"toNodeId\":\"\",\"toTitle\":\"\",\"nodeId\":\"\",\"title\":\"\",\"edgeKind\":\"\",\"confidence\":0.0,\"reason\":\"\",\"evidence\":[\"...\"]}]}],\"sparqlUsed\":[\"q1\",\"q2\"]}\n'
-        "Notes:\n"
-        "- Keep predictions pastorally appropriate and avoid certainty language.\n"
-        "- Ground recommendations in memory context (sermons, verses, completed steps) and in the journey graph structure.\n"
-        "- For each recommended next action, include a specific 'reason' and 2-6 short 'evidence' bullets.\n"
-        "- Always include graph grounding: fromNodeId/fromTitle should match current; toNodeId/toTitle should match the recommended node.\n"
+        "Faith-journey guide. Use memory + graph to: (1) predict plausible state changes, (2) recommend next actions. "
+        "Return STRICT JSON only: {\"ok\":true,\"asOf\":\"<iso>\",\"predictions\":[{\"graphId\",\"graphName\",\"current\":{\"nodeId\",\"title\"},\"predictedChanges\":[{\"timeHorizonDays\",\"stateLabel\",\"confidence\",\"evidence\",\"notes\"}],\"recommendedNextActions\":[{\"fromNodeId\",\"fromTitle\",\"toNodeId\",\"toTitle\",\"reason\",\"evidence\"}]}]}. "
+        "Pastoral tone; 2-4 evidence bullets per action; fromNodeId/fromTitle=current, toNodeId/toTitle=recommended node."
     )
     user2 = json.dumps(
         {
             "churchId": session.churchId,
             "personId": session.personId,
-            "userId": session.userId,
             "timezone": session.timezone,
-            "memory": mem or {},
-            "journey_context": journey or {},
-            "weekly_context": weekly or {},
+            "memory": _trim_memory_for_predict(mem),
+            "journey_context": _trim_journey_for_predict(journey),
+            "weekly_context": _trim_weekly_for_predict(weekly),
             "graphdb": {
                 "ontologyGraph": ontology_graph,
                 "triples": triples,
-                "journeyGraphs": graphs,
+                "journeyGraphs": graphs[:8],
                 "faithJourney": {
                     "namespace": ccfj_prefix,
                     "currentStageId": current_stage_id,
@@ -1495,7 +1532,7 @@ SELECT ?edge ?from ?to ?edgeKind WHERE {{
             },
         },
         ensure_ascii=False,
-    )[:24000]
+    )[:14000]
 
     r2 = await model.ainvoke([("system", sys2), ("user", user2)])
     raw2 = str(getattr(r2, "content", "") or "").strip()
@@ -2649,14 +2686,14 @@ async def run_church_agent(inp: Input) -> OutputEnvelope:
         return await handle_seeker_skill(skill=inp.skill, message=inp.message, args=inp.args, session=session, tools=tools)
     except Exception as e:
         tr = traceback.format_exc()
-        # Keep trace bounded so it fits in LangSmith outputs.
         tr_tail = tr[-8000:] if isinstance(tr, str) else str(tr or "")[-8000:]
+        detail = str(getattr(e, "message", "") or str(e) or "error")
         return OutputEnvelope(
-            message="Internal error in church_agent. See data.trace.",
+            message=f"Internal error in church_agent: {detail[:200]}. Full trace in data.trace.",
             data={
                 "ok": False,
                 "error": "church_agent_exception",
-                "detail": str(getattr(e, "message", "") or str(e) or "error"),
+                "detail": detail,
                 "trace": tr_tail,
             },
         )
