@@ -19,6 +19,7 @@ export default function GuidePage() {
   const { identity } = useDemoIdentity();
   const [message, setMessage] = useState<string>("");
   const [output, setOutput] = useState<OutputEnvelope | null>(null);
+  const [lastTiming, setLastTiming] = useState<{ gateway?: Record<string, number>; agent?: Record<string, number> } | null>(null);
   const [loading, setLoading] = useState(false);
   const [threadId, setThreadId] = useState<string | null>(null);
   const [runAsGuide, setRunAsGuide] = useState(true);
@@ -79,6 +80,13 @@ export default function GuidePage() {
         args: args ?? null,
       });
       setOutput((json as any)?.output ?? null);
+      const timing = (json as any)?.timing_ms;
+      const agentTiming = (json as any)?.output?.data?.debug_timing_ms;
+      setLastTiming(
+        timing || agentTiming
+          ? { gateway: timing ?? undefined, agent: agentTiming ?? undefined }
+          : null,
+      );
     } catch (e: any) {
       setUiError(String(e?.message ?? e ?? "Request failed"));
     } finally {
@@ -164,6 +172,13 @@ export default function GuidePage() {
         {output ? (
           <div style={{ display: "grid", gap: 12 }}>
             <div style={{ fontSize: 16, fontWeight: 800 }}>{output.message}</div>
+            {lastTiming &&
+            (Object.keys(lastTiming.gateway ?? {}).length > 0 || Object.keys(lastTiming.agent ?? {}).length > 0) ? (
+              <details style={{ fontSize: 13, color: "#64748b" }}>
+                <summary style={{ cursor: "pointer" }}>Timing (ms)</summary>
+                <pre style={{ whiteSpace: "pre-wrap", margin: 0 }}>{JSON.stringify(lastTiming, null, 2)}</pre>
+              </details>
+            ) : null}
             <HandoffRenderer handoff={output.handoff ?? []} />
             <CardsRenderer cards={output.cards ?? []} />
             <FormsRenderer forms={output.forms ?? []} />

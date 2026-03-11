@@ -219,6 +219,8 @@ def _ui_handoff_for_user_text(user_text: str) -> list[dict[str, Any]]:
             "calendar of events",
             "show calendar",
             "show me the calendar",
+            "show me my calendar",
+            "my calendar",
             "calendar view",
             "weekly calendar",
             "week calendar",
@@ -2153,6 +2155,15 @@ async def handle_seeker_skill(
         _t_llm_ms = int(round((time.perf_counter() - _t_pre_llm) * 1000))
         txt = getattr(r, "content", "") if r else ""
         out_text = str(txt or "").strip() or "How can I help?"
+        # If the model output raw handoff JSON (e.g. {"type":"ui_tool","tool_id":"calendar"}), show a friendly message instead.
+        if out_text.lstrip().startswith('{"type":"ui_tool"') and "tool_id" in out_text:
+            try:
+                parsed = json.loads(out_text)
+                if isinstance(parsed, dict) and parsed.get("type") == "ui_tool":
+                    tool_id = str(parsed.get("tool_id") or "").strip()
+                    out_text = f"Opening {tool_id.replace('_', ' ')}." if tool_id else "Opening that."
+            except Exception:
+                pass
         ui_handoff = _ui_handoff_for_user_text(user)
 
         # If the assistant recommends scripture references, offer the Bible reader tool.
