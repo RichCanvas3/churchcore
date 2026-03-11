@@ -1960,6 +1960,7 @@ async def handle_seeker_skill(
         )
 
     if skill in {"chat", "chat.stream"}:
+        _t0 = time.perf_counter()
         model = get_chat_model()
         user = (message or "").strip()
         mem, mem_summary = _memory_context_from_args(args)
@@ -1967,6 +1968,7 @@ async def handle_seeker_skill(
         journey, journey_summary = _journey_context_from_args(args)
         identity_contact_summary = _identity_contact_context_from_args(args)
         weekly, weekly_summary = _weekly_context_from_args(args)
+        _t_context = int(round((time.perf_counter() - _t0) * 1000))
 
         # Fast path: "open/show X" UI-tool requests shouldn't pay for a full model call.
         ui_handoff_direct = _ui_handoff_for_user_text(user)
@@ -2092,6 +2094,7 @@ async def handle_seeker_skill(
 
         do_export = user and _should_fetch_church_export(user)
         do_kb = user and _should_search_kb(user)
+        _t_pre_fetch = time.perf_counter()
         if do_export and do_kb:
             (relevant_docs, church_context), (kb_text, kb_hits) = await asyncio.gather(_fetch_church_export(), _fetch_kb())
         elif do_export:
@@ -2103,6 +2106,7 @@ async def handle_seeker_skill(
         else:
             relevant_docs, church_context = [], ""
             kb_text, kb_hits = "", []
+        _t_fetch_ms = int(round((time.perf_counter() - _t_pre_fetch) * 1000))
 
         sys = (
             "You are Church Agent in seeker role. Help the person explore faith and take next steps.\n"
@@ -2144,7 +2148,9 @@ async def handle_seeker_skill(
                     NextAction(title="Small groups", skill="discover.groups"),
                 ],
             )
+        _t_pre_llm = time.perf_counter()
         r = await model.ainvoke([("system", sys), ("user", user)])
+        _t_llm_ms = int(round((time.perf_counter() - _t_pre_llm) * 1000))
         txt = getattr(r, "content", "") if r else ""
         out_text = str(txt or "").strip() or "How can I help?"
         ui_handoff = _ui_handoff_for_user_text(user)
@@ -2180,6 +2186,7 @@ async def handle_seeker_skill(
             except Exception:
                 memory_ops = []
 
+        _t_total_ms = int(round((time.perf_counter() - _t0) * 1000))
         return OutputEnvelope(
             message=out_text,
             suggested_next_actions=[
@@ -2190,7 +2197,16 @@ async def handle_seeker_skill(
             cards=_cards_from_export_docs(relevant_docs),
             handoff=ui_handoff,
             citations=([{"sourceId": h.sourceId, "snippet": h.snippet} for h in kb_hits] if kb_hits else _citations_from_docs(relevant_docs)),
-            data={"memory_ops": memory_ops, "memory_summary_used": mem_summary},
+            data={
+                "memory_ops": memory_ops,
+                "memory_summary_used": mem_summary,
+                "debug_timing_ms": {
+                    "context": _t_context,
+                    "fetch_export_kb": _t_fetch_ms,
+                    "llm": _t_llm_ms,
+                    "total_agent": _t_total_ms,
+                },
+            },
         )
 
     # Aliases (spec names)

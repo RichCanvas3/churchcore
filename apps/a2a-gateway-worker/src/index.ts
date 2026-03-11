@@ -2593,6 +2593,7 @@ async function transcribeMp3WithOpenAI(env: Env, args: { mp3Url: string }) {
 }
 
 async function handleChat(req: Request, env: Env) {
+  const gatewayT0 = Date.now();
   const parsed = ChatSchema.safeParse(await parseJson(req));
   if (!parsed.success) return json({ error: "Invalid body", issues: parsed.error.issues }, { status: 400 });
   const { identity } = parsed.data;
@@ -2669,6 +2670,7 @@ async function handleChat(req: Request, env: Env) {
   };
 
   const weekly = personId ? await getWeeklySermonPlanContext(env, { churchId, campusId: effectiveCampusId, personId }) : null;
+  const gatewayPreMs = Date.now() - gatewayT0;
 
   const envelope = await runAgent(env, {
     threadId: langgraphThreadId,
@@ -2707,7 +2709,15 @@ async function handleChat(req: Request, env: Env) {
   // persist assistant message (+ envelope json)
   await appendMessage(env, { churchId, userId, threadId, senderType: "assistant", content: assistantText || "", envelope });
 
-  return json({ thread_id: threadId, output: envelope });
+  const gatewayTotalMs = Date.now() - gatewayT0;
+  const agentTiming = (envelope as any)?.data?.debug_timing_ms;
+  return json({
+    thread_id: threadId,
+    output: envelope,
+    timing_ms: agentTiming
+      ? { gateway_pre: gatewayPreMs, agent: agentTiming.total_agent ?? null, gateway_total: gatewayTotalMs }
+      : { gateway_pre: gatewayPreMs, gateway_total: gatewayTotalMs },
+  });
 }
 
 async function handleCalendarWeek(req: Request, env: Env) {
