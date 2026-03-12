@@ -63,8 +63,9 @@ classDiagram
 direction LR
 
 class at_Situation["at:Situation"]
-at_Situation --> "0..1" xsd_dateTime["xsd:dateTime"] : validFrom
-at_Situation --> "0..1" xsd_dateTime2["xsd:dateTime"] : validTo
+class xsd_dateTime["xsd:dateTime"]
+at_Situation --> xsd_dateTime : validFrom
+at_Situation --> xsd_dateTime : validTo
 ```
 
 ## Core link patterns (occurrence)
