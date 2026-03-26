@@ -17,7 +17,10 @@ export async function forwardToA2A(req: Request, path: string) {
     // IMPORTANT: ensure we get response headers quickly.
     // If the gateway is down/unreachable, we don't want the client to hang forever.
     const controller = new AbortController();
-    const timeoutMs = 30_000;
+    // Streaming endpoints should respond quickly with headers; non-stream endpoints may take longer
+    // (e.g. sermon.compare calls hosted LangGraph and can exceed 30s).
+    const isStream = path.endsWith(".stream") || path.includes("chat.stream");
+    const timeoutMs = isStream ? 30_000 : 180_000;
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     let res: Response;
     try {
@@ -55,7 +58,11 @@ export async function forwardToA2A(req: Request, path: string) {
     return NextResponse.json(
       {
         error: "A2A proxy failed",
-        detail: String(e?.name === "AbortError" ? "Gateway timed out (no response headers)" : e?.message ?? e ?? "error"),
+        detail: String(
+          e?.name === "AbortError"
+            ? "Gateway timed out waiting for response. This can happen on long-running calls (e.g. sermon compare)."
+            : e?.message ?? e ?? "error",
+        ),
       },
       { status: 500 },
     );
