@@ -116,6 +116,7 @@ export default function ChatPage() {
   const [templateSearch, setTemplateSearch] = useState("");
   const [customTitle, setCustomTitle] = useState("");
   const refreshThreadsSeq = useRef(0);
+  const sendTimeoutRef = useRef<any>(null);
 
   const closeTool = () => {
     const isBible = String(activeUiToolId || "").trim() === "bible_reader";
@@ -1247,6 +1248,10 @@ export default function ChatPage() {
             aiGatewayMode={activeThreadMeta?.aiGatewayMode ?? "grounded"}
             historyAdapter={historyAdapter}
             onFinalEnvelope={(env) => {
+              if (sendTimeoutRef.current) {
+                clearTimeout(sendTimeoutRef.current);
+                sendTimeoutRef.current = null;
+              }
               setSending(false);
               const handoff = Array.isArray((env as any)?.handoff) ? ((env as any).handoff as any[]) : [];
               const uiTool = handoff.find((h) => h && typeof h === "object" && String((h as any).type || "").toLowerCase() === "ui_tool");
@@ -1335,24 +1340,22 @@ export default function ChatPage() {
                   </button>
                 ) : null}
 
-                <div
-                  onKeyDownCapture={(e) => {
-                    // Avoid flipping to "thinking" while typing; only when sending.
-                    // Enter sends (without Shift) for the assistant-ui composer.
-                    if (e.key === "Enter" && !e.shiftKey) {
-                      setSending(true);
-                      setThreadEmpty(false);
-                    }
+                <Composer
+                  disabled={sending}
+                  onSend={() => {
+                    setUiError(null);
+                    setSending(true);
+                    setThreadEmpty(false);
+                    if (sendTimeoutRef.current) clearTimeout(sendTimeoutRef.current);
+                    // Fail-safe: if the send pipeline never starts (or the stream never reaches "final"),
+                    // don't leave the UI stuck in "Thinking…".
+                    sendTimeoutRef.current = setTimeout(() => {
+                      setSending(false);
+                      setUiError("Chat timed out. Check the A2A gateway + LangGraph connection, then refresh.");
+                      sendTimeoutRef.current = null;
+                    }, 95_000);
                   }}
-                >
-                  <Composer
-                    disabled={sending}
-                    onSend={() => {
-                      setSending(true);
-                      setThreadEmpty(false);
-                    }}
-                  />
-                </div>
+                />
               </div>
             </div>
           </A2AChatRuntime>

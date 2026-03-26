@@ -14,15 +14,26 @@ export async function forwardToA2A(req: Request, path: string) {
     const url = `${base.replace(/\/$/, "")}${path.startsWith("/") ? path : `/${path}`}`;
 
     const bodyText = await req.text();
-    const res = await fetch(url, {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        accept: "application/json, text/event-stream",
-        ...(apiKey ? { "x-api-key": apiKey } : {}),
-      },
-      body: bodyText || "{}",
-    });
+    // IMPORTANT: ensure we get response headers quickly.
+    // If the gateway is down/unreachable, we don't want the client to hang forever.
+    const controller = new AbortController();
+    const timeoutMs = 30_000;
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    let res: Response;
+    try {
+      res = await fetch(url, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          accept: "application/json, text/event-stream",
+          ...(apiKey ? { "x-api-key": apiKey } : {}),
+        },
+        body: bodyText || "{}",
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timer);
+    }
 
     const contentType = res.headers.get("content-type") ?? "application/json";
 
@@ -44,7 +55,7 @@ export async function forwardToA2A(req: Request, path: string) {
     return NextResponse.json(
       {
         error: "A2A proxy failed",
-        detail: String(e?.message ?? e ?? "error"),
+        detail: String(e?.name === "AbortError" ? "Gateway timed out (no response headers)" : e?.message ?? e ?? "error"),
       },
       { status: 500 },
     );

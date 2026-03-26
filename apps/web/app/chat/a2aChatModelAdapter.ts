@@ -83,6 +83,19 @@ export function makeA2AChatModelAdapter(args: {
   const provider = args.provider ?? "langgraph";
   const aiGatewayMode = args.aiGatewayMode ?? "grounded";
 
+  function makeTimeoutAbortSignal(timeoutMs: number, upstream?: AbortSignal | null) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), Math.max(1_000, timeoutMs));
+    const cleanup = () => clearTimeout(timer);
+
+    if (upstream) {
+      if (upstream.aborted) controller.abort();
+      else upstream.addEventListener("abort", () => controller.abort(), { once: true });
+    }
+
+    return { signal: controller.signal, cleanup };
+  }
+
   function appendUiToolSnippets(text: string, tools: Array<{ toolId: string; title?: string }>) {
     const ids = tools.map((t) => String(t.toolId || "").trim()).filter(Boolean);
     if (!ids.length) return text;
@@ -98,10 +111,12 @@ export function makeA2AChatModelAdapter(args: {
 
       try {
         const endpoint = provider === "ai_gateway" ? "/api/a2a/chat/ai_gateway/stream" : "/api/a2a/chat/stream";
+        // If streaming never begins (or the connection stalls), don't spin forever.
+        const { signal, cleanup } = makeTimeoutAbortSignal(75_000, abortSignal ?? null);
         const res = await fetch(endpoint, {
           method: "POST",
           headers: { "content-type": "application/json", accept: "text/event-stream" },
-          signal: abortSignal,
+          signal,
           body: JSON.stringify({
             identity: {
               tenant_id: session.churchId,
@@ -118,6 +133,7 @@ export function makeA2AChatModelAdapter(args: {
             ...(provider === "ai_gateway" ? { mode: aiGatewayMode } : {}),
           }),
         });
+        cleanup();
 
         if (!res.ok) {
           const t = await res.text().catch(() => "");
@@ -179,7 +195,7 @@ export function makeA2AChatModelAdapter(args: {
         if (fullText.trim()) yield ({ content: [{ type: "text", text: fullText }] } as any);
       } catch (e: any) {
         if (onFinalEnvelope) onFinalEnvelope(null);
-        const msg = String(e?.message ?? e ?? "Chat failed");
+        const msg = String(e?.name === "AbortError" ? "Timed out waiting for the agent response" : e?.message ?? e ?? "Chat failed");
         yield ({ content: [{ type: "text", text: `Error: ${msg}` }] } as any);
         return;
       }
