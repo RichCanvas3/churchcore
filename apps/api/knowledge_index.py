@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import time
 from dataclasses import dataclass
 from typing import Any, Optional
 
@@ -77,6 +78,14 @@ async def _mcp_call_json(tool_suffix: str, args: dict[str, Any]) -> Optional[dic
 
 _CACHED_BY_CHURCH: dict[str, list[IndexedChunk]] = {}
 _CACHED_BUILT_AT: dict[str, float] = {}
+
+# Cache query embeddings + search results to reduce per-turn latency.
+# Keyed by (model, query) and (model, query, k, index_built_at-ish) respectively.
+_EMBEDDINGS_CLIENT: OpenAIEmbeddings | None = None
+_EMBEDDINGS_MODEL: str | None = None
+_QUERY_EMBED_CACHE: dict[str, tuple[list[float], float]] = {}
+_SEARCH_CACHE: dict[str, tuple[str, list[KnowledgeHit], float]] = {}
+_QUERY_CACHE_MAX = 600
 
 
 async def ensure_index_with_mcp(*, church_id: str, ttl_seconds: int = 600) -> list[IndexedChunk]:
@@ -223,14 +232,58 @@ async def ensure_index_with_mcp(*, church_id: str, ttl_seconds: int = 600) -> li
     return out
 
 
+def _get_embeddings_client() -> OpenAIEmbeddings:
+    global _EMBEDDINGS_CLIENT, _EMBEDDINGS_MODEL
+    model = os.environ.get("OPENAI_EMBEDDINGS_MODEL", "text-embedding-3-large")
+    # If model changes at runtime, rebuild the client.
+    if _EMBEDDINGS_CLIENT is None or _EMBEDDINGS_MODEL != model:
+        _EMBEDDINGS_MODEL = model
+        _EMBEDDINGS_CLIENT = OpenAIEmbeddings(api_key=os.environ.get("OPENAI_API_KEY"), model=model)
+    return _EMBEDDINGS_CLIENT
+
+
+def _cache_put(cache: dict[str, Any], key: str, value: Any) -> None:
+    # Very small, simple bound to prevent unbounded memory growth.
+    if len(cache) > _QUERY_CACHE_MAX:
+        cache.clear()
+    cache[key] = value
+
+
 def search_kb(index: list[IndexedChunk] | None, query: str, k: int = 4) -> tuple[str, list[KnowledgeHit]]:
     if not index:
         return "No relevant knowledge base content found.", []
-    embeddings = OpenAIEmbeddings(
-        api_key=os.environ.get("OPENAI_API_KEY"),
-        model=os.environ.get("OPENAI_EMBEDDINGS_MODEL", "text-embedding-3-large"),
-    )
-    q = embeddings.embed_query(query)
+    query = (query or "").strip()
+    if not query:
+        return "No relevant knowledge base content found.", []
+
+    now = time.time()
+    embeddings = _get_embeddings_client()
+    model = os.environ.get("OPENAI_EMBEDDINGS_MODEL", "text-embedding-3-large")
+
+    # Cache query embeddings (major latency win).
+    emb_key = f"{model}::{query}"
+    cached_emb = _QUERY_EMBED_CACHE.get(emb_key)
+    if cached_emb is not None:
+        q, built_at = cached_emb
+        # TTL: 15 minutes
+        if (now - built_at) > 900:
+            cached_emb = None
+    if cached_emb is None:
+        q = embeddings.embed_query(query)
+        _cache_put(_QUERY_EMBED_CACHE, emb_key, (q, now))
+
+    # Cache full search results as well (cosine over whole index can be CPU-heavy).
+    # We don't have church_id here, so use a cheap index fingerprint.
+    fp = f"{len(index)}:{index[0].sourceId if index else ''}:{index[-1].sourceId if index else ''}"
+    search_key = f"{model}::{k}::{fp}::{query}"
+    cached = _SEARCH_CACHE.get(search_key)
+    if cached is not None:
+        txt, hits, built_at = cached
+        # TTL: 5 minutes
+        if (now - built_at) <= 300:
+            return txt, hits
+
+    # Compute cosine similarities across index.
 
     scored = sorted(
         [(cosine_similarity(q, c.embedding), c) for c in index],
@@ -248,6 +301,7 @@ def search_kb(index: list[IndexedChunk] | None, query: str, k: int = 4) -> tuple
         return "No relevant knowledge base content found.", []
 
     tool_text = "Knowledge base matches:\n" + "\n".join([f"- [{i+1}] {h.sourceId}: {h.snippet}" for i, h in enumerate(hits)])
+    _cache_put(_SEARCH_CACHE, search_key, (tool_text, hits, now))
     return tool_text, hits
 
 

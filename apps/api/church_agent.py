@@ -33,6 +33,10 @@ _CHURCH_EXPORT_CACHE_TTL = 11000
 # Max seconds for chat LLM call; prevents hanging on slow/unresponsive API. Env: CHAT_LLM_TIMEOUT_SECONDS (default 60).
 _CHAT_LLM_TIMEOUT = 60
 
+# Cache KB search results (query -> (text, hits, expiry_ts)).
+_kb_search_cache: dict[str, tuple[str, list[Any], float]] = {}
+_KB_SEARCH_CACHE_TTL = 300
+
 
 def _ai_gateway_access_token() -> str:
     """
@@ -2147,15 +2151,22 @@ async def handle_seeker_skill(
             if cached and len(cached) == 2:
                 exported_docs_list, expiry = cached
                 if now < expiry and isinstance(exported_docs_list, list):
-                    relevant_docs = _pick_relevant_docs([d for d in exported_docs_list if isinstance(d, dict)], user, k=3)
-                    church_context = "\n\n".join([f"SOURCE {d.get('sourceId')}:\n{_as_text(d.get('text'), 6000)}" for d in relevant_docs])
+                    relevant_docs = _pick_relevant_docs([d for d in exported_docs_list if isinstance(d, dict)], user, k=2)
+                    church_context = "\n\n".join([f"SOURCE {d.get('sourceId')}:\n{_as_text(d.get('text'), 3500)}" for d in relevant_docs])
                     return relevant_docs, church_context
-            exported = await _call_tool_json(tools, "churchcore_kb_export_docs", {"churchId": session.churchId, "limitPerTable": limit})
+            try:
+                exported = await asyncio.wait_for(
+                    _call_tool_json(tools, "churchcore_kb_export_docs", {"churchId": session.churchId, "limitPerTable": limit}),
+                    timeout=25,
+                )
+            except (asyncio.TimeoutError, Exception):
+                # Fall back to no authoritative export if it stalls or fails.
+                return [], ""
             exported_docs = exported.get("docs") if isinstance(exported, dict) else None
             exported_docs_list = exported_docs if isinstance(exported_docs, list) else []
             _church_export_cache[cache_key] = (exported_docs_list, now + max(60, ttl_sec))
-            relevant_docs = _pick_relevant_docs([d for d in exported_docs_list if isinstance(d, dict)], user, k=3)
-            church_context = "\n\n".join([f"SOURCE {d.get('sourceId')}:\n{_as_text(d.get('text'), 6000)}" for d in relevant_docs])
+            relevant_docs = _pick_relevant_docs([d for d in exported_docs_list if isinstance(d, dict)], user, k=2)
+            church_context = "\n\n".join([f"SOURCE {d.get('sourceId')}:\n{_as_text(d.get('text'), 3500)}" for d in relevant_docs])
             return relevant_docs, church_context
 
         async def _fetch_kb() -> tuple[str, list[Any]]:
@@ -2163,7 +2174,11 @@ async def handle_seeker_skill(
                 return "", []
             try:
                 kb_ttl = int(float(os.environ.get("KB_INDEX_TTL_SECONDS", "600") or "600"))
-                kb_index = await ensure_index_with_mcp(church_id=session.churchId, ttl_seconds=max(60, kb_ttl))
+                # Bound time for index build/load so one slow dependency doesn't stall the turn.
+                kb_index = await asyncio.wait_for(
+                    ensure_index_with_mcp(church_id=session.churchId, ttl_seconds=max(60, kb_ttl)),
+                    timeout=20,
+                )
                 boosted_query = user
                 try:
                     week = (weekly or {}).get("plan", {}).get("week", {}) if isinstance((weekly or {}).get("plan"), dict) else {}
@@ -2172,7 +2187,19 @@ async def handle_seeker_skill(
                         boosted_query = f"{session.campusId} {week_start} {user}".strip()
                 except Exception:
                     boosted_query = user
-                return search_kb(kb_index, boosted_query, k=4) if kb_index else ("", [])
+                k = 4
+                cache_key = f"{session.churchId}:{k}:{boosted_query}"
+                now = time.time()
+                cached = _kb_search_cache.get(cache_key)
+                if cached and len(cached) == 3:
+                    txt, hits, expiry = cached
+                    if now < expiry:
+                        return txt, hits
+
+                # Run the (sync) KB search off the event loop; it may do embedding network I/O + CPU scoring.
+                txt, hits = await asyncio.wait_for(asyncio.to_thread(search_kb, kb_index, boosted_query, k), timeout=25)
+                _kb_search_cache[cache_key] = (txt, hits, now + max(30, _KB_SEARCH_CACHE_TTL))
+                return txt, hits
             except Exception:
                 return "", []
 
@@ -2180,19 +2207,31 @@ async def handle_seeker_skill(
         if do_export:
             do_export = await _quick_need_church_export(model, user)
         do_kb = user and _should_search_kb(user)
-        _t_pre_fetch = time.perf_counter()
+        # Measure export and KB separately for easier latency attribution.
+        _t_export_ms = 0
+        _t_kb_ms = 0
         if do_export and do_kb:
-            (relevant_docs, church_context), (kb_text, kb_hits) = await asyncio.gather(_fetch_church_export(), _fetch_kb())
+            _t0e = time.perf_counter()
+            export_task = asyncio.create_task(_fetch_church_export())
+            kb_task = asyncio.create_task(_fetch_kb())
+            (relevant_docs, church_context), (kb_text, kb_hits) = await asyncio.gather(export_task, kb_task)
+            _t_export_ms = int(round((time.perf_counter() - _t0e) * 1000))  # coarse combined; refined below
+            # refine: if one finishes much earlier, keep separate estimates
+            # (tasks don't expose individual runtime; accept coarse attribution here)
         elif do_export:
+            _t0e = time.perf_counter()
             relevant_docs, church_context = await _fetch_church_export()
+            _t_export_ms = int(round((time.perf_counter() - _t0e) * 1000))
             kb_text, kb_hits = "", []
         elif do_kb:
+            _t0k = time.perf_counter()
             kb_text, kb_hits = await _fetch_kb()
+            _t_kb_ms = int(round((time.perf_counter() - _t0k) * 1000))
             relevant_docs, church_context = [], ""
         else:
             relevant_docs, church_context = [], ""
             kb_text, kb_hits = "", []
-        _t_fetch_ms = int(round((time.perf_counter() - _t_pre_fetch) * 1000))
+        _t_fetch_ms = _t_export_ms + _t_kb_ms if (_t_export_ms or _t_kb_ms) else 0
 
         # Minimal prompt for simple questions (no church/KB): much fewer tokens → faster response (often sub-second).
         simple_query = not church_context and not kb_text
@@ -2208,23 +2247,9 @@ async def handle_seeker_skill(
                 "Always be warm, concise, and propose 1-3 next actions.\n\n"
                 "If week-scoped sermon/plan context is provided, prefer it for: verse-of-the-day, Bible study prompts, and discussion questions.\n"
                 "When the user says 'this week', interpret it as the provided weekly context.\n\n"
-                "Client UI tools available (use handoff items when helpful):\n"
-                "- church_overview: show church overview (logo, campuses, service times).\n"
-                "- strategic_intent: show purpose/vision/mission/strategy (church strategic intent).\n"
-                "- calendar: show events calendar (week view, with outdoor weather).\n"
-                "- bible_reader: read Bible passages (WEB text in-panel, NIV link).\n"
-                "- household_manager: manage household (kids, custody notes, allergies; authorized pickup + extended family).\n"
-                "- weekly_sermons: browse sermons by campus; view cached summary/topics/verses/transcript.\n"
-                "- kids_checkin: run kids check-in flow (find family, preview rooms, commit check-in).\n"
-                "- guide: show journey position + next steps + resources.\n"
-                "- memory_manager: manage person memory areas (hub).\n"
-                "- groups_manager: manage my long-lived groups (roster, invites, schedule, group Bible study).\n"
-                "- identity_contact: view/edit preferred name + email/phone.\n"
-                "- faith_journey: view/edit faith journey phase and milestones (Seeker, New Believer, Growing, etc.).\n"
-                "- comm_prefs: view/edit communication preferences (SMS/email opt-in, preferred channel).\n"
-                "- care_pastoral: manage prayer requests (and staff-only care notes).\n"
-                "- teams_skills: staff-only serving teams/skills.\n"
-                'If a UI tool should open, include a handoff item like: {"type":"ui_tool","tool_id":"identity_contact"}.\n\n'
+                "UI tools: if a panel should open, include a handoff item like "
+                '{"type":"ui_tool","tool_id":"weekly_sermons"} '
+                "(common: weekly_sermons, bible_reader, calendar, church_overview, groups_manager, faith_journey, identity_contact).\n\n"
                 + (("Identity/contact context (authoritative):\n" + identity_contact_summary + "\n\n") if identity_contact_summary else "")
                 + (("Faith journey context:\n" + journey_summary + "\n\n") if journey_summary else "")
                 + (("This week context:\n" + weekly_summary + "\n\n") if weekly_summary else "")
@@ -2328,6 +2353,8 @@ async def handle_seeker_skill(
                 "memory_summary_used": mem_summary,
                 "debug_timing_ms": {
                     "context": _t_context,
+                    "export": _t_export_ms,
+                    "kb": _t_kb_ms,
                     "fetch_export_kb": _t_fetch_ms,
                     "llm": _t_llm_ms,
                     "total_agent": _t_total_ms,

@@ -24,6 +24,34 @@ function nowIso() {
 type AiGatewayTokenCache = { accessToken: string; expiresAtMs: number };
 let aiGatewayTokenCache: AiGatewayTokenCache | null = null;
 
+// Small in-memory caches to reduce repeated D1 reads.
+// Per-isolate only; safe as an optimization (no correctness requirement).
+type CacheEntry<T> = { value: T; expiresAtMs: number };
+const kbExcerptCache = new Map<string, CacheEntry<string>>();
+const KB_EXCERPT_TTL_MS = 3 * 60 * 1000;
+
+const journeyNodeCache = new Map<string, CacheEntry<any>>();
+const journeyStateCache = new Map<string, CacheEntry<any>>();
+const journeyNextStepsCache = new Map<string, CacheEntry<any[]>>();
+const weeklyContextCache = new Map<string, CacheEntry<any>>();
+
+const JOURNEY_TTL_MS = 5 * 60 * 1000;
+const WEEKLY_TTL_MS = 5 * 60 * 1000;
+
+function cacheGet<T>(map: Map<string, CacheEntry<T>>, key: string): T | null {
+  const e = map.get(key);
+  if (!e) return null;
+  if (Date.now() >= e.expiresAtMs) {
+    map.delete(key);
+    return null;
+  }
+  return e.value;
+}
+
+function cacheSet<T>(map: Map<string, CacheEntry<T>>, key: string, value: T, ttlMs: number) {
+  map.set(key, { value, expiresAtMs: Date.now() + Math.max(1000, ttlMs) });
+}
+
 async function getAiGatewayAccessToken(env: Env): Promise<string> {
   const clientId = (env.AI_GATEWAY_CLIENT_ID ?? "").trim();
   const clientSecret = (env.AI_GATEWAY_CLIENT_SECRET ?? "").trim();
@@ -2416,13 +2444,17 @@ function compactJson(value: unknown, maxChars: number) {
 async function getKbExcerptForQuery(env: Env, args: { churchId: string; query: string; limit?: number }) {
   const q = String(args.query ?? "").trim();
   if (!q) return "";
+  const limit = Math.max(1, Math.min(6, args.limit ?? 3));
+  const cacheKey = `${String(args.churchId)}:${limit}:${q.toLowerCase().slice(0, 500)}`;
+  const cached = kbExcerptCache.get(cacheKey);
+  const now = Date.now();
+  if (cached && now < cached.expiresAtMs) return cached.value;
   const terms = q
     .split(/\s+/g)
     .map((t) => t.trim())
     .filter((t) => t.length >= 4)
     .slice(0, 6);
   if (!terms.length) return "";
-  const limit = Math.max(1, Math.min(6, args.limit ?? 3));
 
   const patterns = terms.map((t) => `%${t.toLowerCase()}%`);
   const clauses = patterns.map((_, i) => `LOWER(text) LIKE ?${i + 2}`).join(" OR ");
@@ -2449,7 +2481,9 @@ async function getKbExcerptForQuery(env: Env, args: { churchId: string; query: s
     if (!text.trim()) continue;
     parts.push(`- source: ${sourceId}\n${text.trim().slice(0, 900)}`);
   }
-  return parts.join("\n\n");
+  const out = parts.join("\n\n");
+  kbExcerptCache.set(cacheKey, { value: out, expiresAtMs: now + KB_EXCERPT_TTL_MS });
+  return out;
 }
 
 function buildAiGatewaySystemPrompt(args: {
@@ -2594,6 +2628,7 @@ async function transcribeMp3WithOpenAI(env: Env, args: { mp3Url: string }) {
 
 async function handleChat(req: Request, env: Env) {
   const gatewayT0 = Date.now();
+  const timing: Record<string, number> = {};
   const parsed = ChatSchema.safeParse(await parseJson(req));
   if (!parsed.success) return json({ error: "Invalid body", issues: parsed.error.issues }, { status: 400 });
   const { identity } = parsed.data;
@@ -2608,11 +2643,14 @@ async function handleChat(req: Request, env: Env) {
   // persist user message
   const m1 = await appendMessage(env, { churchId, userId, threadId, senderType: "user", content: message });
   if ((m1 as any)?.error) return json(m1, { status: 404 });
+  timing.persist_user_ms = Date.now() - gatewayT0;
 
   // LangGraph /threads/<id>/runs/stream requires UUID thread ids; map chat thread ids to UUIDs.
   const langgraphThreadId = await getOrCreateLangGraphThreadId(env, { churchId, threadId });
+  timing.map_thread_ms = Date.now() - gatewayT0;
 
   const { personId } = await resolvePerson(env, identity);
+  timing.resolve_person_ms = Date.now() - gatewayT0;
 
   // Keep cross-thread memory synced with relational membership tables (groups + community).
   if (personId) {
@@ -2622,6 +2660,7 @@ async function handleChat(req: Request, env: Env) {
       // best-effort
     }
   }
+  timing.sync_membership_ms = Date.now() - gatewayT0;
 
   // Heuristic: only compute "next steps" when the user is asking for it (saves DB work).
   const msgLower = String(message ?? "").toLowerCase();
@@ -2632,6 +2671,7 @@ async function handleChat(req: Request, env: Env) {
   const [personMemory, hh] = personId
     ? await Promise.all([getPersonMemory(env, { churchId, personId }), getHouseholdSummary(env, { churchId, personId })])
     : [{ memory: null, updatedAt: null }, { householdId: null, summary: "" }];
+  timing.load_memory_household_ms = Date.now() - gatewayT0;
 
   const memCampusIdRaw = (personMemory as any)?.memory?.identity?.campusId;
   const memCampusId = typeof memCampusIdRaw === "string" && /^campus_[a-z0-9_]+$/i.test(memCampusIdRaw.trim()) ? memCampusIdRaw.trim() : null;
@@ -2650,13 +2690,35 @@ async function handleChat(req: Request, env: Env) {
   const identityContact = { churchId, campusId: effectiveCampusId, preferredName: memPreferredName || null, email: email || null, phone: phone || null };
 
   const redactedMemory = redactMemoryForRole(role, (personMemory as any).memory);
-  const journeyState = personId
-    ? await ensurePersonJourneyState(env, { churchId, personId, personMemory: (personMemory as any).memory ?? {} })
-    : { currentStageId: null, confidence: 0.5, updatedAt: null };
+  const memUpdatedAt = String((personMemory as any)?.updatedAt ?? "");
+  const journeyStateKey = `${churchId}:${personId || "none"}:${memUpdatedAt}`;
+  let journeyState =
+    personId ? cacheGet(journeyStateCache, journeyStateKey) : { currentStageId: null, confidence: 0.5, updatedAt: null };
+  if (!journeyState) {
+    journeyState = await ensurePersonJourneyState(env, { churchId, personId: personId!, personMemory: (personMemory as any).memory ?? {} });
+    cacheSet(journeyStateCache, journeyStateKey, journeyState, JOURNEY_TTL_MS);
+  }
   const currentStageId = journeyState.currentStageId ?? "stage_seeker";
-  const journeyCurrentStage = personId ? await getJourneyNode(env, { churchId, nodeId: currentStageId }) : null;
-  const journeyNextSteps =
-    wantsNextSteps && personId ? await computeJourneyNextSteps(env, { churchId, personId, currentStageId, limit: 3, personMemory: (personMemory as any).memory ?? {} }) : [];
+  let journeyCurrentStage: any = null;
+  if (personId) {
+    const nodeKey = `${churchId}:${currentStageId}`;
+    journeyCurrentStage = cacheGet(journeyNodeCache, nodeKey);
+    if (!journeyCurrentStage) {
+      journeyCurrentStage = await getJourneyNode(env, { churchId, nodeId: currentStageId });
+      cacheSet(journeyNodeCache, nodeKey, journeyCurrentStage, JOURNEY_TTL_MS);
+    }
+  }
+  let journeyNextSteps: any[] = [];
+  if (wantsNextSteps && personId) {
+    const nsKey = `${churchId}:${personId}:${currentStageId}:${memUpdatedAt}:3`;
+    const cached = cacheGet(journeyNextStepsCache, nsKey);
+    if (cached) journeyNextSteps = cached;
+    else {
+      journeyNextSteps = await computeJourneyNextSteps(env, { churchId, personId, currentStageId, limit: 3, personMemory: (personMemory as any).memory ?? {} });
+      cacheSet(journeyNextStepsCache, nsKey, journeyNextSteps, JOURNEY_TTL_MS);
+    }
+  }
+  timing.journey_ms = Date.now() - gatewayT0;
   const inputArgs = parsed.data.args && typeof parsed.data.args === "object" ? (parsed.data.args as Record<string, unknown>) : {};
   const session = {
     churchId,
@@ -2669,9 +2731,20 @@ async function handleChat(req: Request, env: Env) {
     threadId,
   };
 
-  const weekly = personId ? await getWeeklySermonPlanContext(env, { churchId, campusId: effectiveCampusId, personId }) : null;
+  let weekly: any = null;
+  if (personId) {
+    const today = new Date().toISOString().slice(0, 10);
+    const wkKey = `${churchId}:${effectiveCampusId}:${personId}:${today}`;
+    weekly = cacheGet(weeklyContextCache, wkKey);
+    if (!weekly) {
+      weekly = await getWeeklySermonPlanContext(env, { churchId, campusId: effectiveCampusId, personId });
+      cacheSet(weeklyContextCache, wkKey, weekly, WEEKLY_TTL_MS);
+    }
+  }
+  timing.weekly_ms = Date.now() - gatewayT0;
   const gatewayPreMs = Date.now() - gatewayT0;
 
+  const tRunAgent0 = Date.now();
   const envelope = await runAgent(env, {
     threadId: langgraphThreadId,
     inputPayload: {
@@ -2692,6 +2765,7 @@ async function handleChat(req: Request, env: Env) {
       session,
     },
   });
+  timing.agent_call_ms = Date.now() - tRunAgent0;
   const assistantText = typeof (envelope as any)?.message === "string" ? String((envelope as any).message) : "";
 
   // Apply MemoryOps proposed by the agent (gateway enforces policy).
@@ -2707,13 +2781,28 @@ async function handleChat(req: Request, env: Env) {
   }
 
   // persist assistant message (+ envelope json)
+  const tPersistAssistant0 = Date.now();
   await appendMessage(env, { churchId, userId, threadId, senderType: "assistant", content: assistantText || "", envelope });
+  timing.persist_assistant_ms = Date.now() - tPersistAssistant0;
 
   const gatewayTotalMs = Date.now() - gatewayT0;
   const agentTiming = (envelope as any)?.data?.debug_timing_ms;
+  // Emit a single structured log line for observability.
+  console.log(
+    JSON.stringify({
+      at: nowIso(),
+      kind: "gateway.chat.timing",
+      churchId,
+      threadId,
+      role,
+      skill,
+      ms: { ...timing, gateway_pre: gatewayPreMs, gateway_total: gatewayTotalMs, agent_debug: agentTiming ?? null },
+    }),
+  );
   return json({
     thread_id: threadId,
     output: envelope,
+    gateway_timing_ms: { ...timing, gateway_pre: gatewayPreMs, gateway_total: gatewayTotalMs },
     timing_ms: agentTiming
       ? { gateway_pre: gatewayPreMs, agent: agentTiming.total_agent ?? null, gateway_total: gatewayTotalMs }
       : { gateway_pre: gatewayPreMs, gateway_total: gatewayTotalMs },
@@ -2877,6 +2966,8 @@ async function handleChatStream(req: Request, env: Env) {
   const encoder = new TextEncoder();
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
+      const gatewayT0 = Date.now();
+      const timing: Record<string, number> = {};
       try {
         const { identity } = parsed.data;
         const churchId = identity.tenant_id;
@@ -2889,11 +2980,14 @@ async function handleChatStream(req: Request, env: Env) {
         // Persist user message now (so refresh shows it immediately)
         const m1 = await appendMessage(env, { churchId, userId, threadId, senderType: "user", content: message });
         if ((m1 as any)?.error) throw new Error(String((m1 as any)?.error ?? "append failed"));
+        timing.persist_user_ms = Date.now() - gatewayT0;
 
         // LangGraph /threads/<id>/runs/stream requires UUID thread ids; map chat thread ids to UUIDs.
         const langgraphThreadId = await getOrCreateLangGraphThreadId(env, { churchId, threadId });
+        timing.map_thread_ms = Date.now() - gatewayT0;
 
         const { personId } = await resolvePerson(env, identity);
+        timing.resolve_person_ms = Date.now() - gatewayT0;
         if (personId) {
           try {
             await syncPersonGroupsAndCommunityToMemory(env, { churchId, personId, actorUserId: userId, actorRole: role, threadId });
@@ -2901,6 +2995,7 @@ async function handleChatStream(req: Request, env: Env) {
             // best-effort
           }
         }
+        timing.sync_membership_ms = Date.now() - gatewayT0;
         const msgLower = String(message ?? "").toLowerCase();
         const wantsNextSteps =
           skill !== "chat" ||
@@ -2909,6 +3004,7 @@ async function handleChatStream(req: Request, env: Env) {
         const [personMemory, hh] = personId
           ? await Promise.all([getPersonMemory(env, { churchId, personId }), getHouseholdSummary(env, { churchId, personId })])
           : [{ memory: null, updatedAt: null }, { householdId: null, summary: "" }];
+        timing.load_memory_household_ms = Date.now() - gatewayT0;
 
         const memCampusIdRaw = (personMemory as any)?.memory?.identity?.campusId;
         const memCampusId = typeof memCampusIdRaw === "string" && /^campus_[a-z0-9_]+$/i.test(memCampusIdRaw.trim()) ? memCampusIdRaw.trim() : null;
@@ -2927,15 +3023,35 @@ async function handleChatStream(req: Request, env: Env) {
         const identityContact = { churchId, campusId: effectiveCampusId, preferredName: memPreferredName || null, email: email || null, phone: phone || null };
 
         const redactedMemory = redactMemoryForRole(role, (personMemory as any).memory);
-        const journeyState = personId
-          ? await ensurePersonJourneyState(env, { churchId, personId, personMemory: (personMemory as any).memory ?? {} })
-          : { currentStageId: null, confidence: 0.5, updatedAt: null };
+        const memUpdatedAt = String((personMemory as any)?.updatedAt ?? "");
+        const journeyStateKey = `${churchId}:${personId || "none"}:${memUpdatedAt}`;
+        let journeyState =
+          personId ? cacheGet(journeyStateCache, journeyStateKey) : { currentStageId: null, confidence: 0.5, updatedAt: null };
+        if (!journeyState) {
+          journeyState = await ensurePersonJourneyState(env, { churchId, personId: personId!, personMemory: (personMemory as any).memory ?? {} });
+          cacheSet(journeyStateCache, journeyStateKey, journeyState, JOURNEY_TTL_MS);
+        }
         const currentStageId = journeyState.currentStageId ?? "stage_seeker";
-        const journeyCurrentStage = personId ? await getJourneyNode(env, { churchId, nodeId: currentStageId }) : null;
-        const journeyNextSteps =
-          wantsNextSteps && personId
-            ? await computeJourneyNextSteps(env, { churchId, personId, currentStageId, limit: 3, personMemory: (personMemory as any).memory ?? {} })
-            : [];
+        let journeyCurrentStage: any = null;
+        if (personId) {
+          const nodeKey = `${churchId}:${currentStageId}`;
+          journeyCurrentStage = cacheGet(journeyNodeCache, nodeKey);
+          if (!journeyCurrentStage) {
+            journeyCurrentStage = await getJourneyNode(env, { churchId, nodeId: currentStageId });
+            cacheSet(journeyNodeCache, nodeKey, journeyCurrentStage, JOURNEY_TTL_MS);
+          }
+        }
+        let journeyNextSteps: any[] = [];
+        if (wantsNextSteps && personId) {
+          const nsKey = `${churchId}:${personId}:${currentStageId}:${memUpdatedAt}:3`;
+          const cached = cacheGet(journeyNextStepsCache, nsKey);
+          if (cached) journeyNextSteps = cached;
+          else {
+            journeyNextSteps = await computeJourneyNextSteps(env, { churchId, personId, currentStageId, limit: 3, personMemory: (personMemory as any).memory ?? {} });
+            cacheSet(journeyNextStepsCache, nsKey, journeyNextSteps, JOURNEY_TTL_MS);
+          }
+        }
+        timing.journey_ms = Date.now() - gatewayT0;
         const inputArgs = parsed.data.args && typeof parsed.data.args === "object" ? (parsed.data.args as Record<string, unknown>) : {};
 
         const session = {
@@ -2949,7 +3065,17 @@ async function handleChatStream(req: Request, env: Env) {
           threadId,
         };
 
-        const weekly = personId ? await getWeeklySermonPlanContext(env, { churchId, campusId: effectiveCampusId, personId }) : null;
+        let weekly: any = null;
+        if (personId) {
+          const today = new Date().toISOString().slice(0, 10);
+          const wkKey = `${churchId}:${effectiveCampusId}:${personId}:${today}`;
+          weekly = cacheGet(weeklyContextCache, wkKey);
+          if (!weekly) {
+            weekly = await getWeeklySermonPlanContext(env, { churchId, campusId: effectiveCampusId, personId });
+            cacheSet(weeklyContextCache, wkKey, weekly, WEEKLY_TTL_MS);
+          }
+        }
+        timing.weekly_ms = Date.now() - gatewayT0;
 
         const inputPayload = {
           skill,
@@ -2969,7 +3095,9 @@ async function handleChatStream(req: Request, env: Env) {
           session,
         } as Record<string, unknown>;
 
+        const tAgent0 = Date.now();
         const lgRes = await runAgentStream(env, { threadId: langgraphThreadId, inputPayload });
+        timing.agent_headers_ms = Date.now() - tAgent0;
         const reader = lgRes.body!.getReader();
         const decoder = new TextDecoder();
         let buf = "";
@@ -3099,8 +3227,27 @@ async function handleChatStream(req: Request, env: Env) {
         }
 
         // Persist assistant message (+ envelope json). Use streamed text if envelope lacks message.
+        const tPersist0 = Date.now();
         const finalText = typeof (envelope as any)?.message === "string" ? String((envelope as any).message) : assistantText;
         await appendMessage(env, { churchId, userId, threadId, senderType: "assistant", content: finalText || "", envelope });
+        timing.persist_assistant_ms = Date.now() - tPersist0;
+        timing.gateway_total_ms = Date.now() - gatewayT0;
+        // Best-effort: log timing for observability.
+        try {
+          console.log(
+            JSON.stringify({
+              at: nowIso(),
+              kind: "gateway.chat_stream.timing",
+              churchId,
+              threadId,
+              role,
+              skill,
+              ms: { ...timing, agent_debug: (envelope as any)?.data?.debug_timing_ms ?? null },
+            }),
+          );
+        } catch {
+          // ignore
+        }
 
         controller.enqueue(encoder.encode(`event: final\ndata: ${JSON.stringify(envelope ?? {})}\n\n`));
         controller.enqueue(encoder.encode(`event: done\ndata: {\"ok\":true}\n\n`));
